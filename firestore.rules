@@ -1,0 +1,156 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global helpers
+    function isSignedIn() { return request.auth != null; }
+    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function isAuthorizedToEdit() { return isAdmin() || isVerified(); }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isAdmin() { 
+      return isSignedIn() && (
+        request.auth.token.email == 'imranzecorp@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId) || isAdmin();
+      
+      function isValidUser(data) {
+        return data.keys().hasAll(['uid', 'email']) &&
+               data.uid is string && data.email is string;
+      }
+    }
+
+    // Admin list
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Inventory
+    match /inventory/{itemId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin() && isValidItem(incoming());
+      allow update: if (isAdmin() && isValidItem(incoming())) || (
+        isVerified() && 
+        isValidItem(incoming()) && 
+        incoming().diff(existing()).affectedKeys().hasOnly(['currentQuantity', 'lastUpdated', 'jobNumber', 'client', 'outlet', 'location'])
+      );
+      allow delete: if isAdmin();
+
+      function isValidItem(data) {
+        return data.name is string && data.name.size() > 0 && 
+               data.sku is string && data.currentQuantity is number &&
+               (data.get('jobNumber', '') is string) &&
+               (data.get('client', '') is string) &&
+               (data.get('outlet', '') is string) &&
+               (data.get('location', '') is string) &&
+               (data.get('brand', '') is string) &&
+               (data.get('modelNumber', '') is string) &&
+               (data.get('supplier', '') is string) &&
+               (data.get('description', '') is string) &&
+               (data.get('imageUrl', '') is string) &&
+               (data.get('minStock', 0) is number) &&
+               (data.get('stockInDate', 0) is number) &&
+               (data.get('inventoryType', 'Warehouse Stock') is string);
+      }
+    }
+
+    // Social Posts
+    match /posts/{postId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidPost(incoming());
+      allow update: if isSignedIn() && (isOwner(existing().authorId) || isAdmin()) && isValidPost(incoming());
+      allow delete: if isSignedIn() && (isOwner(existing().authorId) || isAdmin());
+
+      function isValidPost(data) {
+        return data.authorId == request.auth.uid && data.content is string && data.content.size() < 2000;
+      }
+
+      match /comments/{commentId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && isValidComment(incoming());
+        allow delete: if isSignedIn() && (isOwner(existing().authorId) || isAdmin());
+
+        function isValidComment(data) {
+          return data.postId == postId && data.authorId == request.auth.uid && data.content is string;
+        }
+      }
+    }
+
+    // Notifications
+    match /notifications/{notificationId} {
+      allow read: if isOwner(existing().userId) || (existing().get('isPublic', false) == true);
+      allow create: if isSignedIn();
+      allow update: if (isOwner(existing().userId) || isAdmin()) && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+      allow delete: if isOwner(existing().userId) || isAdmin();
+    }
+
+    // Chats
+    match /chats/{chatId}/messages/{messageId} {
+      allow read: if isSignedIn() && (chatId.contains(request.auth.uid) || isAdmin());
+      allow create: if isSignedIn() && (incoming().senderId == request.auth.uid);
+    }
+
+    // Activity Logs
+    match /activity_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+    }
+
+    // Transactions Log
+    match /transactions_log/{txId} {
+      allow read: if isSignedIn();
+      allow create: if isAuthorizedToEdit() && isValidTransactionLog(incoming());
+      allow update, delete: if isAdmin();
+
+      function isValidTransactionLog(data) {
+        return data.itemId is string && data.type in ['IN', 'OUT'] &&
+               data.quantity is number && data.userId == request.auth.uid &&
+               (data.get('jobNumber', '') is string) &&
+               (data.get('location', '') is string) &&
+               (data.get('outlet', '') is string) &&
+               (data.get('inventoryType', 'Warehouse Stock') is string);
+      }
+    }
+
+    // Projects
+    match /projects/{projectId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidProject(incoming());
+      allow update: if isSignedIn() && (isOwner(existing().userId) || isAdmin()) && isValidProject(incoming());
+      allow delete: if isAdmin() || (isSignedIn() && isOwner(existing().userId));
+
+      function isValidProject(data) {
+        return data.client is string && data.jobNumber is string &&
+               data.userId == request.auth.uid &&
+               data.items is list &&
+               (data.get('location', '') is string) &&
+               (data.get('totalQuantityIn', 0) is number) &&
+               (data.get('totalQuantityOut', 0) is number);
+      }
+    }
+
+    // Clients
+    match /clients/{clientId} {
+      allow read: if isSignedIn();
+      allow create, update: if isAdmin() && isValidClient(incoming());
+      allow delete: if isAdmin();
+
+      function isValidClient(data) {
+        return data.name is string && data.name.size() > 0;
+      }
+    }
+  }
+}

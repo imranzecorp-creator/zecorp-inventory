@@ -1,0 +1,8 @@
+{
+  "name": "ZECORP INVENTORY MANAGEMENT ",
+  "description": "A comprehensive inventory management system with real-time stock tracking, data analytics, social collaboration, and AI-powered assistance.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": []
+}

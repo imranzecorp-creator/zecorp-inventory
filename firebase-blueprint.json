@@ -1,0 +1,212 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "InventoryItem": {
+      "title": "Inventory Item",
+      "description": "A product or item in the inventory",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "sku": { "type": "string" },
+        "description": { "type": "string" },
+        "location": { "type": "string" },
+        "currentQuantity": { "type": "number" },
+        "minStock": { "type": "number" },
+        "imageUrl": { "type": "string" },
+        "lastUpdated": { "type": "string", "format": "date-time" },
+        "jobNumber": { "type": "string" },
+        "client": { "type": "string" },
+        "stockInDate": { "type": "string", "format": "date-time" },
+        "brand": { "type": "string" },
+        "modelNumber": { "type": "string" },
+        "supplier": { "type": "string" },
+        "outlet": { "type": "string" },
+        "inventoryType": { "type": "string", "enum": ["Warehouse Stock", "Client Stock"] }
+      },
+      "required": ["name", "sku", "currentQuantity"]
+    },
+    "StockTransaction": {
+      "title": "Stock Transaction",
+      "description": "A record of stock moving in or out",
+      "type": "object",
+      "properties": {
+        "itemId": { "type": "string" },
+        "type": { "type": "string", "enum": ["IN", "OUT"] },
+        "quantity": { "type": "number" },
+        "client": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "userId": { "type": "string" },
+        "notes": { "type": "string" },
+        "jobNumber": { "type": "string" },
+        "outlet": { "type": "string" },
+        "inventoryType": { "type": "string", "enum": ["Warehouse Stock", "Client Stock"] }
+      },
+      "required": ["itemId", "type", "quantity", "date", "userId"]
+    },
+    "Post": {
+      "title": "Post",
+      "description": "A social post created by a user",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "content": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "likes": { "type": "number" }
+      },
+      "required": ["authorId", "content", "createdAt"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "A comment on a post",
+      "type": "object",
+      "properties": {
+        "postId": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["postId", "authorId", "content", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "A system or user notification",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string" },
+        "message": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "message", "createdAt"]
+    },
+    "ChatMessage": {
+      "title": "Chat Message",
+      "description": "A message in a chat conversation",
+      "type": "object",
+      "properties": {
+        "senderId": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "content": { "type": "string" },
+        "isAi": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["senderId", "content", "createdAt"]
+    },
+    "ActivityLog": {
+      "title": "Activity Log",
+      "description": "A log of user actions",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "action", "createdAt"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "A project involving multiple inventory items",
+      "type": "object",
+      "properties": {
+        "client": { "type": "string" },
+        "jobNumber": { "type": "string" },
+        "outlet": { "type": "string" },
+        "location": { "type": "string" },
+        "totalQuantityIn": { "type": "number" },
+        "totalQuantityOut": { "type": "number" },
+        "status": { "type": "string", "enum": ["Active", "Completed", "Draft"] },
+        "items": { 
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "inventoryItemId": { "type": "string" },
+              "name": { "type": "string" },
+              "brand": { "type": "string" },
+              "model": { "type": "string" },
+              "quantity": { "type": "number" },
+              "supplier": { "type": "string" },
+              "location": { "type": "string" },
+              "quantityIn": { "type": "number" },
+              "quantityOut": { "type": "number" }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "userId": { "type": "string" }
+      },
+      "required": ["client", "jobNumber", "userId"]
+    },
+    "Client": {
+      "title": "Client Option",
+      "description": "Predefined client name option for dropdowns",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["name"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/inventory/{itemId}": {
+      "schema": "InventoryItem",
+      "description": "Inventory items"
+    },
+    "/transactions_log/{txId}": {
+      "schema": "StockTransaction",
+      "description": "Global activity logs for all items"
+    },
+    "/posts/{postId}": {
+      "schema": "Post",
+      "description": "Social feed posts"
+    },
+    "/posts/{postId}/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "Comments on posts"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "App notifications"
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Chat messages (could be private or AI)"
+    },
+    "/activity_logs/{logId}": {
+      "schema": "ActivityLog",
+      "description": "User activity tracking"
+    },
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "Job/Project records"
+    },
+    "/clients/{clientId}": {
+      "schema": "Client",
+      "description": "Predefined client names"
+    }
+  }
+}
