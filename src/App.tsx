@@ -278,7 +278,7 @@ export default function App() {
               <Dashboard items={items} transactions={transactions} projects={projects} user={user} />
             )}
             {activeTab === 'inventory' && (
-              <InventoryList items={items} clients={clients} user={user} />
+              <InventoryList items={items} clients={clients} user={user} projects={projects} />
             )}
             {activeTab === 'projects' && (
               <Projects projects={projects} inventory={items} clients={clients} user={user} />

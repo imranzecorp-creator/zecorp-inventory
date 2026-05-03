@@ -19,6 +19,7 @@ import {
   Square,
   Zap,
   Building,
+  User,
   ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -32,7 +33,7 @@ import {
   increment
 } from 'firebase/firestore';
 import { db, OperationType, handleFirestoreError, auth } from '../lib/firebase';
-import { InventoryItem, UserProfile } from '../types';
+import { InventoryItem, UserProfile, Project } from '../types';
 import { cn, formatDate } from '../lib/utils';
 import { generateInventoryReport } from '../services/pdfService';
 import { suggestItemDetails, processAiSearch } from '../services/geminiService';
@@ -43,9 +44,10 @@ interface InventoryListProps {
   items: InventoryItem[];
   clients: any[];
   user: UserProfile;
+  projects: Project[];
 }
 
-export default function InventoryList({ items, clients, user }: InventoryListProps) {
+export default function InventoryList({ items, clients, user, projects }: InventoryListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAiSearching, setIsAiSearching] = useState(false);
   const [aiFilteredIds, setAiFilteredIds] = useState<string[] | null>(null);
@@ -69,6 +71,10 @@ export default function InventoryList({ items, clients, user }: InventoryListPro
   const [jobFilter, setJobFilter] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
   const [inventoryTypeFilter, setInventoryTypeFilter] = useState<'Warehouse Stock' | 'Client Stock' | ''>('');
+  const [stockInStart, setStockInStart] = useState('');
+  const [stockInEnd, setStockInEnd] = useState('');
+  const [updatedStart, setUpdatedStart] = useState('');
+  const [updatedEnd, setUpdatedEnd] = useState('');
 
   const isAdmin = user.role === 'admin';
   const canUpdateStock = isAdmin || auth.currentUser?.emailVerified;
@@ -97,6 +103,10 @@ export default function InventoryList({ items, clients, user }: InventoryListPro
     setJobFilter('');
     setLocationFilter('');
     setInventoryTypeFilter('');
+    setStockInStart('');
+    setStockInEnd('');
+    setUpdatedStart('');
+    setUpdatedEnd('');
   };
 
   const uniqueValues = useMemo(() => {
@@ -143,9 +153,23 @@ export default function InventoryList({ items, clients, user }: InventoryListPro
       if (locationFilter && !item.location?.toLowerCase().includes(locationLow)) return false;
       if (inventoryTypeFilter && item.inventoryType !== inventoryTypeFilter) return false;
 
+      // Date Range Filters
+      if (stockInStart) {
+        if (!item.stockInDate || item.stockInDate < new Date(stockInStart).getTime()) return false;
+      }
+      if (stockInEnd) {
+        if (!item.stockInDate || item.stockInDate > new Date(stockInEnd).setHours(23, 59, 59, 999)) return false;
+      }
+      if (updatedStart) {
+        if (!item.lastUpdated || item.lastUpdated < new Date(updatedStart).getTime()) return false;
+      }
+      if (updatedEnd) {
+        if (!item.lastUpdated || item.lastUpdated > new Date(updatedEnd).setHours(23, 59, 59, 999)) return false;
+      }
+
       return true;
     });
-  }, [items, searchTerm, aiFilteredIds, selectedBrands, selectedModels, selectedSuppliers, selectedOutlets, clientFilter, jobFilter, locationFilter, inventoryTypeFilter]);
+  }, [items, searchTerm, aiFilteredIds, selectedBrands, selectedModels, selectedSuppliers, selectedOutlets, clientFilter, jobFilter, locationFilter, inventoryTypeFilter, stockInStart, stockInEnd, updatedStart, updatedEnd]);
 
   const toggleSelectAll = () => {
     if (selectedIds.length === filteredItems.length) {
@@ -286,9 +310,9 @@ export default function InventoryList({ items, clients, user }: InventoryListPro
                 : "bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10"
             )}
           >
-            <Filter className={cn("w-4 h-4", (selectedBrands.length > 0 || selectedModels.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || clientFilter || jobFilter || locationFilter) && "text-primary animate-pulse")} />
+            <Filter className={cn("w-4 h-4", (selectedBrands.length > 0 || selectedModels.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || clientFilter || jobFilter || locationFilter || stockInStart || stockInEnd || updatedStart || updatedEnd) && "text-primary animate-pulse")} />
             <span className="text-sm font-medium">Advanced</span>
-            {(selectedBrands.length > 0 || selectedModels.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || clientFilter || jobFilter || locationFilter) && (
+            {(selectedBrands.length > 0 || selectedModels.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || clientFilter || jobFilter || locationFilter || stockInStart || stockInEnd || updatedStart || updatedEnd) && (
               <div className="w-1.5 h-1.5 rounded-full bg-primary" />
             )}
           </motion.button>
@@ -368,13 +392,51 @@ export default function InventoryList({ items, clients, user }: InventoryListPro
 
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Wh. Location</label>
+                  <input 
+                    type="text"
+                    value={locationFilter}
+                    onChange={(e) => setLocationFilter(e.target.value)}
+                    placeholder="Location..."
+                    className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
+                  />
+                </div>
+
+                {/* Date Filters Row */}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Stock In (From)</label>
+                  <input 
+                    type="date"
+                    value={stockInStart}
+                    onChange={(e) => setStockInStart(e.target.value)}
+                    className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:ring-2 focus:ring-primary/20 outline-none"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Stock In (To)</label>
+                  <input 
+                    type="date"
+                    value={stockInEnd}
+                    onChange={(e) => setStockInEnd(e.target.value)}
+                    className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:ring-2 focus:ring-primary/20 outline-none"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Updated (From)</label>
+                  <input 
+                    type="date"
+                    value={updatedStart}
+                    onChange={(e) => setUpdatedStart(e.target.value)}
+                    className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:ring-2 focus:ring-primary/20 outline-none"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Updated (To)</label>
                   <div className="flex space-x-2">
                     <input 
-                      type="text"
-                      value={locationFilter}
-                      onChange={(e) => setLocationFilter(e.target.value)}
-                      placeholder="Location..."
-                      className="flex-1 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
+                      type="date"
+                      value={updatedEnd}
+                      onChange={(e) => setUpdatedEnd(e.target.value)}
+                      className="flex-1 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:ring-2 focus:ring-primary/20 outline-none"
                     />
                     <button 
                       onClick={clearSearch}
@@ -392,7 +454,7 @@ export default function InventoryList({ items, clients, user }: InventoryListPro
                     Matching Results: <span className="text-primary">{filteredItems.length}</span>
                   </p>
                 </div>
-                { (selectedBrands.length > 0 || selectedModels.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || clientFilter || jobFilter || locationFilter) && (
+                { (selectedBrands.length > 0 || selectedModels.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || clientFilter || jobFilter || locationFilter || stockInStart || stockInEnd || updatedStart || updatedEnd) && (
                   <button 
                     onClick={clearSearch}
                     className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
@@ -896,6 +958,7 @@ export default function InventoryList({ items, clients, user }: InventoryListPro
           <BulkUpdateModal 
             items={items.filter(i => selectedIds.includes(i.id))}
             clients={clients}
+            projects={projects}
             onClose={() => { setShowBulkModal(false); setSelectedIds([]); }}
             user={user}
           />
@@ -914,11 +977,14 @@ export default function InventoryList({ items, clients, user }: InventoryListPro
   );
 }
 
-function BulkUpdateModal({ items, clients, onClose, user }: { items: InventoryItem[], clients: any[], onClose: () => void, user: UserProfile }) {
+function BulkUpdateModal({ items, clients, projects, onClose, user }: { items: InventoryItem[], clients: any[], projects: Project[], onClose: () => void, user: UserProfile }) {
   const [stockAction, setStockAction] = useState<'IN' | 'OUT' | null>(null);
-  const [qty, setQty] = useState(1);
+  const [globalQty, setGlobalQty] = useState(1);
+  const [individualQtys, setIndividualQtys] = useState<Record<string, number>>({});
   const [client, setClient] = useState('');
   const [showClientSuggestions, setShowClientSuggestions] = useState(false);
+  const [showProjectSuggestions, setShowProjectSuggestions] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [jobNumber, setJobNumber] = useState('');
   const [outlet, setOutlet] = useState('');
   const [location, setLocation] = useState('');
@@ -931,6 +997,22 @@ function BulkUpdateModal({ items, clients, onClose, user }: { items: InventoryIt
     return clients.filter(c => c.name.toLowerCase().includes(client.toLowerCase()));
   }, [clients, client]);
 
+  const filteredProjects = useMemo(() => {
+    if (!jobNumber.trim()) return projects.slice(0, 5);
+    return projects.filter(p => 
+      p.jobNumber.toLowerCase().includes(jobNumber.toLowerCase()) ||
+      p.client.toLowerCase().includes(jobNumber.toLowerCase())
+    ).slice(0, 8);
+  }, [projects, jobNumber]);
+
+  const handleProjectSelect = (p: Project) => {
+    setJobNumber(p.jobNumber);
+    setClient(p.client);
+    setOutlet(p.outlet);
+    setSelectedProjectId(p.id);
+    setShowProjectSuggestions(false);
+  };
+
   const isAuthorized = user.role === 'admin' || auth.currentUser?.emailVerified;
 
   if (!isAuthorized) return null;
@@ -941,8 +1023,9 @@ function BulkUpdateModal({ items, clients, onClose, user }: { items: InventoryIt
     try {
       const timestamp = new Date(transactionDate).getTime();
       
-      // Perform updates sequentially or in batches. Since this is client-side, we'll do promise.all
       await Promise.all(items.map(async (item) => {
+          const itemQty = individualQtys[item.id] || globalQty;
+          
           const tx: any = {
             itemId: item.id,
             itemName: item.name,
@@ -950,7 +1033,7 @@ function BulkUpdateModal({ items, clients, onClose, user }: { items: InventoryIt
             brand: item.brand,
             modelNumber: item.modelNumber,
             type: stockAction,
-            quantity: qty,
+            quantity: itemQty,
             client: client,
             jobNumber: jobNumber,
             outlet: outlet,
@@ -963,14 +1046,14 @@ function BulkUpdateModal({ items, clients, onClose, user }: { items: InventoryIt
             isBulk: true
           };
 
-          const newQuantity = item.currentQuantity + (stockAction === 'IN' ? qty : -qty);
+          const newQuantity = item.currentQuantity + (stockAction === 'IN' ? itemQty : -itemQty);
 
           // 1. Log transaction
           await addDoc(collection(db, 'transactions_log'), tx);
 
           // 2. Update stock
           await updateDoc(doc(db, 'inventory', item.id), {
-            currentQuantity: increment(stockAction === 'IN' ? qty : -qty),
+            currentQuantity: increment(stockAction === 'IN' ? itemQty : -itemQty),
             lastUpdated: Date.now(),
             jobNumber: jobNumber || item.jobNumber,
             client: stockAction === 'IN' ? (client || item.client) : item.client,
@@ -1024,204 +1107,266 @@ function BulkUpdateModal({ items, clients, onClose, user }: { items: InventoryIt
         initial={{ opacity: 0, scale: 0.9, y: 40 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 40 }}
-        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-2xl glass-morphism rounded-[40px] shadow-2xl z-[71] overflow-hidden border border-white/10"
+        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-4xl glass-morphism rounded-[40px] shadow-2xl z-[71] overflow-hidden border border-white/10 flex flex-col max-h-[90vh]"
       >
-        <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/[0.03]">
+        <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/[0.03] shrink-0">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-2xl bg-primary text-white flex items-center justify-center">
               <Zap className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-xl font-display font-bold text-white tracking-tight">Bulk Stock Update</h2>
-              <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Processing {items.length} items simultaneously</p>
+              <h2 className="text-xl font-display font-bold text-white tracking-tight">Bulk Stock Adjustment</h2>
+              <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Adjusting {items.length} items</p>
             </div>
           </div>
           <button 
             onClick={onClose} 
             className="p-3 hover:bg-white/10 rounded-2xl transition-all text-slate-400 hover:text-white group"
           >
-            <motion.div
-              whileHover={{ rotate: 90, scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-            >
-              <X className="w-5 h-5" />
-            </motion.div>
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-10 space-y-8">
-          <div className="bg-white/5 rounded-3xl p-6 border border-white/5 max-h-32 overflow-y-auto custom-scrollbar">
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Items in scope</p>
-            <div className="flex flex-wrap gap-2">
+        <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
+          {/* Item List with Quantities */}
+          <div className="space-y-4">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Selected Items & Quantities</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {items.map(item => (
-                <span key={item.id} className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-lg border border-primary/20">
-                  {item.name}
-                </span>
+                <div key={item.id} className="p-4 bg-white/[0.03] rounded-2xl border border-white/5 flex items-center justify-between group hover:border-primary/30 transition-all">
+                  <div className="flex items-center space-x-3 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
+                      {item.imageUrl ? (
+                        <img src={item.imageUrl} alt="" className="w-full h-full object-cover rounded-lg" />
+                      ) : (
+                        <Package className="w-4 h-4 text-slate-500" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-white truncate">{item.name}</p>
+                      <p className="text-[10px] text-slate-500 font-mono uppercase">Stock: {item.currentQuantity}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="relative">
+                      <input 
+                        type="number"
+                        min="1"
+                        className="w-16 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-center text-sm font-black text-primary outline-none focus:border-primary transition-all"
+                        value={individualQtys[item.id] || globalQty}
+                        onChange={(e) => setIndividualQtys(prev => ({ ...prev, [item.id]: Math.max(1, parseInt(e.target.value) || 1) }))}
+                      />
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <button 
-              onClick={() => setStockAction('IN')}
-              className={cn(
-                "py-4 font-black uppercase tracking-widest rounded-2xl transition-all active:scale-95 border",
-                stockAction === 'IN' 
-                  ? "bg-green-500 text-white border-green-400 shadow-lg shadow-green-500/30" 
-                  : "bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20"
-              )}
-            >
-              Bulk Receiving
-            </button>
-            <button 
-              onClick={() => setStockAction('OUT')}
-              className={cn(
-                "py-4 font-black uppercase tracking-widest rounded-2xl transition-all active:scale-95 border",
-                stockAction === 'OUT' 
-                  ? "bg-red-500 text-white border-red-400 shadow-lg shadow-red-500/30" 
-                  : "bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20"
-              )}
-            >
-              Bulk Distributing
-            </button>
-          </div>
-
-          <AnimatePresence>
-            {stockAction && (
-              <motion.div 
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className="space-y-6"
-              >
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Transaction Type</label>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Transaction Date</label>
-                    <input 
-                      type="date" 
-                      value={transactionDate} 
-                      onChange={(e) => setTransactionDate(e.target.value)}
-                      className="w-full px-5 py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Quantity per item</label>
-                    <input 
-                      type="number" 
-                      min="1" 
-                      value={qty} 
-                      onChange={(e) => setQty(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-full px-5 py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                    />
-                  </div>
+                  <button 
+                    onClick={() => setStockAction('IN')}
+                    className={cn(
+                      "py-4 font-black uppercase tracking-widest rounded-2xl transition-all active:scale-95 border",
+                      stockAction === 'IN' 
+                        ? "bg-green-500 text-white border-green-400 shadow-lg shadow-green-500/30" 
+                        : "bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20"
+                    )}
+                  >
+                    Stock IN
+                  </button>
+                  <button 
+                    onClick={() => setStockAction('OUT')}
+                    className={cn(
+                      "py-4 font-black uppercase tracking-widest rounded-2xl transition-all active:scale-95 border",
+                      stockAction === 'OUT' 
+                        ? "bg-red-500 text-white border-red-400 shadow-lg shadow-red-500/30" 
+                        : "bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20"
+                    )}
+                  >
+                    Stock OUT
+                  </button>
                 </div>
+              </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Job Number</label>
-                    <input 
-                      type="text" 
-                      value={jobNumber} 
-                      onChange={(e) => setJobNumber(e.target.value)}
-                      placeholder="#BULK-123"
-                      className="w-full px-5 py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold placeholder:text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Client Outlet</label>
-                    <input 
-                      type="text" 
-                      value={outlet} 
-                      onChange={(e) => setOutlet(e.target.value)}
-                      placeholder="Target outlet..."
-                      className="w-full px-5 py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold placeholder:text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Warehouse Location</label>
-                    <input 
-                      type="text" 
-                      value={location} 
-                      onChange={(e) => setLocation(e.target.value)}
-                      placeholder="Location..."
-                      className="w-full px-5 py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold placeholder:text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                    />
-                  </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Global Quantity</label>
+                  <input 
+                    type="number" 
+                    min="1" 
+                    value={globalQty} 
+                    onChange={(e) => setGlobalQty(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full px-5 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                  />
                 </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Date</label>
+                  <input 
+                    type="date" 
+                    value={transactionDate} 
+                    onChange={(e) => setTransactionDate(e.target.value)}
+                    className="w-full px-5 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-mono"
+                  />
+                </div>
+              </div>
 
-                <div className="space-y-2 relative">
-                  <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Client / Universal Source</label>
+              <div className="space-y-2 relative">
+                <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Reference Project / Job #</label>
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
                   <input 
                     type="text" 
-                    value={client} 
+                    value={jobNumber} 
                     onChange={(e) => {
-                      setClient(e.target.value);
-                      setShowClientSuggestions(true);
+                      setJobNumber(e.target.value);
+                      setShowProjectSuggestions(true);
                     }}
-                    onFocus={() => setShowClientSuggestions(true)}
-                    placeholder="Shared client name..."
-                    className="w-full px-5 py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold placeholder:text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-mono"
+                    onFocus={() => setShowProjectSuggestions(true)}
+                    placeholder="Search active projects..."
+                    className="w-full pl-12 pr-5 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                   />
-                  <AnimatePresence>
-                    {showClientSuggestions && filteredClients.length > 0 && (
-                      <motion.div 
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="absolute bottom-full left-0 right-0 mb-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden"
-                      >
-                        <div className="max-h-48 overflow-y-auto custom-scrollbar">
-                          {filteredClients.map((c) => (
-                            <button
-                              key={c.id}
-                              type="button"
-                              onClick={() => {
-                                setClient(c.name);
-                                setShowClientSuggestions(false);
-                              }}
-                              className="w-full px-6 py-4 flex items-center space-x-3 hover:bg-white/5 transition-colors text-left border-b border-white/[0.02] last:border-0"
-                            >
+                </div>
+                <AnimatePresence>
+                  {showProjectSuggestions && filteredProjects.length > 0 && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden"
+                    >
+                      <div className="max-h-48 overflow-y-auto custom-scrollbar">
+                        {filteredProjects.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => handleProjectSelect(p)}
+                            className="w-full px-6 py-4 flex items-center justify-between hover:bg-white/5 transition-colors text-left border-b border-white/[0.02] last:border-0"
+                          >
+                            <div className="flex items-center space-x-3">
                               <Building className="w-4 h-4 text-primary" />
-                              <span className="text-sm font-bold text-white">{c.name}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                              <div>
+                                <p className="text-sm font-bold text-white">{p.jobNumber}</p>
+                                <p className="text-[10px] text-slate-500 uppercase tracking-widest">{p.client}</p>
+                              </div>
+                            </div>
+                            <span className={cn(
+                              "text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded",
+                              p.status === 'Active' ? 'bg-green-500/10 text-green-500' : 'bg-slate-500/10 text-slate-500'
+                            )}>{p.status}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
 
+            <div className="space-y-6">
+              <div className="space-y-2 relative">
+                <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Client Name</label>
+                <input 
+                  type="text" 
+                  value={client} 
+                  onChange={(e) => {
+                    setClient(e.target.value);
+                    setShowClientSuggestions(true);
+                  }}
+                  onFocus={() => setShowClientSuggestions(true)}
+                  placeholder="Client name..."
+                  className="w-full px-5 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                />
+                <AnimatePresence>
+                  {showClientSuggestions && filteredClients.length > 0 && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden"
+                    >
+                      <div className="max-h-48 overflow-y-auto custom-scrollbar">
+                        {filteredClients.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => {
+                              setClient(c.name);
+                              setShowClientSuggestions(false);
+                            }}
+                            className="w-full px-6 py-4 flex items-center space-x-3 hover:bg-white/5 transition-colors text-left border-b border-white/[0.02] last:border-0"
+                          >
+                            <User className="w-4 h-4 text-primary" />
+                            <span className="text-sm font-bold text-white">{c.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Bulk Transaction Notes</label>
-                  <textarea 
-                    value={notes} 
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Applied to all selected items..."
-                    rows={2}
-                    className="w-full px-5 py-4 rounded-2xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all resize-none"
+                  <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Outlet</label>
+                  <input 
+                    type="text" 
+                    value={outlet} 
+                    onChange={(e) => setOutlet(e.target.value)}
+                    placeholder="Outlet..."
+                    className="w-full px-5 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-mono"
                   />
                 </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Location Override</label>
+                  <input 
+                    type="text" 
+                    value={location} 
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="New location..."
+                    className="w-full px-5 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-mono"
+                  />
+                </div>
+              </div>
 
-                <button 
-                  onClick={handleBulkUpdate}
-                  disabled={processing}
-                  className={cn(
-                    "w-full py-5 text-white font-black uppercase tracking-widest rounded-2xl shadow-2xl transition-all active:scale-95 flex items-center justify-center space-x-3",
-                    stockAction === 'IN' ? 'bg-green-600 hover:bg-green-500' : 'bg-red-600 hover:bg-red-500',
-                    processing && "opacity-50 cursor-not-allowed"
-                  )}
-                >
-                  {processing ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <>
-                      <Zap className="w-5 h-5" />
-                      <span>Execute Bulk Transaction</span>
-                    </>
-                  )}
-                </button>
-              </motion.div>
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Transaction Notes</label>
+                <textarea 
+                  value={notes} 
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Notes for this batch update..."
+                  rows={2}
+                  className="w-full px-5 py-4 rounded-2xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all resize-none"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-8 border-t border-white/5 bg-white/[0.03] shrink-0">
+          <button 
+            onClick={handleBulkUpdate}
+            disabled={processing || !stockAction}
+            className={cn(
+              "w-full py-5 text-white font-black uppercase tracking-widest rounded-3xl shadow-2xl transition-all active:scale-95 flex items-center justify-center space-x-3",
+              stockAction === 'IN' ? 'bg-green-600 hover:bg-green-500 shadow-green-500/20' : 
+              stockAction === 'OUT' ? 'bg-red-600 hover:bg-red-500 shadow-red-500/20' : 'bg-slate-700',
+              processing && "opacity-50 cursor-not-allowed"
             )}
-          </AnimatePresence>
+          >
+            {processing ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <>
+                <Zap className="w-5 h-5" />
+                <span>Execute Batch Adjustment</span>
+              </>
+            )}
+          </button>
         </div>
       </motion.div>
     </>
