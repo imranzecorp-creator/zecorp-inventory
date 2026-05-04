@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { 
   Plus, 
   Search, 
   MoreVertical, 
   Edit, 
   Trash, 
+  RotateCcw,
   AlertCircle, 
   MapPin, 
   Filter,
@@ -20,7 +21,9 @@ import {
   Zap,
   Building,
   User,
-  ChevronDown
+  Warehouse,
+  ChevronDown,
+  Hash
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -30,7 +33,11 @@ import {
   deleteDoc, 
   doc, 
   serverTimestamp,
-  increment
+  increment,
+  getDocs,
+  query,
+  where,
+  writeBatch
 } from 'firebase/firestore';
 import { db, OperationType, handleFirestoreError, auth } from '../lib/firebase';
 import { InventoryItem, UserProfile, Project } from '../types';
@@ -76,10 +83,16 @@ export default function InventoryList({ items, clients, user, projects }: Invent
   const [updatedStart, setUpdatedStart] = useState('');
   const [updatedEnd, setUpdatedEnd] = useState('');
 
-  const isAdmin = user.role === 'admin';
-  const canUpdateStock = isAdmin || auth.currentUser?.emailVerified;
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null);
+  const [inventoryError, setInventoryError] = useState<string | null>(null);
 
-  const handleAiSearch = async () => {
+  const isAdmin = user.role === 'admin' || user.email.toLowerCase() === 'imranzecorp@gmail.com';
+  const isApproved = user.isApproved || isAdmin;
+  const canUpdateStock = isApproved;
+
+  const handleAiSearch = useCallback(async () => {
     if (!searchTerm.trim()) return;
     setIsAiSearching(true);
     try {
@@ -90,9 +103,9 @@ export default function InventoryList({ items, clients, user, projects }: Invent
     } finally {
       setIsAiSearching(false);
     }
-  };
+  }, [searchTerm, items]);
 
-  const clearSearch = () => {
+  const clearSearch = useCallback(() => {
     setSearchTerm('');
     setAiFilteredIds(null);
     setSelectedBrands([]);
@@ -107,14 +120,14 @@ export default function InventoryList({ items, clients, user, projects }: Invent
     setStockInEnd('');
     setUpdatedStart('');
     setUpdatedEnd('');
-  };
+  }, []);
 
   const uniqueValues = useMemo(() => {
     return {
       brands: Array.from(new Set(items.map(i => i.brand).filter(Boolean))) as string[],
       models: Array.from(new Set(items.map(i => i.modelNumber).filter(Boolean))) as string[],
       suppliers: Array.from(new Set(items.map(i => i.supplier).filter(Boolean))) as string[],
-      outlets: Array.from(new Set(items.map(i => i.outlet).filter(Boolean))) as string[],
+      projects: Array.from(new Set(items.map(i => i.outlet).filter(Boolean))) as string[],
     };
   }, [items]);
 
@@ -129,7 +142,6 @@ export default function InventoryList({ items, clients, user, projects }: Invent
       // Basic Search
       const matchesSearch = 
         item.name.toLowerCase().includes(searchLow) ||
-        item.sku?.toLowerCase().includes(searchLow) ||
         item.location.toLowerCase().includes(searchLow) ||
         (item.brand && item.brand.toLowerCase().includes(searchLow)) ||
         (item.modelNumber && item.modelNumber.toLowerCase().includes(searchLow)) ||
@@ -189,13 +201,128 @@ export default function InventoryList({ items, clients, user, projects }: Invent
     setExpandedId(expandedId === id ? null : id);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this item?')) {
-      try {
-        await deleteDoc(doc(db, 'inventory', id));
-      } catch (err) {
-        handleFirestoreError(err, OperationType.DELETE, `inventory/${id}`);
+  const handleDelete = async (item: InventoryItem) => {
+    if (!item?.id || deletingId) return;
+    
+    setDeletingId(item.id);
+    setInventoryError(null);
+    try {
+      console.log(`Starting deletion for item: ${item.id} (${item.name})`);
+      let totalOps = 0;
+      let batch = writeBatch(db);
+
+      const commitBatch = async () => {
+        if (totalOps > 0) {
+          await batch.commit();
+          batch = writeBatch(db);
+          totalOps = 0;
+        }
+      };
+      
+      // 1. Fetch transactions for this item
+      const txQuery = query(collection(db, 'transactions_log'), where('itemId', '==', item.id));
+      const txSnapshot = await getDocs(txQuery);
+      
+      for (const txDoc of txSnapshot.docs) {
+        batch.delete(txDoc.ref);
+        totalOps++;
+        if (totalOps >= 450) await commitBatch();
       }
+      
+      // 2. Delete the item
+      batch.delete(doc(db, 'inventory', item.id));
+      totalOps++;
+      
+      // 3. Commit remaining
+      await commitBatch();
+
+      // Cleanup local state
+      if (expandedId === item.id) setExpandedId(null);
+      if (selectedItem?.id === item.id) setSelectedItem(null);
+      setSelectedIds(prev => prev.filter(i => i !== item.id));
+      setItemToDelete(null);
+
+      // 4. Activity Log (Non-blocking)
+      addDoc(collection(db, 'activity_logs'), {
+        userId: user.uid,
+        action: 'DELETE_ITEM',
+        details: `Deleted item: ${item.name} and ${txSnapshot.size} transactions`,
+        createdAt: serverTimestamp()
+      }).catch(e => console.warn('Logging failed:', e));
+      
+    } catch (err) {
+      console.error('Delete operation failed:', err);
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setInventoryError(`Delete failed: ${msg}`);
+      handleFirestoreError(err, OperationType.DELETE, `inventory/${item.id}`);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0 || isDeleting) return;
+    
+    setIsDeleting(true);
+    setInventoryError(null);
+    try {
+      // Process in smaller chunks to be safe with Firestore limits and memory
+      const itemChunks = [];
+      for (let i = 0; i < selectedIds.length; i += 10) {
+        itemChunks.push(selectedIds.slice(i, i + 10));
+      }
+
+      for (const itemChunk of itemChunks) {
+        let totalOps = 0;
+        let batch = writeBatch(db);
+
+        const commitBatch = async () => {
+          if (totalOps > 0) {
+            await batch.commit();
+            batch = writeBatch(db);
+            totalOps = 0;
+          }
+        };
+
+        // For each item in this chunk, mark it and its transactions for deletion
+        for (const id of itemChunk) {
+          // Find transactions
+          const txQuery = query(collection(db, 'transactions_log'), where('itemId', '==', id));
+          const txSnapshot = await getDocs(txQuery);
+          
+          for (const txDoc of txSnapshot.docs) {
+            batch.delete(txDoc.ref);
+            totalOps++;
+            if (totalOps >= 450) await commitBatch();
+          }
+
+          // Mark item
+          batch.delete(doc(db, 'inventory', id));
+          totalOps++;
+          if (totalOps >= 450) await commitBatch();
+        }
+
+        // Finish this chunk
+        await commitBatch();
+      }
+      
+      // Activity Log
+      addDoc(collection(db, 'activity_logs'), {
+        userId: user.uid,
+        action: 'BULK_DELETE_ITEMS',
+        details: `Bulk deleted ${selectedIds.length} items`,
+        createdAt: serverTimestamp()
+      }).catch(e => console.warn('Logging failed:', e));
+      
+      setSelectedIds([]);
+      setExpandedId(null);
+    } catch (err) {
+      console.error('Bulk delete operation failed:', err);
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setInventoryError(`Bulk delete failed: ${msg}`);
+      handleFirestoreError(err, OperationType.DELETE, 'inventory/bulk');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -205,42 +332,49 @@ export default function InventoryList({ items, clients, user, projects }: Invent
       animate={{ opacity: 1 }}
       className="space-y-6"
     >
+      {inventoryError && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mx-auto max-w-7xl"
+        >
+          <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <AlertCircle className="w-5 h-5 text-red-500" />
+              <p className="text-sm font-bold text-red-500">{inventoryError}</p>
+            </div>
+            <button onClick={() => setInventoryError(null)} className="p-1 hover:bg-white/5 rounded-lg transition-all">
+              <X className="w-4 h-4 text-red-500" />
+            </button>
+          </div>
+        </motion.div>
+      )}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Inventory Stock</h1>
-          <p className="text-sm text-slate-400">Manage your items, check stock levels and locations.</p>
+          <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">Inventory Stock</h1>
+          <p className="text-[10px] md:text-sm text-slate-500 md:text-slate-400 uppercase font-black md:font-normal tracking-[0.1em]">Central Asset Grid • {items.length} Units</p>
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2 md:space-x-3 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
           <button 
             onClick={() => generateInventoryReport(filteredItems, {
               search: searchTerm,
               brand: selectedBrands.join(', '),
               client: clientFilter,
               job: jobFilter,
-              outlet: selectedOutlets.join(', '),
+              project: selectedOutlets.join(', '),
               location: locationFilter
             })}
-            className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-slate-300 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors group"
+            className="flex-shrink-0 flex items-center space-x-2 px-3 md:px-4 py-2 md:py-2.5 text-xs md:text-sm font-black md:font-medium text-slate-300 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all active:scale-95 group uppercase md:normal-case tracking-widest md:tracking-normal"
           >
-            <motion.div
-              whileHover={{ y: [0, -2, 0] }}
-              transition={{ duration: 0.5, repeat: Infinity }}
-            >
-              <Download className="w-4 h-4" />
-            </motion.div>
-            <span>PDF Export</span>
+            <Download className="w-3.5 h-3.5 md:w-4 md:h-4" />
+            <span>Export</span>
           </button>
-          {isAdmin && (
+          {isApproved && (
             <button 
               onClick={() => setShowAddModal(true)}
-              className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-xl hover:bg-green-500 shadow-lg shadow-green-500/25 transition-all active:scale-95 group"
+              className="flex-shrink-0 flex items-center space-x-2 px-3 md:px-4 py-2 md:py-2.5 text-xs md:text-sm font-black md:font-medium text-white bg-primary rounded-xl hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all active:scale-95 group uppercase md:normal-case tracking-widest md:tracking-normal"
             >
-              <motion.div
-                whileHover={{ rotate: 90, scale: 1.1 }}
-                transition={{ type: "spring", stiffness: 300 }}
-              >
-                <Plus className="w-4 h-4" />
-              </motion.div>
+              <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />
               <span>Add Item</span>
             </button>
           )}
@@ -349,8 +483,8 @@ export default function InventoryList({ items, clients, user, projects }: Invent
                 />
 
                 <FilterDropdown 
-                  label="Outlets" 
-                  options={uniqueValues.outlets} 
+                  label="Projects" 
+                  options={uniqueValues.projects} 
                   selected={selectedOutlets} 
                   onChange={setSelectedOutlets} 
                 />
@@ -391,12 +525,12 @@ export default function InventoryList({ items, clients, user, projects }: Invent
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Wh. Location</label>
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Project Outlet</label>
                   <input 
                     type="text"
                     value={locationFilter}
                     onChange={(e) => setLocationFilter(e.target.value)}
-                    placeholder="Location..."
+                    placeholder="Search outlets..."
                     className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
                   />
                 </div>
@@ -443,7 +577,7 @@ export default function InventoryList({ items, clients, user, projects }: Invent
                       className="p-2 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
                       title="Clear All Filters"
                     >
-                      <Trash className="w-4 h-4" />
+                      <RotateCcw className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -475,7 +609,7 @@ export default function InventoryList({ items, clients, user, projects }: Invent
           <table className="w-full">
             <thead>
               <tr className="bg-white/5 border-b border-white/5 text-left">
-                {isAdmin && (
+                {isApproved && (
                   <th className="px-6 py-4 w-12">
                     <button 
                       onClick={toggleSelectAll}
@@ -511,7 +645,7 @@ export default function InventoryList({ items, clients, user, projects }: Invent
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Quantity</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Location</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                {isAdmin && (
+                {isApproved && (
                   <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
                 )}
               </tr>
@@ -536,7 +670,7 @@ export default function InventoryList({ items, clients, user, projects }: Invent
                       expandedId === item.id && "bg-white/[0.03]"
                     )}
                   >
-                    {isAdmin && (
+                    {isApproved && (
                       <td className="px-6 py-3" onClick={(e) => { e.stopPropagation(); toggleSelectItem(item.id); }}>
                         <div className="text-slate-500 group-hover:text-primary transition-colors">
                           <AnimatePresence mode="wait">
@@ -678,7 +812,7 @@ export default function InventoryList({ items, clients, user, projects }: Invent
                             </motion.button>
                           </div>
                         )}
-                        {isAdmin && (
+                        {isApproved && (
                           <div className="flex items-center space-x-2">
                             <motion.button 
                               whileHover={{ scale: 1.1, rotate: -5 }}
@@ -691,10 +825,16 @@ export default function InventoryList({ items, clients, user, projects }: Invent
                             <motion.button 
                               whileHover={{ scale: 1.1, rotate: 5 }}
                               whileTap={{ scale: 0.9 }}
-                              onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}
-                              className="p-2 text-slate-500 hover:text-red-400 hover:bg-white/10 rounded-lg transition-all"
+                              disabled={deletingId === item.id}
+                              onClick={(e) => { e.stopPropagation(); setItemToDelete(item); }}
+                              className="p-2 text-red-500/40 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all disabled:opacity-50"
+                              title="Delete Item"
                             >
-                              <Trash className="w-4 h-4" />
+                              {deletingId === item.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-red-500" />
+                              ) : (
+                                <Trash className="w-4 h-4" />
+                              )}
                             </motion.button>
                           </div>
                         )}
@@ -710,16 +850,28 @@ export default function InventoryList({ items, clients, user, projects }: Invent
                         exit={{ opacity: 0, height: 0 }}
                         className="bg-white/[0.01]"
                       >
-                        <td colSpan={isAdmin ? 6 : 5} className="px-6 py-0 overflow-hidden">
+                        <td colSpan={isApproved ? 6 : 5} className="px-6 py-0 overflow-hidden">
                           <motion.div 
                             initial={{ y: -10, opacity: 0 }}
                             animate={{ y: 0, opacity: 1 }}
                             className="py-6 px-12 grid grid-cols-2 lg:grid-cols-4 gap-6 border-x border-white/5"
                           >
                             <div className="space-y-1">
-                              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Stock Category</p>
-                              <p className="text-sm font-bold text-primary">{item.inventoryType || 'Warehouse Stock'}</p>
+                              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                {item.inventoryType === 'Client Stock' ? 'Allocated Client' : 'Project'}
+                              </p>
+                              <p className="text-sm font-bold text-primary">
+                                {item.inventoryType === 'Client Stock' 
+                                  ? (item.client || 'General Client') 
+                                  : (item.outlet || 'Central Hub')}
+                              </p>
                             </div>
+                            {item.inventoryType === 'Client Stock' && item.jobNumber && (
+                              <div className="space-y-1">
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Job Number</p>
+                                <p className="text-sm font-bold text-amber-500">{item.jobNumber}</p>
+                              </div>
+                            )}
                             <div className="space-y-1">
                               <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Brand & Model</p>
                               <p className="text-sm font-bold text-white">{item.brand || 'N/A'} {item.modelNumber || ''}</p>
@@ -772,59 +924,90 @@ export default function InventoryList({ items, clients, user, projects }: Invent
               layout
               onClick={() => toggleExpand(item.id)}
               className={cn(
-                "p-4 transition-colors active:bg-white/5",
-                selectedIds.includes(item.id) && "bg-primary/10",
+                "p-4 transition-all active:bg-white/[0.05] relative overflow-hidden",
+                selectedIds.includes(item.id) && "bg-primary/5",
                 expandedId === item.id && "bg-white/[0.03]"
               )}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10 overflow-hidden relative group">
-                    {item.imageUrl ? (
-                      <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <motion.div
-                         whileHover={{ scale: 1.2, rotate: 5 }}
-                         className="flex items-center justify-center"
-                      >
-                        <Package className="w-5 h-5 text-slate-600" />
-                      </motion.div>
-                    )}
-                    {isAdmin && (
+              <div className="flex items-center justify-between relative z-10">
+                <div className="flex items-center space-x-4">
+                  <div className="relative group">
+                    <div className="w-14 h-14 rounded-[20px] bg-white/5 flex items-center justify-center border border-white/10 overflow-hidden shadow-inner">
+                      {item.imageUrl ? (
+                        <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        <Package className="w-6 h-6 text-slate-600" />
+                      )}
+                    </div>
+                    {isApproved && (
                       <button 
                         onClick={(e) => { e.stopPropagation(); toggleSelectItem(item.id); }}
                         className={cn(
-                          "absolute inset-0 flex items-center justify-center transition-opacity",
-                          selectedIds.includes(item.id) ? "bg-primary/80 opacity-100" : "opacity-0"
+                          "absolute -top-1 -left-1 w-6 h-6 rounded-full flex items-center justify-center border transition-all shadow-lg",
+                          selectedIds.includes(item.id) 
+                            ? "bg-primary border-primary text-white scale-110" 
+                            : "bg-slate-900 border-white/20 text-slate-500 scale-90"
                         )}
                       >
-                        <CheckSquare className="w-5 h-5 text-white" />
+                        {selectedIds.includes(item.id) ? (
+                          <CheckSquare className="w-3 h-3 text-white" />
+                        ) : (
+                          <Square className="w-3 h-3 text-white" />
+                        )}
                       </button>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-bold text-white truncate">{item.name}</h3>
-                    <p className="text-[10px] text-slate-500 font-mono uppercase mt-0.5 tracking-wider truncate">{item.sku}</p>
+                    <div className="flex items-center space-x-2">
+                       <h3 className="text-[15px] font-bold text-white leading-tight truncate">{item.name}</h3>
+                       {item.inventoryType === 'Client Stock' && (
+                         <div className="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
+                       )}
+                    </div>
+                    <div className="flex items-center space-x-2 mt-2">
+                       <span className={cn(
+                         "text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border",
+                         item.inventoryType === 'Client Stock' 
+                           ? "bg-amber-500/10 text-amber-500 border-amber-500/20" 
+                           : "bg-primary/10 text-primary border-primary/20"
+                       )}>
+                         {item.inventoryType === 'Client Stock' ? 'CL' : 'WH'} {item.brand ? `• ${item.brand}` : ''}
+                       </span>
+                    </div>
                   </div>
                 </div>
-                <div className="text-right ml-4">
-                  <div className="flex items-center justify-end space-x-1.5">
-                    <span className={cn(
-                      "text-lg font-black",
-                      item.currentQuantity <= item.minStock ? "text-amber-500" : "text-white"
-                    )}>{item.currentQuantity}</span>
-                    {item.currentQuantity <= item.minStock && <AlertCircle className="w-3.5 h-3.5 text-amber-500 animate-pulse" />}
-                  </div>
-                  <span className={cn(
-                    "text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded",
-                    item.currentQuantity > item.minStock 
-                      ? "text-green-500 bg-green-500/10" 
-                      : item.currentQuantity === 0 
-                        ? "text-red-500 bg-red-500/10" 
-                        : "text-amber-500 bg-amber-500/10"
-                  )}>
-                    {item.currentQuantity > item.minStock ? 'Healthy' : 'Critical'}
-                  </span>
+                
+                <div className="text-right flex flex-col items-end">
+                   <div className="flex items-center space-x-2 mb-1">
+                      {isApproved && (
+                        <button 
+                          disabled={deletingId === item.id}
+                          onClick={(e) => { e.stopPropagation(); setItemToDelete(item); }}
+                          className="p-1.5 text-red-500/40 hover:text-red-500 bg-red-500/5 hover:bg-red-500/10 rounded-lg transition-all mr-1 disabled:opacity-50"
+                        >
+                          {deletingId === item.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Trash className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      )}
+                      <span className={cn(
+                        "text-xl font-black tracking-tight",
+                        item.currentQuantity <= item.minStock ? "text-amber-500" : "text-white"
+                      )}>{item.currentQuantity}</span>
+                      <ChevronDown className={cn("w-4 h-4 text-slate-600 transition-transform duration-300", expandedId === item.id && "rotate-180 text-primary")} />
+                   </div>
+                   <div className="h-1 w-12 bg-white/5 rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.min((item.currentQuantity / (item.minStock * 5 || 25)) * 100, 100)}%` }}
+                        className={cn(
+                          "h-full rounded-full transition-all duration-1000",
+                          item.currentQuantity <= item.minStock ? "bg-amber-500" : "bg-primary"
+                        )}
+                      />
+                   </div>
                 </div>
               </div>
 
@@ -836,54 +1019,85 @@ export default function InventoryList({ items, clients, user, projects }: Invent
                     exit={{ height: 0, opacity: 0 }}
                     className="overflow-hidden"
                   >
-                    <div className="pt-4 mt-4 border-t border-white/5 grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Location</p>
-                        <div className="flex items-center space-x-1.5 text-slate-300">
-                          <MapPin className="w-3 h-3 text-primary" />
-                          <p className="text-xs font-bold truncate">{item.location}</p>
+                    <div className="pt-6 mt-4 border-t border-white/5 grid grid-cols-2 gap-6 relative z-10">
+                      <div className="space-y-1.5">
+                        <p className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em]">
+                          {item.inventoryType === 'Client Stock' ? 'Client Assignment' : 'Warehouse Origin'}
+                        </p>
+                        <div className="flex items-center space-x-2 text-slate-200">
+                          {item.inventoryType === 'Client Stock' ? (
+                            <User className="w-3.5 h-3.5 text-amber-500" />
+                          ) : (
+                            <MapPin className="w-3.5 h-3.5 text-primary" />
+                          )}
+                          <p className="text-xs font-bold truncate leading-none">
+                            {item.inventoryType === 'Client Stock' 
+                              ? (item.client || 'General Client') 
+                              : (item.location || 'Not Assigned')}
+                          </p>
                         </div>
                       </div>
-                      <div className="space-y-1">
-                        <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Brand</p>
-                        <p className="text-xs font-bold text-white truncate">{item.brand || 'Generic'}</p>
+                      <div className="space-y-1.5">
+                        <p className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em]">Batch Status</p>
+                        <span className={cn(
+                          "text-[10px] font-black uppercase tracking-wider",
+                          item.currentQuantity > item.minStock ? "text-green-400" : "text-amber-400"
+                        )}>
+                          {item.currentQuantity > item.minStock ? 'Healthy Node' : 'Low Reserves'}
+                        </span>
                       </div>
-                      <div className="col-span-2 flex items-center justify-between pt-2 border-t border-white/5">
-                        <div className="flex items-center space-x-2">
+                      
+                      <div className="col-span-2 flex items-center justify-between pt-4 mt-2 border-t border-white/5">
+                        <div className="flex items-center space-x-3">
                           {canUpdateStock && (
                             <div className="flex items-center space-x-2 mr-2">
-                              <button 
+                              <motion.button 
+                                whileTap={{ scale: 0.85 }}
                                 onClick={(e) => { e.stopPropagation(); setAdjustmentItem(item); setAdjustmentType('IN'); }}
-                                className="w-9 h-9 flex items-center justify-center bg-green-500/10 text-green-500 rounded-xl border border-green-500/20 active:scale-90 transition-transform"
-                                title="Stock Receiving"
+                                className="w-12 h-12 flex items-center justify-center bg-green-500 text-white rounded-2xl shadow-lg shadow-green-500/20 active:bg-green-600 transition-colors"
                               >
-                                <Plus className="w-4 h-4" />
-                              </button>
-                              <button 
+                                <Plus className="w-6 h-6 stroke-[3]" />
+                              </motion.button>
+                              <motion.button 
+                                whileTap={{ scale: 0.85 }}
                                 onClick={(e) => { e.stopPropagation(); setAdjustmentItem(item); setAdjustmentType('OUT'); }}
-                                className="w-9 h-9 flex items-center justify-center bg-red-500/10 text-red-500 rounded-xl border border-red-500/20 active:scale-90 transition-transform"
-                                title="Stock Distribution"
+                                className="w-12 h-12 flex items-center justify-center bg-red-500 text-white rounded-2xl shadow-lg shadow-red-500/20 active:bg-red-600 transition-colors"
                               >
-                                <Minus className="w-4 h-4" />
-                              </button>
+                                <Minus className="w-6 h-6 stroke-[3]" />
+                              </motion.button>
                             </div>
                           )}
-                          <button 
+                          <motion.button 
+                            whileTap={{ scale: 0.95 }}
                             onClick={(e) => { e.stopPropagation(); setSelectedItem(item); setInitialAction(null); }}
-                            className="px-4 py-2 bg-primary text-white text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center space-x-2 shadow-lg shadow-primary/20 active:scale-95 transition-transform"
+                            className="h-12 px-6 bg-primary/10 border border-primary/20 text-primary text-[10px] font-black uppercase tracking-widest rounded-2xl flex items-center space-x-2 active:bg-primary/20 mt-1"
                           >
-                            <Zap className="w-3 h-3" />
+                            <Info className="w-4 h-4" />
                             <span>Details</span>
-                          </button>
+                          </motion.button>
                         </div>
-                        {isAdmin && (
-                          <div className="flex items-center space-x-4">
-                            <button onClick={(e) => { e.stopPropagation(); setEditingItem(item); }} className="p-2 text-slate-400 active:text-white"><Edit className="w-4 h-4" /></button>
-                            <button onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }} className="p-2 text-red-500/50 active:text-red-500"><Trash className="w-4 h-4" /></button>
+                        {isApproved && (
+                          <div className="flex items-center space-x-2">
+                            <motion.button 
+                              whileTap={{ scale: 0.8 }}
+                              onClick={(e) => { e.stopPropagation(); setEditingItem(item); }} 
+                              className="w-11 h-11 flex items-center justify-center bg-white/5 rounded-2xl text-slate-400 active:text-white border border-white/5"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </motion.button>
+                            <motion.button 
+                              whileTap={{ scale: 0.8 }}
+                              onClick={(e) => { e.stopPropagation(); setItemToDelete(item); }} 
+                              className="w-11 h-11 flex items-center justify-center bg-red-500/10 rounded-2xl text-red-500/60 active:text-red-500 border border-red-500/10"
+                            >
+                              <Trash className="w-4 h-4" />
+                            </motion.button>
                           </div>
                         )}
                       </div>
                     </div>
+                    {/* Background Glow */}
+                    <div className="absolute -right-10 top-1/2 -translate-y-1/2 w-40 h-40 bg-primary/5 blur-3xl rounded-full pointer-events-none" />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -920,7 +1134,20 @@ export default function InventoryList({ items, clients, user, projects }: Invent
                 className="flex items-center space-x-2 px-5 py-2 text-sm font-black text-white bg-primary rounded-full hover:bg-primary-hover transition-all active:scale-95 uppercase tracking-widest"
               >
                 <Plus className="w-4 h-4" />
-                <span>Bulk Stock Update</span>
+                <span>Bulk Stock</span>
+              </button>
+
+              <button 
+                onClick={handleBulkDelete}
+                disabled={isDeleting}
+                className="flex items-center space-x-2 px-5 py-2 text-sm font-black text-red-400 bg-red-400/10 border border-red-400/20 rounded-full hover:bg-red-400/20 transition-all active:scale-95 uppercase tracking-widest disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash className="w-4 h-4" />
+                )}
+                <span>{isDeleting ? 'Deleting...' : 'Delete Batch'}</span>
               </button>
               
               <button 
@@ -934,6 +1161,65 @@ export default function InventoryList({ items, clients, user, projects }: Invent
         )}
       </AnimatePresence>
 
+      {/* Delete Item Confirmation Modal */}
+      <AnimatePresence>
+        {itemToDelete && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setItemToDelete(null)}
+              className="absolute inset-0 bg-[#020617]/80 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-md glass-morphism p-8 rounded-[40px] border border-white/10 shadow-2xl overflow-hidden"
+            >
+              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-red-500 to-amber-500" />
+              <div className="flex flex-col items-center text-center space-y-6">
+                <div className="w-20 h-20 bg-red-500/10 rounded-3xl flex items-center justify-center ring-1 ring-red-500/20">
+                  <Trash className="w-10 h-10 text-red-500" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-2">Confirm Deletion</h3>
+                  <p className="text-slate-400 text-sm leading-relaxed">
+                    Permanently delete <span className="text-white font-bold">{itemToDelete.name}</span> and ALL its transaction history?
+                    <br />
+                    <span className="text-red-400/80 mt-2 block italic text-[11px]">This action is non-reversible.</span>
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-4 w-full">
+                  <button 
+                    onClick={() => setItemToDelete(null)}
+                    disabled={deletingId === itemToDelete.id}
+                    className="py-4 bg-white/5 text-slate-400 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 hover:text-white transition-all ring-1 ring-white/10"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(itemToDelete)}
+                    disabled={deletingId === itemToDelete.id}
+                    className="py-4 bg-red-500 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-red-500/20 hover:bg-red-600 transition-all active:scale-95 flex items-center justify-center space-x-2"
+                  >
+                    {deletingId === itemToDelete.id ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Deleting...</span>
+                      </>
+                    ) : (
+                      <span>Delete Now</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Item Detail Modal */}
       <AnimatePresence>
         {selectedItem && (
@@ -941,6 +1227,7 @@ export default function InventoryList({ items, clients, user, projects }: Invent
             item={selectedItem} 
             clients={clients}
             onClose={() => { setSelectedItem(null); setInitialAction(null); }} 
+            onDelete={() => { setItemToDelete(selectedItem); setSelectedItem(null); }}
             user={user}
             initialAction={initialAction}
           />
@@ -968,6 +1255,7 @@ export default function InventoryList({ items, clients, user, projects }: Invent
             item={editingItem} 
             items={items}
             clients={clients}
+            projects={projects}
             onClose={() => { setShowAddModal(false); setEditingItem(null); }} 
             user={user}
           />
@@ -1013,7 +1301,7 @@ function BulkUpdateModal({ items, clients, projects, onClose, user }: { items: I
     setShowProjectSuggestions(false);
   };
 
-  const isAuthorized = user.role === 'admin' || auth.currentUser?.emailVerified;
+  const isAuthorized = user.role === 'admin' || user.isApproved;
 
   if (!isAuthorized) return null;
 
@@ -1029,7 +1317,6 @@ function BulkUpdateModal({ items, clients, projects, onClose, user }: { items: I
           const tx: any = {
             itemId: item.id,
             itemName: item.name,
-            itemSku: item.sku,
             brand: item.brand,
             modelNumber: item.modelNumber,
             type: stockAction,
@@ -1054,7 +1341,7 @@ function BulkUpdateModal({ items, clients, projects, onClose, user }: { items: I
           // 2. Update stock
           await updateDoc(doc(db, 'inventory', item.id), {
             currentQuantity: increment(stockAction === 'IN' ? itemQty : -itemQty),
-            lastUpdated: Date.now(),
+            lastUpdated: serverTimestamp(),
             jobNumber: jobNumber || item.jobNumber,
             client: stockAction === 'IN' ? (client || item.client) : item.client,
             outlet: outlet || item.outlet,
@@ -1069,7 +1356,7 @@ function BulkUpdateModal({ items, clients, projects, onClose, user }: { items: I
             message: `BULK ALERT: ${item.name} is low! (${newQuantity} remaining)`,
             read: false,
             isPublic: true,
-            createdAt: timestamp
+            createdAt: serverTimestamp()
           });
         }
       }));
@@ -1081,7 +1368,7 @@ function BulkUpdateModal({ items, clients, projects, onClose, user }: { items: I
         message: `BULK ${stockAction}: ${items.length} items updated by ${user.displayName}. Job #${jobNumber || 'N/A'}`,
         read: false,
         isPublic: true,
-        createdAt: timestamp
+        createdAt: serverTimestamp()
       });
 
       // 5. Global Activity Log
@@ -1089,7 +1376,7 @@ function BulkUpdateModal({ items, clients, projects, onClose, user }: { items: I
         userId: user.uid,
         action: 'BULK_STOCK_UPDATE',
         details: `Bulk ${stockAction} for ${items.length} items. Job #${jobNumber || 'N/A'}`,
-        createdAt: timestamp
+        createdAt: serverTimestamp()
       });
 
       onClose();
@@ -1312,22 +1599,22 @@ function BulkUpdateModal({ items, clients, projects, onClose, user }: { items: I
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Outlet</label>
+                  <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Project</label>
                   <input 
                     type="text" 
                     value={outlet} 
                     onChange={(e) => setOutlet(e.target.value)}
-                    placeholder="Outlet..."
+                    placeholder="Project name..."
                     className="w-full px-5 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-mono"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Location Override</label>
+                  <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Project Outlet Override</label>
                   <input 
                     type="text" 
                     value={location} 
                     onChange={(e) => setLocation(e.target.value)}
-                    placeholder="New location..."
+                    placeholder="New outlet location..."
                     className="w-full px-5 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-mono"
                   />
                 </div>
@@ -1397,7 +1684,6 @@ function StockAdjustmentModal({ item, type, clients, onClose, user }: { item: In
       const tx: any = {
         itemId: item.id,
         itemName: item.name,
-        itemSku: item.sku,
         brand: item.brand,
         modelNumber: item.modelNumber,
         type: type,
@@ -1418,7 +1704,7 @@ function StockAdjustmentModal({ item, type, clients, onClose, user }: { item: In
       
       await updateDoc(doc(db, 'inventory', item.id), {
         currentQuantity: increment(type === 'IN' ? qty : -qty),
-        lastUpdated: Date.now(),
+        lastUpdated: serverTimestamp(),
         jobNumber: jobNumber,
         client: type === 'IN' ? (client || item.client) : item.client,
         outlet: outlet || item.outlet,
@@ -1432,7 +1718,7 @@ function StockAdjustmentModal({ item, type, clients, onClose, user }: { item: In
         message: `STOCK ${type === 'IN' ? 'IN' : 'OUT'}: ${item.name} (${qty} units) for Job #${jobNumber || 'N/A'}`,
         read: false,
         isPublic: true,
-        createdAt: Date.now()
+        createdAt: serverTimestamp()
       });
 
       // Low Stock Notification
@@ -1443,7 +1729,7 @@ function StockAdjustmentModal({ item, type, clients, onClose, user }: { item: In
           message: `CRITICAL: ${item.name} is running low! (${newQuantity} units left)`,
           read: false,
           isPublic: true,
-          createdAt: Date.now()
+          createdAt: serverTimestamp()
         });
       }
 
@@ -1452,7 +1738,7 @@ function StockAdjustmentModal({ item, type, clients, onClose, user }: { item: In
         userId: user.uid,
         action: 'STOCK_UPDATE',
         details: `${type === 'IN' ? 'Stock In' : 'Stock Out'}: ${item.name} (${qty} units)`,
-        createdAt: Date.now()
+        createdAt: serverTimestamp()
       });
 
       onClose();
@@ -1488,7 +1774,7 @@ function StockAdjustmentModal({ item, type, clients, onClose, user }: { item: In
                 {type === 'IN' ? 'Stock Receiving' : 'Stock Distribution'}
               </h2>
               <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">
-                {item.name} • {item.sku}
+                {item.name}
               </p>
             </div>
           </div>
@@ -1537,12 +1823,12 @@ function StockAdjustmentModal({ item, type, clients, onClose, user }: { item: In
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Client Outlet</label>
+              <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Project</label>
               <input 
                 type="text" 
                 value={outlet} 
                 onChange={(e) => setOutlet(e.target.value)}
-                placeholder="Target Outlet..."
+                placeholder="Target Project..."
                 className="w-full px-5 py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold placeholder:text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
               />
             </div>
@@ -1594,13 +1880,13 @@ function StockAdjustmentModal({ item, type, clients, onClose, user }: { item: In
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Location Address / Note</label>
+            <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Project Outlet</label>
             <input 
               type="text" 
               value={location} 
               onChange={(e) => setLocation(e.target.value)}
-              placeholder="Primary Location..."
-              className="w-full px-5 py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold placeholder:text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+              placeholder="Outlet Address / Note..."
+              className="w-full px-5 py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold placeholder:text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-mono"
             />
           </div>
 
@@ -1622,7 +1908,7 @@ function StockAdjustmentModal({ item, type, clients, onClose, user }: { item: In
   );
 }
 
-function ItemDetailModal({ item, clients, onClose, user, initialAction }: any) {
+function ItemDetailModal({ item, clients, onClose, onDelete, user, initialAction }: any) {
   const [stockAction, setStockAction] = useState<'IN' | 'OUT' | null>(initialAction || null);
   const [qty, setQty] = useState(1);
   const [client, setClient] = useState('');
@@ -1637,6 +1923,7 @@ function ItemDetailModal({ item, clients, onClose, user, initialAction }: any) {
   const [location, setLocation] = useState(item.location || '');
   const [transactionDate, setTransactionDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
+  const isApproved = user.role === 'admin' || user.isApproved;
 
   const handleUpdateStock = async () => {
     if (!stockAction) return;
@@ -1644,7 +1931,6 @@ function ItemDetailModal({ item, clients, onClose, user, initialAction }: any) {
       const tx: any = {
         itemId: item.id,
         itemName: item.name,
-        itemSku: item.sku,
         brand: item.brand,
         modelNumber: item.modelNumber,
         type: stockAction,
@@ -1665,7 +1951,7 @@ function ItemDetailModal({ item, clients, onClose, user, initialAction }: any) {
       
       await updateDoc(doc(db, 'inventory', item.id), {
         currentQuantity: increment(stockAction === 'IN' ? qty : -qty),
-        lastUpdated: Date.now(),
+        lastUpdated: serverTimestamp(),
         jobNumber: jobNumber,
         client: stockAction === 'IN' ? (client || item.client) : item.client,
         outlet: outlet || item.outlet,
@@ -1679,7 +1965,7 @@ function ItemDetailModal({ item, clients, onClose, user, initialAction }: any) {
         message: `STOCK ${stockAction === 'IN' ? 'IN' : 'OUT'}: ${item.name} (${qty} units) for Job #${jobNumber || 'N/A'}`,
         read: false,
         isPublic: true,
-        createdAt: Date.now()
+        createdAt: serverTimestamp()
       });
 
       // Low Stock Notification
@@ -1690,7 +1976,7 @@ function ItemDetailModal({ item, clients, onClose, user, initialAction }: any) {
           message: `CRITICAL: ${item.name} is running low! (${newQuantity} remaining / Min: ${item.minStock})`,
           read: false,
           isPublic: true,
-          createdAt: Date.now()
+          createdAt: serverTimestamp()
         });
       }
 
@@ -1699,7 +1985,7 @@ function ItemDetailModal({ item, clients, onClose, user, initialAction }: any) {
         userId: user.uid,
         action: 'STOCK_UPDATE',
         details: `${stockAction === 'IN' ? 'Stock In' : 'Stock Out'}: ${item.name} (${qty} units) for Job #${jobNumber || 'N/A'}`,
-        createdAt: Date.now()
+        createdAt: serverTimestamp()
       });
 
       onClose();
@@ -1726,12 +2012,23 @@ function ItemDetailModal({ item, clients, onClose, user, initialAction }: any) {
             </div>
           )}
           <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-slate-950 to-transparent" />
-          <button 
-            onClick={onClose}
-            className="absolute top-6 right-6 p-2 bg-black/40 hover:bg-black/60 rounded-full text-white backdrop-blur-md transition-all border border-white/10"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="absolute top-6 right-6 flex items-center space-x-2">
+            {isApproved && (
+              <button 
+                onClick={onDelete}
+                className="p-2 bg-red-500/20 hover:bg-red-500/40 rounded-full text-red-500 backdrop-blur-md transition-all border border-red-500/20"
+                title="Delete Item"
+              >
+                <Trash className="w-5 h-5" />
+              </button>
+            )}
+            <button 
+              onClick={onClose}
+              className="p-2 bg-black/40 hover:bg-black/60 rounded-full text-white backdrop-blur-md transition-all border border-white/10"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         <div className="p-10">
@@ -1764,7 +2061,7 @@ function ItemDetailModal({ item, clients, onClose, user, initialAction }: any) {
 
           <div className="grid grid-cols-2 gap-6 mt-6">
             <div className="p-5 bg-white/5 rounded-3xl border border-white/5">
-              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Primary Location</p>
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Primary Project Outlet</p>
               <div className="flex items-center space-x-2 text-slate-200">
                 <MapPin className="w-4 h-4 text-primary" />
                 <span className="font-bold">{item.location}</span>
@@ -1781,7 +2078,7 @@ function ItemDetailModal({ item, clients, onClose, user, initialAction }: any) {
 
           {/* Quick Actions */}
           <div className="mt-10 pt-10 border-t border-white/5">
-            {user.role === 'admin' || auth.currentUser?.emailVerified ? (
+            {isApproved ? (
               !stockAction ? (
                 <div className="flex gap-4">
                   <button 
@@ -1935,30 +2232,41 @@ function ItemDetailModal({ item, clients, onClose, user, initialAction }: any) {
   );
 }
 
-function ItemFormModal({ item, items, clients, onClose, user }: any) {
+function ItemFormModal({ item, items, clients, projects, onClose, user }: any) {
   const [loading, setLoading] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const [showClientSuggestions, setShowClientSuggestions] = useState(false);
-  const isAdmin = user.role === 'admin';
+  const [showProjectSuggestions, setShowProjectSuggestions] = useState(false);
+  const [selectionStep, setSelectionStep] = useState(!item); // Only show selection for NEW items
+  const isApproved = user.role === 'admin' || user.isApproved;
 
-  if (!isAdmin) {
+  if (!isApproved) {
     return (
-      <>
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 overflow-y-auto" onClick={onClose} />
-        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md glass-morphism p-10 rounded-[40px] shadow-2xl z-[51] border border-white/10 text-center">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <motion.div 
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="max-w-md w-full glass-morphism p-8 rounded-[32px] border border-white/10 text-center"
+        >
           <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-white mb-2">Access Restricted</h2>
-          <p className="text-slate-400 text-sm mb-6">Only administrators can create or modify inventory catalog records (codes and structural data).</p>
+          <p className="text-slate-400 text-sm mb-6">Your account is awaiting approval. Once approved, you will be able to manage inventory catalog records.</p>
           <button onClick={onClose} className="w-full py-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl font-bold transition-all">Close</button>
-        </div>
-      </>
+        </motion.div>
+      </div>
     );
   }
 
+  const generateSku = (type: string) => {
+    const prefix = type === 'Warehouse Stock' ? 'WH' : 'CL';
+    const random = Math.floor(1000 + Math.random() * 9000);
+    return `${prefix}-${random}`;
+  };
+
   const [formData, setFormData] = useState({
-    name: item?.name || '',
     sku: item?.sku || '',
+    name: item?.name || '',
     description: item?.description || '',
     location: item?.location || '',
     currentQuantity: item?.currentQuantity || 0,
@@ -1976,10 +2284,39 @@ function ItemFormModal({ item, items, clients, onClose, user }: any) {
     stockOutAmount: 0,
   });
 
+  const handleTypeSelect = (type: string) => {
+    setFormData(prev => ({
+      ...prev,
+      inventoryType: type as any,
+      sku: prev.sku || generateSku(type),
+      // Reset relevant fields
+      ...(type === 'Warehouse Stock' ? { client: '', jobNumber: '' } : {})
+    }));
+    setSelectionStep(false);
+  };
+
   const filteredClients = useMemo(() => {
     if (!formData.client.trim()) return clients;
     return clients.filter((c: any) => c.name.toLowerCase().includes(formData.client.toLowerCase()));
   }, [clients, formData.client]);
+
+  const filteredProjects = useMemo(() => {
+    if (!formData.jobNumber.trim()) return projects.slice(0, 5);
+    return projects.filter((p: any) => 
+      p.jobNumber.toLowerCase().includes(formData.jobNumber.toLowerCase()) ||
+      p.client.toLowerCase().includes(formData.jobNumber.toLowerCase())
+    ).slice(0, 8);
+  }, [projects, formData.jobNumber]);
+
+  const handleProjectSelect = (p: any) => {
+    setFormData(prev => ({
+      ...prev,
+      jobNumber: p.jobNumber,
+      client: p.client,
+      outlet: p.outlet || prev.outlet,
+    }));
+    setShowProjectSuggestions(false);
+  };
 
   const [templateSearch, setTemplateSearch] = useState('');
   const [showTemplateResults, setShowTemplateResults] = useState(false);
@@ -1991,7 +2328,7 @@ function ItemFormModal({ item, items, clients, onClose, user }: any) {
     const uniqueItems: any[] = [];
     items.forEach((i: any) => {
       if (!uniqueItems.find(u => u.name === i.name && u.brand === i.brand)) {
-        if (i.name.toLowerCase().includes(lowSearch) || i.sku?.toLowerCase().includes(lowSearch)) {
+        if (i.name.toLowerCase().includes(lowSearch)) {
           uniqueItems.push(i);
         }
       }
@@ -2005,10 +2342,17 @@ function ItemFormModal({ item, items, clients, onClose, user }: any) {
       name: template.name,
       brand: template.brand || prev.brand,
       modelNumber: template.modelNumber || prev.modelNumber,
-      sku: template.sku || prev.sku,
       description: template.description || prev.description,
+      location: template.location || prev.location,
+      minStock: template.minStock || prev.minStock,
+      supplier: template.supplier || prev.supplier,
+      outlet: template.outlet || prev.outlet,
+      inventoryType: template.inventoryType || prev.inventoryType,
+      imageUrl: template.imageUrl || prev.imageUrl,
       // CRITICAL: Quantity is NOT copied
-      currentQuantity: 0 
+      currentQuantity: 0,
+      stockInAmount: 0,
+      stockOutAmount: 0
     }));
     setTemplateSearch('');
     setShowTemplateResults(false);
@@ -2067,7 +2411,7 @@ function ItemFormModal({ item, items, clients, onClose, user }: any) {
         ...formData,
         currentQuantity: finalQuantity,
         stockInDate: new Date(formData.stockInDate).getTime(),
-        lastUpdated: Date.now(),
+        lastUpdated: serverTimestamp(),
       };
       
       // Clean up internal UI state
@@ -2082,7 +2426,6 @@ function ItemFormModal({ item, items, clients, onClose, user }: any) {
           await addDoc(collection(db, 'transactions_log'), {
             itemId: item.id,
             itemName: formData.name,
-            itemSku: formData.sku,
             brand: formData.brand,
             modelNumber: formData.modelNumber,
             type: 'IN',
@@ -2093,7 +2436,7 @@ function ItemFormModal({ item, items, clients, onClose, user }: any) {
             location: formData.location,
             inventoryType: formData.inventoryType,
             notes: `Stock In adjusted during catalog edit`,
-            date: Date.now(),
+            date: serverTimestamp(),
             userId: user.uid,
             userName: user.displayName
           });
@@ -2104,7 +2447,6 @@ function ItemFormModal({ item, items, clients, onClose, user }: any) {
           await addDoc(collection(db, 'transactions_log'), {
             itemId: item.id,
             itemName: formData.name,
-            itemSku: formData.sku,
             brand: formData.brand,
             modelNumber: formData.modelNumber,
             type: 'OUT',
@@ -2115,7 +2457,7 @@ function ItemFormModal({ item, items, clients, onClose, user }: any) {
             location: formData.location,
             inventoryType: formData.inventoryType,
             notes: `Stock Out adjusted during catalog edit`,
-            date: Date.now(),
+            date: serverTimestamp(),
             userId: user.uid,
             userName: user.displayName
           });
@@ -2128,7 +2470,7 @@ function ItemFormModal({ item, items, clients, onClose, user }: any) {
               message: `ALERT: ${formData.name} is low after adjustment! (${finalQuantity} remaining)`,
               read: false,
               isPublic: true,
-              createdAt: Date.now()
+              createdAt: serverTimestamp()
             });
           }
         }
@@ -2139,7 +2481,6 @@ function ItemFormModal({ item, items, clients, onClose, user }: any) {
         await addDoc(collection(db, 'transactions_log'), {
           itemId: newItem.id,
           itemName: formData.name,
-          itemSku: formData.sku,
           brand: formData.brand,
           modelNumber: formData.modelNumber,
           type: 'IN',
@@ -2150,7 +2491,7 @@ function ItemFormModal({ item, items, clients, onClose, user }: any) {
           location: formData.location,
           inventoryType: formData.inventoryType,
           notes: `Initial stock record created`,
-          date: Date.now(),
+          date: serverTimestamp(),
           userId: user.uid,
           userName: user.displayName
         });
@@ -2162,7 +2503,7 @@ function ItemFormModal({ item, items, clients, onClose, user }: any) {
           message: `NEW STOCK: ${formData.name} added with ${formData.currentQuantity} units. Job #${formData.jobNumber}`,
           read: false,
           isPublic: true,
-          createdAt: Date.now()
+          createdAt: serverTimestamp()
         });
 
         // Add Activity Log
@@ -2170,7 +2511,7 @@ function ItemFormModal({ item, items, clients, onClose, user }: any) {
           userId: user.uid,
           action: 'CREATE_ITEM',
           details: `Added new item: ${formData.name} with ${formData.currentQuantity} units.`,
-          createdAt: Date.now()
+          createdAt: serverTimestamp()
         });
       }
       onClose();
@@ -2196,14 +2537,69 @@ function ItemFormModal({ item, items, clients, onClose, user }: any) {
         </div>
         
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-10 space-y-6 custom-scrollbar">
+          {selectionStep ? (
+            <div className="space-y-6 py-10">
+              <div className="text-center space-y-2 mb-10">
+                <h3 className="text-xl font-bold text-white tracking-tight">Select Inventory Destination</h3>
+                <p className="text-sm text-slate-500">Is this for central warehouse stock or assigned to a specific client?</p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <button
+                  type="button"
+                  onClick={() => handleTypeSelect('Warehouse Stock')}
+                  className="group relative p-8 glass-morphism rounded-[40px] border border-white/5 hover:border-primary/50 transition-all text-left flex flex-col items-center justify-center space-y-6 hover:bg-primary/5 shadow-2xl"
+                >
+                  <div className="w-20 h-20 rounded-[30px] bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner">
+                    <Warehouse className="w-10 h-10 text-primary" />
+                  </div>
+                  <div className="text-center">
+                    <h4 className="text-lg font-black text-white uppercase tracking-tight">Warehouse</h4>
+                    <p className="text-xs text-slate-500 mt-2 leading-relaxed">Central inventory for general storage and distribution</p>
+                  </div>
+                  <div className="px-5 py-2.5 bg-primary text-white rounded-full text-[10px] font-black uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 transition-all transform translate-y-4 group-hover:translate-y-0 shadow-lg shadow-primary/20">
+                    Select WH- STOCK
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleTypeSelect('Client Stock')}
+                  className="group relative p-8 glass-morphism rounded-[40px] border border-white/5 hover:border-amber-500/50 transition-all text-left flex flex-col items-center justify-center space-y-6 hover:bg-amber-500/5 shadow-2xl"
+                >
+                  <div className="w-20 h-20 rounded-[30px] bg-amber-500/10 flex items-center justify-center group-hover:scale-110 transition-transform shadow-inner">
+                    <User className="w-10 h-10 text-amber-500" />
+                  </div>
+                  <div className="text-center">
+                    <h4 className="text-lg font-black text-white uppercase tracking-tight">Client Assignment</h4>
+                    <p className="text-xs text-slate-500 mt-2 leading-relaxed">Dedicated stock allocated to specific client projects</p>
+                  </div>
+                  <div className="px-5 py-2.5 bg-amber-500 text-white rounded-full text-[10px] font-black uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 transition-all transform translate-y-4 group-hover:translate-y-0 shadow-lg shadow-amber-500/20">
+                    Select CL- STOCK
+                  </div>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
           {!item && (
             <div className="relative group">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1 mb-2 block">Quick-Fill from Existing Catalog</label>
+              <div className="flex items-center justify-between mb-2 px-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Quick-Fill from Existing Catalog</label>
+                <button 
+                  type="button" 
+                  onClick={() => setSelectionStep(true)}
+                  className="flex items-center space-x-1.5 text-[9px] font-black text-primary uppercase tracking-widest hover:text-white transition-colors"
+                >
+                  <ChevronDown className="w-3 h-3 rotate-90" />
+                  <span>Switch to {formData.inventoryType === 'Warehouse Stock' ? 'Client' : 'Warehouse'}</span>
+                </button>
+              </div>
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input 
                   type="text"
-                  placeholder="Search existing items to copy details (Brand, Model, SKU)..."
+                  placeholder="Search existing items to copy details (Brand, Model)..."
                   value={templateSearch}
                   onChange={(e) => {
                     setTemplateSearch(e.target.value);
@@ -2231,7 +2627,7 @@ function ItemFormModal({ item, items, clients, onClose, user }: any) {
                       >
                         <div className="text-left">
                           <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{template.name}</p>
-                          <p className="text-[10px] text-slate-500 font-mono">SKU: {template.sku} | Brand: {template.brand || 'N/A'}</p>
+                          <p className="text-[10px] text-slate-500 font-mono">Brand: {template.brand || 'N/A'}</p>
                         </div>
                         <Plus className="w-4 h-4 text-primary opacity-50 group-hover:opacity-100 group-hover:scale-110 transition-all" />
                       </button>
@@ -2303,26 +2699,33 @@ function ItemFormModal({ item, items, clients, onClose, user }: any) {
             )}
           </AnimatePresence>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-2">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Inventory Type</label>
-              <div className="flex p-1 bg-white/5 border border-white/10 rounded-2xl">
-                {['Warehouse Stock', 'Client Stock'].map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, inventoryType: type as any })}
-                    className={cn(
-                      "flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
-                      formData.inventoryType === type 
-                        ? "bg-primary text-white shadow-lg shadow-primary/20" 
-                        : "text-slate-500 hover:text-slate-300"
-                    )}
-                  >
-                    {type}
-                  </button>
-                ))}
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Inventory Code / SKU</label>
+              <div className="relative">
+                <Hash className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
+                <input 
+                  value={formData.sku} 
+                  onChange={e => setFormData({...formData, sku: e.target.value.toUpperCase()})} 
+                  placeholder={formData.inventoryType === 'Warehouse Stock' ? 'WH-0000' : 'CL-0000'}
+                  className="w-full pl-12 pr-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-mono font-bold focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all placeholder:opacity-30" 
+                />
               </div>
             </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Classification</label>
+              <div className="w-full px-5 py-4 bg-white/10 border border-white/10 rounded-2xl text-white flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  {formData.inventoryType === 'Warehouse Stock' ? <Warehouse className="w-4 h-4 text-primary" /> : <User className="w-4 h-4 text-amber-500" />}
+                  <span className="text-xs font-bold uppercase tracking-tight">{formData.inventoryType}</span>
+                </div>
+                <div className={cn(
+                  "w-2 h-2 rounded-full animate-pulse",
+                  formData.inventoryType === 'Warehouse Stock' ? "bg-primary" : "bg-amber-500"
+                )} />
+              </div>
+            </div>
+          </div>
 
           <div className="space-y-4">
             <div className="space-y-2">
@@ -2364,7 +2767,7 @@ function ItemFormModal({ item, items, clients, onClose, user }: any) {
 
           <div className="grid grid-cols-1 gap-6">
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Storage Location</label>
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Project Outlet</label>
               <input required value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} placeholder="e.g., Aisle 4, Shelf B" className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
             </div>
           </div>
@@ -2390,29 +2793,77 @@ function ItemFormModal({ item, items, clients, onClose, user }: any) {
           </div>
 
           <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Job Number</label>
-              <input value={formData.jobNumber} onChange={e => setFormData({...formData, jobNumber: e.target.value})} placeholder="#JOB-000" className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
+            <div className="space-y-2 relative">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Job Number</label>
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
+                  <input 
+                    value={formData.jobNumber} 
+                    onChange={e => {
+                      setFormData({...formData, jobNumber: e.target.value});
+                      setShowProjectSuggestions(true);
+                    }} 
+                    onFocus={() => setShowProjectSuggestions(true)}
+                    placeholder="#JOB-000" 
+                    className="w-full pl-12 pr-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" 
+                  />
+                </div>
+                <AnimatePresence>
+                  {showProjectSuggestions && filteredProjects.length > 0 && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                    >
+                      <div className="max-h-48 overflow-y-auto custom-scrollbar">
+                        {filteredProjects.map((p: any) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => handleProjectSelect(p)}
+                            className="w-full px-6 py-4 flex items-center justify-between hover:bg-white/5 transition-colors text-left border-b border-white/[0.02] last:border-0"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <Building className="w-4 h-4 text-primary" />
+                              <div>
+                                <p className="text-sm font-bold text-white">{p.jobNumber}</p>
+                                <p className="text-[10px] text-slate-500 uppercase tracking-widest">{p.client}</p>
+                              </div>
+                            </div>
+                            <span className={cn(
+                              "text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded",
+                              p.status === 'Active' ? 'bg-green-500/10 text-green-500' : 'bg-slate-500/10 text-slate-500'
+                            )}>{p.status}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
             </div>
             <div className="space-y-2 relative">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Client</label>
-              <input 
-                value={formData.client} 
-                onChange={e => {
-                  setFormData({...formData, client: e.target.value});
-                  setShowClientSuggestions(true);
-                }}
-                onFocus={() => setShowClientSuggestions(true)}
-                placeholder="Client Name" 
-                className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all font-mono" 
-              />
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Client Name</label>
+              <div className="relative">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600" />
+                <input 
+                  value={formData.client} 
+                  onChange={e => {
+                    setFormData({...formData, client: e.target.value});
+                    setShowClientSuggestions(true);
+                  }}
+                  onFocus={() => setShowClientSuggestions(true)}
+                  placeholder="Client Organization" 
+                  className="w-full pl-12 pr-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" 
+                />
+              </div>
               <AnimatePresence>
                 {showClientSuggestions && filteredClients.length > 0 && (
                   <motion.div 
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
-                    className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden"
+                    className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
                   >
                     <div className="max-h-48 overflow-y-auto custom-scrollbar">
                       {filteredClients.map((c: any) => (
@@ -2420,13 +2871,18 @@ function ItemFormModal({ item, items, clients, onClose, user }: any) {
                           key={c.id}
                           type="button"
                           onClick={() => {
-                            setFormData({...formData, client: c.name});
+                            setFormData({ ...formData, client: c.name });
                             setShowClientSuggestions(false);
                           }}
                           className="w-full px-6 py-4 flex items-center space-x-3 hover:bg-white/5 transition-colors text-left border-b border-white/[0.02] last:border-0"
                         >
-                          <Building className="w-4 h-4 text-primary" />
-                          <span className="text-sm font-bold text-white">{c.name}</span>
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-[10px] font-bold">
+                            {c.name.substring(0, 2).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-white leading-tight">{c.name}</p>
+                            <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-0.5">Verified Client</p>
+                          </div>
                         </button>
                       ))}
                     </div>
@@ -2437,8 +2893,13 @@ function ItemFormModal({ item, items, clients, onClose, user }: any) {
           </div>
 
           <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Outlet</label>
-            <input value={formData.outlet} onChange={e => setFormData({...formData, outlet: e.target.value})} placeholder="Outlet location..." className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Project</label>
+            <input 
+              value={formData.outlet} 
+              onChange={e => setFormData({...formData, outlet: e.target.value})} 
+              placeholder={formData.inventoryType === 'Warehouse Stock' ? "Target Project Hub" : "Client Project Reference"} 
+              className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" 
+            />
           </div>
 
           <div className="bg-white/5 border border-white/10 rounded-[32px] p-6 space-y-6">
@@ -2542,6 +3003,8 @@ function ItemFormModal({ item, items, clients, onClose, user }: any) {
           >
             {loading ? 'Processing Registry...' : (showDuplicateWarning ? 'Proceed Anyway' : (item ? 'Update Inventory Member' : 'Deploy New Item'))}
           </button>
+          </>
+          )}
         </form>
       </motion.div>
     </>

@@ -22,6 +22,8 @@ interface SidebarProps {
   role: 'admin' | 'user';
 }
 
+import Logo from './Logo';
+
 export default function Sidebar({ activeTab, setActiveTab, role }: SidebarProps) {
   const [uptime, setUptime] = useState('99.9%');
   
@@ -44,23 +46,9 @@ export default function Sidebar({ activeTab, setActiveTab, role }: SidebarProps)
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          className="flex items-center space-x-2"
+          className="flex flex-col items-center"
         >
-          <div className="flex items-center space-x-3">
-            <div className="relative">
-              <div className="absolute -inset-1 bg-gradient-to-tr from-primary to-emerald-500 rounded-xl blur opacity-30 animate-pulse"></div>
-              <div className="relative w-9 h-9 bg-slate-900 rounded-xl flex items-center justify-center border border-white/10 shadow-2xl">
-                <Package className="text-primary w-5 h-5" />
-              </div>
-            </div>
-            <div className="flex flex-col">
-              <div className="flex items-center">
-                <span className="text-xl font-black tracking-tight text-white uppercase">ZE</span>
-                <span className="text-xl font-black tracking-tight text-primary uppercase">CORP</span>
-              </div>
-              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 -mt-1 bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-indigo-400">Inventory System</span>
-            </div>
-          </div>
+          <Logo className="scale-75" />
         </motion.div>
       </div>
 

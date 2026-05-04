@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, memo } from 'react';
 import { 
   TrendingUp, 
   Package, 
@@ -72,9 +72,9 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
     };
 
     fetchInsights();
-  }, [items.length]);
+  }, [items, transactions]);
 
-  const handleAiSearch = async (e: React.FormEvent) => {
+  const handleAiSearch = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!aiSearchQuery.trim()) {
       setAiResultIds(null);
@@ -85,7 +85,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
     const results = await processAiSearch(aiSearchQuery, items);
     setAiResultIds(results);
     setIsAiSearching(false);
-  };
+  }, [aiSearchQuery, items]);
 
   const stats = useMemo(() => {
     const filteredItems = stockTypeFilter === 'All' ? items : items.filter(i => i.inventoryType === stockTypeFilter);
@@ -174,7 +174,6 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
       }
 
       const matchesSearch = item.name.toLowerCase().includes(stockSearch.toLowerCase()) || 
-                           item.sku.toLowerCase().includes(stockSearch.toLowerCase()) ||
                            (item.brand && item.brand.toLowerCase().includes(stockSearch.toLowerCase())) ||
                            (item.modelNumber && item.modelNumber.toLowerCase().includes(stockSearch.toLowerCase()));
       const matchesJob = !stockJobFilter || (item.jobNumber && item.jobNumber.toLowerCase().includes(stockJobFilter.toLowerCase()));
@@ -185,12 +184,12 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
     });
   }, [items, stockSearch, stockJobFilter, stockClientFilter, stockLocationFilter, aiResultIds]);
 
-  const handleExportTransactions = () => {
+  const handleExportTransactions = useCallback(() => {
     const filteredTx = txTypeFilter === 'ALL' 
       ? transactions 
       : transactions.filter(tx => tx.type === txTypeFilter);
     generateTransactionsReport(filteredTx, { typeFilter: txTypeFilter });
-  };
+  }, [transactions, txTypeFilter]);
 
   return (
     <motion.div 
@@ -215,7 +214,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
               <span className="text-[10px] font-black text-primary uppercase tracking-[0.3em] leading-none">System Terminal Online</span>
             </div>
             
-            <h1 className="text-4xl md:text-6xl font-black text-white tracking-tight leading-tight">
+            <h1 className="text-3xl md:text-6xl font-black text-white tracking-tight leading-tight">
               Welcome back, <br className="md:hidden" />
               <motion.span 
                 initial={{ backgroundPosition: "0% 50%" }}
@@ -227,7 +226,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
                 {user.displayName?.split(' ')[0] || 'Friend'}
               </motion.span>
             </h1>
-            <p className="text-slate-400 text-sm md:text-base font-medium max-w-lg border-l-2 border-white/5 pl-4 ml-1">
+            <p className="text-slate-400 text-xs md:text-base font-medium max-w-lg border-l-2 border-white/5 pl-4 ml-1">
               Synchronizing with central grid. <span className="text-white">{items.length} assets</span> currently under management.
             </p>
           </div>
@@ -285,11 +284,11 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
               </div>
             </div>
 
-            <div className="flex-1 max-w-2xl px-4">
-              <div className="flex space-x-4 overflow-x-auto pb-2 scrollbar-hide">
+          <div className="flex-1 max-w-2xl px-1 md:px-4">
+              <div className="flex space-x-3 md:space-x-4 overflow-x-auto pb-4 custom-scrollbar-hide">
                 {isAnalyzing ? (
                   Array(2).fill(0).map((_, i) => (
-                    <div key={i} className="flex-shrink-0 w-64 h-16 bg-white/5 rounded-2xl animate-pulse border border-white/5" />
+                    <div key={i} className="flex-shrink-0 w-56 md:w-64 h-14 md:h-16 bg-white/5 rounded-2xl animate-pulse border border-white/5" />
                   ))
                 ) : (
                   insights.map((insight, idx) => (
@@ -299,7 +298,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: idx * 0.1 }}
                       className={cn(
-                        "flex-shrink-0 w-72 p-3 rounded-2xl border transition-all cursor-default",
+                        "flex-shrink-0 w-64 md:w-72 p-3 rounded-2xl border transition-all cursor-default shadow-lg",
                         insight.type === 'WARNING' ? "bg-red-500/10 border-red-500/20 text-red-100" :
                         insight.type === 'POSITIVE' ? "bg-green-500/10 border-green-500/20 text-green-100" :
                         "bg-white/5 border-white/10 text-slate-200"
@@ -332,33 +331,33 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
       )}
 
       {/* Global Stock Type Toggle */}
-      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 px-1">
+      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 md:gap-4 px-1">
         {[
           { id: 'All', label: 'All Inventory', icon: Package },
-          { id: 'Warehouse Stock', label: 'Warehouse Stock', icon: Globe },
-          { id: 'Client Stock', label: 'Client Stock', icon: HistoryIcon }
+          { id: 'Warehouse Stock', label: 'Warehouse', icon: Globe },
+          { id: 'Client Stock', label: 'Client', icon: HistoryIcon }
         ].map((type) => (
           <motion.button
             key={type.id}
             whileTap={{ scale: 0.95 }}
             onClick={() => setStockTypeFilter(type.id as any)}
             className={cn(
-              "flex items-center space-x-3 px-8 py-4 rounded-[24px] font-black uppercase tracking-widest text-[10px] transition-all border",
+              "flex items-center space-x-2 md:space-x-3 px-4 md:px-8 py-3 md:py-4 rounded-xl md:rounded-[24px] font-black uppercase tracking-widest text-[8px] md:text-[10px] transition-all border",
               stockTypeFilter === type.id 
                 ? "bg-primary border-primary text-white shadow-2xl shadow-primary/40 ring-4 ring-primary/20" 
                 : "bg-white/5 border-white/10 text-slate-500 hover:text-slate-200 hover:bg-white/10"
             )}
           >
-            <type.icon className="w-4 h-4" />
+            <type.icon className="w-3 h-3 md:w-4 md:h-4" />
             <span>{type.label}</span>
           </motion.button>
         ))}
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
         <StatCard 
-          label="Total Items" 
+          label="Items" 
           value={stats.totalItems} 
           icon={Package} 
           trend="+12%" 
@@ -366,7 +365,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
           color="blue"
         />
         <StatCard 
-          label="Active Projects" 
+          label="Jobs" 
           value={stats.totalProjects} 
           icon={Zap} 
           trend="Sync" 
@@ -374,16 +373,16 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
           color="indigo"
         />
         <StatCard 
-          label="Low Stock Alerts" 
+          label="Low Stock" 
           value={stats.lowStock} 
           icon={AlertCircle} 
-          trend={`${Math.round((stats.lowStock / stats.totalItems) * 100 || 0)}% of total`} 
+          trend={`${Math.round((stats.lowStock / (stats.totalItems || 1)) * 100)}%`} 
           trendUp={false} 
           color="amber"
           active={stats.lowStock > 0}
         />
         <StatCard 
-          label="Out of Stock" 
+          label="O.O.S" 
           value={stats.outOfStock} 
           icon={AlertCircle} 
           trend="Critical" 
@@ -391,14 +390,16 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
           color="red"
           active={stats.outOfStock > 0}
         />
-        <StatCard 
-          label="Total Activity" 
-          value={transactions.length} 
-          icon={TrendingUp} 
-          trend="+5 today" 
-          trendUp={true} 
-          color="indigo"
-        />
+        <div className="col-span-2 lg:col-span-1">
+          <StatCard 
+            label="Total Activity" 
+            value={transactions.length} 
+            icon={TrendingUp} 
+            trend="+5 today" 
+            trendUp={true} 
+            color="indigo"
+          />
+        </div>
       </div>
 
       {/* AI Daily Insights Section */}
@@ -503,7 +504,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
             </motion.div>
             <input 
               type="text" 
-              placeholder="Search ID/SKU..." 
+              placeholder="Search ID..." 
               value={stockSearch}
               onChange={(e) => setStockSearch(e.target.value)}
               className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all"
@@ -533,7 +534,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
             <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-primary transition-colors" />
             <input 
               type="text" 
-              placeholder="Location..." 
+              placeholder="Project Outlet..." 
               value={stockLocationFilter}
               onChange={(e) => setStockLocationFilter(e.target.value)}
               className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all"
@@ -550,7 +551,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
                 <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Item Name</th>
                 <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Available Stock</th>
                 <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Last Client</th>
-                <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Storage Location</th>
+                <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Project Outlet</th>
                 <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Job Number</th>
               </tr>
             </thead>
@@ -616,7 +617,6 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-sm font-bold text-white truncate">{item.name}</h4>
-                    <p className="text-[10px] text-slate-500 font-mono uppercase tracking-widest truncate">{item.sku}</p>
                   </div>
                 </div>
                 <div className="text-right ml-4">
@@ -628,7 +628,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
               </div>
               <div className="grid grid-cols-2 gap-2 pt-3 border-t border-white/5 text-[10px] font-black uppercase tracking-[0.1em]">
                 <div className="flex flex-col">
-                  <span className="text-slate-600">Location</span>
+                  <span className="text-slate-600">Project Outlet</span>
                   <span className="text-slate-300 truncate">{item.location}</span>
                 </div>
                 <div className="flex flex-col text-right">
@@ -852,7 +852,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
   );
 }
 
-function StatCard({ label, value, icon: Icon, trend, trendUp, color, active }: any) {
+const StatCard = memo(({ label, value, icon: Icon, trend, trendUp, color, active }: any) => {
   const colors: any = {
     blue: 'bg-primary/20 text-primary border border-primary/20 shadow-lg shadow-primary/10',
     amber: 'bg-amber-500/20 text-amber-500 border border-amber-500/20 shadow-lg shadow-amber-900/10',
@@ -865,24 +865,26 @@ function StatCard({ label, value, icon: Icon, trend, trendUp, color, active }: a
       whileHover={{ y: -5 }}
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className={`p-6 rounded-3xl glass-morphism border border-white/5 shadow-sm transition-all duration-300 ${active ? 'ring-2 ring-red-500/20 bg-red-500/5' : ''}`}
+      className={`p-4 md:p-6 rounded-[24px] md:rounded-3xl glass-morphism border border-white/5 shadow-sm transition-all duration-300 ${active ? 'ring-2 ring-red-500/20 bg-red-500/5' : ''}`}
     >
       <div className="flex items-start justify-between">
         <motion.div 
           whileHover={{ rotate: [0, -10, 10, -10, 0], scale: 1.1 }}
           transition={{ duration: 0.5 }}
-          className={`p-3 rounded-2xl ${colors[color]}`}
+          className={`p-2.5 md:p-3 rounded-xl md:rounded-2xl ${colors[color]}`}
         >
-          <Icon className="w-6 h-6" />
+          <Icon className="w-5 h-5 md:w-6 md:h-6" />
         </motion.div>
-        <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${trendUp ? 'bg-green-500/10 text-green-400' : 'bg-white/5 text-slate-400'}`}>
+        <span className={`text-[8px] md:text-[10px] font-bold px-1.5 md:px-2 py-0.5 md:py-1 rounded-full ${trendUp ? 'bg-green-500/10 text-green-400' : 'bg-white/5 text-slate-400'}`}>
           {trend}
         </span>
       </div>
-      <div className="mt-4">
-        <p className="text-slate-400 text-sm font-medium">{label}</p>
-        <h3 className="text-3xl font-bold text-white mt-1">{value}</h3>
+      <div className="mt-3 md:mt-4">
+        <p className="text-slate-400 text-xs md:text-sm font-medium">{label}</p>
+        <h3 className="text-2xl md:text-3xl font-bold text-white mt-0.5 md:mt-1">{value}</h3>
       </div>
     </motion.div>
   );
-}
+});
+
+StatCard.displayName = 'StatCard';

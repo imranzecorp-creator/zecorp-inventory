@@ -21,6 +21,8 @@ interface HeaderProps {
   setActiveTab: (tab: string) => void;
 }
 
+import Logo from './Logo';
+
 export default function Header({ user, unreadCount, notifications, setActiveTab }: HeaderProps) {
   const [showNotify, setShowNotify] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
@@ -34,8 +36,13 @@ export default function Header({ user, unreadCount, notifications, setActiveTab 
   };
 
   return (
-    <header className="h-16 glass-morphism border-b border-white/5 px-4 md:px-8 flex items-center justify-between sticky top-0 z-40">
-      <div className="flex-1 max-w-xl hidden md:block">
+    <header className="h-16 glass-morphism border-b border-white/5 px-4 md:px-8 flex items-center justify-between sticky top-0 z-[100]">
+      <div className="flex items-center gap-4">
+        <Logo variant="full" className="scale-50 origin-left hidden md:flex" />
+        <Logo variant="icon" className="md:hidden" />
+      </div>
+
+      <div className="flex-1 max-w-xl mx-4">
         <div className="relative group">
           <motion.div
             whileFocus={{ scale: 1.2, color: 'var(--color-primary)' }}
@@ -45,7 +52,7 @@ export default function Header({ user, unreadCount, notifications, setActiveTab 
           </motion.div>
           <input 
             type="text" 
-            placeholder="Search items, SKU, location..." 
+            placeholder="Search items, location..." 
             className="w-full pl-10 pr-12 py-2 bg-white/5 border border-white/10 rounded-full text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all font-display"
           />
           <div className="absolute right-3 top-1/2 -translate-y-1/2 hidden lg:flex items-center space-x-1 px-1.5 py-0.5 rounded border border-white/10 bg-white/5 pointer-events-none">
@@ -89,7 +96,7 @@ export default function Header({ user, unreadCount, notifications, setActiveTab 
                   initial={{ opacity: 0, y: 10, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute right-0 mt-4 w-80 glass-morphism rounded-3xl shadow-2xl border border-white/10 overflow-hidden z-50 origin-top-right"
+                  className="absolute right-0 mt-4 w-[90vw] md:w-80 glass-morphism rounded-3xl shadow-2xl border border-white/10 overflow-hidden z-50 origin-top-right backdrop-blur-3xl"
                 >
                   <div className="p-5 border-b border-white/5 flex justify-between items-center bg-white/5 backdrop-blur-3xl">
                     <h3 className="font-display font-bold text-white tracking-tight">Notifications</h3>
@@ -150,7 +157,7 @@ export default function Header({ user, unreadCount, notifications, setActiveTab 
                   initial={{ opacity: 0, y: 10, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute right-0 mt-2 w-64 glass-morphism rounded-3xl shadow-2xl border border-white/10 overflow-hidden z-50 origin-top-right backdrop-blur-3xl"
+                  className="absolute right-0 mt-2 w-72 md:w-64 glass-morphism rounded-3xl shadow-2xl border border-white/10 overflow-hidden z-50 origin-top-right backdrop-blur-3xl"
                 >
                   <div className="p-5 border-b border-white/5 bg-white/[0.03]">
                     <p className="text-sm font-bold text-white truncate">{user.displayName}</p>

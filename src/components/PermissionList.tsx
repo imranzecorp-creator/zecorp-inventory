@@ -33,21 +33,21 @@ export default function PermissionList({ className }: PermissionListProps) {
     {
       action: "Create New Items",
       guest: false,
-      verified: false,
+      verified: true,
       admin: true,
       description: "Add new product codes and records to the system."
     },
     {
       action: "Edit Catalog Details",
       guest: false,
-      verified: false,
+      verified: true,
       admin: true,
-      description: "Modify structure like Name, SKU, Codes, or Location."
+      description: "Modify structure like Name, Codes, or Location."
     },
     {
       action: "Delete Records",
       guest: false,
-      verified: false,
+      verified: true,
       admin: true,
       description: "Permanently remove items or history from the database."
     },
@@ -131,7 +131,7 @@ export default function PermissionList({ className }: PermissionListProps) {
       <div className="mt-10 p-6 bg-primary/5 rounded-3xl border border-primary/10 flex items-start space-x-4">
         <Info className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
         <p className="text-xs text-primary/80 leading-relaxed font-medium">
-          <strong className="text-white">Note:</strong> Admin privileges are required for all structural alterations including item creation, deletion, and database schema updates. Verified users can perform stock modifications after email confirmation.
+          <strong className="text-white">Note:</strong> Admin and Approved users have full control over catalog records. Guest users have read-only access until their email is verified and approved by an administrator.
         </p>
       </div>
     </motion.div>

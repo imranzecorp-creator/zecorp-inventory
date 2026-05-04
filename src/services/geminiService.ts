@@ -121,7 +121,7 @@ export async function processAiSearch(query: string, items: InventoryItem[]): Pr
         Identify the IDs of items that match this natural language query: "${query}"
         
         Items:
-        ${JSON.stringify(items.map(i => ({ id: i.id, name: i.name, sku: i.sku, qty: i.currentQuantity, min: i.minStock })))}
+        ${JSON.stringify(items.map(i => ({ id: i.id, name: i.name, qty: i.currentQuantity, min: i.minStock })))}
       `,
       config: {
         responseMimeType: "application/json",

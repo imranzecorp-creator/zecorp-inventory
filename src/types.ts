@@ -4,22 +4,29 @@ export interface UserProfile {
   displayName?: string;
   photoURL?: string;
   role: 'admin' | 'user';
-  createdAt: number;
+  isApproved: boolean;
+  createdAt: any;
+}
+
+export interface ApprovedEmail {
+  id: string;
+  email: string;
+  addedBy: string;
+  createdAt: any;
 }
 
 export interface InventoryItem {
   id: string;
   name: string;
-  sku?: string;
   description: string;
   location: string;
   currentQuantity: number;
   minStock: number;
   imageUrl?: string;
-  lastUpdated: number;
+  lastUpdated: any;
   jobNumber?: string;
   client?: string;
-  stockInDate?: number;
+  stockInDate?: any;
   brand?: string;
   modelNumber?: string;
   supplier?: string;
@@ -31,13 +38,12 @@ export interface StockTransaction {
   id: string;
   itemId: string;
   itemName: string;
-  itemSku?: string;
   brand?: string;
   modelNumber?: string;
   type: 'IN' | 'OUT';
   quantity: number;
   client: string;
-  date: number;
+  date: any;
   userId: string;
   userName: string;
   notes?: string;
@@ -54,7 +60,7 @@ export interface Post {
   authorPhoto?: string;
   content: string;
   imageUrl?: string;
-  createdAt: number;
+  createdAt: any;
   likes: string[]; // List of user IDs
 }
 
@@ -65,7 +71,7 @@ export interface Comment {
   authorName: string;
   authorPhoto?: string;
   content: string;
-  createdAt: number;
+  createdAt: any;
 }
 
 export interface ChatMessage {
@@ -74,7 +80,7 @@ export interface ChatMessage {
   senderName: string;
   content: string;
   isAi: boolean;
-  createdAt: number;
+  createdAt: any;
 }
 
 export interface AppNotification {
@@ -83,7 +89,7 @@ export interface AppNotification {
   type: string;
   message: string;
   read: boolean;
-  createdAt: number;
+  createdAt: any;
   isPublic?: boolean;
 }
 
@@ -109,7 +115,7 @@ export interface Project {
   totalQuantityOut?: number;
   status: 'Active' | 'Completed' | 'Draft';
   items: ProjectItem[];
-  createdAt: number;
-  updatedAt: number;
+  createdAt: any;
+  updatedAt: any;
   userId: string;
 }

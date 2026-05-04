@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { 
   ArrowUpRight, 
   ArrowDownRight, 
@@ -41,58 +41,59 @@ export default function TransactionHistory({ transactions }: TransactionHistoryP
   const [outletFilter, setOutletFilter] = useState('');
   const [inventoryTypeFilter, setInventoryTypeFilter] = useState<'Warehouse Stock' | 'Client Stock' | ''>('');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [includeSku, setIncludeSku] = useState(false);
   const [includeNotes, setIncludeNotes] = useState(false);
   const [showExportOptions, setShowExportOptions] = useState(false);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [showAiSummary, setShowAiSummary] = useState(false);
 
-  const filtered = transactions.filter(tx => {
-    const searchLow = searchTerm.toLowerCase();
-    const itemName = tx.itemName?.toLowerCase() || '';
-    const brand = tx.brand?.toLowerCase() || '';
-    const model = tx.modelNumber?.toLowerCase() || '';
-    const client = tx.client?.toLowerCase() || '';
-    const representative = tx.userName?.toLowerCase() || '';
-    const jobNum = tx.jobNumber?.toLowerCase() || '';
-    const location = tx.location?.toLowerCase() || '';
-    const outlet = tx.outlet?.toLowerCase() || '';
+  const filtered = useMemo(() => {
+    return transactions.filter(tx => {
+      const searchLow = searchTerm.toLowerCase();
+      const itemName = tx.itemName?.toLowerCase() || '';
+      const brand = tx.brand?.toLowerCase() || '';
+      const model = tx.modelNumber?.toLowerCase() || '';
+      const client = tx.client?.toLowerCase() || '';
+      const representative = tx.userName?.toLowerCase() || '';
+      const jobNum = tx.jobNumber?.toLowerCase() || '';
+      const location = tx.location?.toLowerCase() || '';
+      const outlet = tx.outlet?.toLowerCase() || '';
 
-    const matchesSearch = 
-      itemName.includes(searchLow) ||
-      brand.includes(searchLow) ||
-      model.includes(searchLow) ||
-      client.includes(searchLow) ||
-      representative.includes(searchLow) ||
-      jobNum.includes(searchLow) ||
-      location.includes(searchLow) ||
-      outlet.includes(searchLow);
-    
-    if (!matchesSearch) return false;
+      const matchesSearch = 
+        itemName.includes(searchLow) ||
+        brand.includes(searchLow) ||
+        model.includes(searchLow) ||
+        client.includes(searchLow) ||
+        representative.includes(searchLow) ||
+        jobNum.includes(searchLow) ||
+        location.includes(searchLow) ||
+        outlet.includes(searchLow);
+      
+      if (!matchesSearch) return false;
 
-    // Advanced Filters
-    if (typeFilter !== 'ALL' && tx.type !== typeFilter) return false;
-    if (clientFilter && !client.includes(clientFilter.toLowerCase())) return false;
-    if (locationFilter && !location.includes(locationFilter.toLowerCase())) return false;
-    if (userFilter && !representative.includes(userFilter.toLowerCase())) return false;
-    if (outletFilter && !outlet.includes(outletFilter.toLowerCase())) return false;
-    if (inventoryTypeFilter && tx.inventoryType !== inventoryTypeFilter) return false;
+      // Advanced Filters
+      if (typeFilter !== 'ALL' && tx.type !== typeFilter) return false;
+      if (clientFilter && !client.includes(clientFilter.toLowerCase())) return false;
+      if (locationFilter && !location.includes(locationFilter.toLowerCase())) return false;
+      if (userFilter && !representative.includes(userFilter.toLowerCase())) return false;
+      if (outletFilter && !outlet.includes(outletFilter.toLowerCase())) return false;
+      if (inventoryTypeFilter && tx.inventoryType !== inventoryTypeFilter) return false;
 
-    if (startDate || endDate) {
-      const txDate = new Date(tx.date);
-      if (startDate && txDate < new Date(startDate)) return false;
-      if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        if (txDate > end) return false;
+      if (startDate || endDate) {
+        const txDate = new Date(tx.date);
+        if (startDate && txDate < new Date(startDate)) return false;
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          if (txDate > end) return false;
+        }
       }
-    }
 
-    return true;
-  });
+      return true;
+    });
+  }, [transactions, searchTerm, typeFilter, clientFilter, locationFilter, userFilter, outletFilter, inventoryTypeFilter, startDate, endDate]);
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setSearchTerm('');
     setStartDate('');
     setEndDate('');
@@ -102,11 +103,10 @@ export default function TransactionHistory({ transactions }: TransactionHistoryP
     setUserFilter('');
     setOutletFilter('');
     setInventoryTypeFilter('');
-  };
+  }, []);
 
-  const handleExport = () => {
+  const handleExport = useCallback(() => {
     generateTransactionsReport(filtered, {
-      includeSku,
       includeNotes,
       dateRange: startDate || endDate ? { start: startDate, end: endDate } : undefined,
       typeFilter: typeFilter,
@@ -120,19 +120,19 @@ export default function TransactionHistory({ transactions }: TransactionHistoryP
       }
     });
     setShowExportOptions(false);
-  };
+  }, [filtered, includeNotes, startDate, endDate, typeFilter, searchTerm, clientFilter, locationFilter, userFilter, outletFilter, inventoryTypeFilter]);
 
-  const toggleExpand = (id: string) => {
-    setExpandedId(expandedId === id ? null : id);
-  };
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedId(prev => prev === id ? null : id);
+  }, []);
 
-  const handleGenerateAiSummary = async () => {
+  const handleGenerateAiSummary = useCallback(async () => {
     setIsSummarizing(true);
     setShowAiSummary(true);
     const summary = await summarizeTransactions(filtered);
     setAiSummary(summary);
     setIsSummarizing(false);
-  };
+  }, [filtered]);
 
   return (
     <motion.div 
@@ -189,15 +189,6 @@ export default function TransactionHistory({ transactions }: TransactionHistoryP
                   <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest">Report Customization</h3>
                   
                   <div className="space-y-2">
-                    <label className="flex items-center space-x-2 cursor-pointer group">
-                      <input 
-                        type="checkbox" 
-                        checked={includeSku} 
-                        onChange={(e) => setIncludeSku(e.target.checked)}
-                        className="w-4 h-4 rounded border-white/10 bg-white/5 text-primary focus:ring-primary/20"
-                      />
-                      <span className="text-xs text-slate-300 group-hover:text-white transition-colors">Include Master SKU</span>
-                    </label>
                     <label className="flex items-center space-x-2 cursor-pointer group">
                       <input 
                         type="checkbox" 
@@ -379,12 +370,12 @@ export default function TransactionHistory({ transactions }: TransactionHistoryP
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Location</label>
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Project Outlet</label>
                   <input 
                     type="text"
                     value={locationFilter}
                     onChange={(e) => setLocationFilter(e.target.value)}
-                    placeholder="Filter by location..."
+                    placeholder="Filter by outlet..."
                     className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
                   />
                 </div>
@@ -546,10 +537,6 @@ export default function TransactionHistory({ transactions }: TransactionHistoryP
                                 <span>Reference Details</span>
                               </div>
                               <div className="flex flex-col space-y-1">
-                                <span className="text-xs text-slate-400">Master SKU</span>
-                                <span className="text-sm font-mono font-bold text-white uppercase">{tx.itemSku || 'N/A'}</span>
-                              </div>
-                              <div className="flex flex-col space-y-1 mt-1">
                                 <span className="text-xs text-slate-400">Brand & Model</span>
                                 <span className="text-sm font-bold text-white uppercase">{tx.brand || 'N/A'} {tx.modelNumber || ''}</span>
                               </div>
@@ -688,10 +675,6 @@ export default function TransactionHistory({ transactions }: TransactionHistoryP
                         <div className="space-y-1">
                           <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Brand / Model</p>
                           <p className="text-xs font-bold text-white truncate">{tx.brand || 'N/A'} {tx.modelNumber || ''}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">SKU</p>
-                          <p className="text-xs font-mono font-bold text-white truncate">{tx.itemSku || 'N/A'}</p>
                         </div>
                       </div>
                       <div className="p-3 bg-white/5 rounded-xl border border-white/5 italic text-xs text-slate-400">

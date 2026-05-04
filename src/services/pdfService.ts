@@ -3,7 +3,6 @@ import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
 
 export interface TransactionReportOptions {
-  includeSku?: boolean;
   includeNotes?: boolean;
   dateRange?: { start: string; end: string };
   typeFilter?: string;
@@ -68,12 +67,11 @@ export async function generateInventoryReport(items: any[], activeFilters?: any)
     }
   }
   
-  const headers = [["Item Name", "Brand/Model", "SKU", "Type", "Qty", "Job#", "Client", "Location"]];
+  const headers = [["Item Name", "Brand/Model", "Type", "Qty", "Job#", "Client", "Location"]];
   
   const tableData = items.map(item => [
     item.name,
     `${item.brand || '-'} / ${item.modelNumber || '-'}`,
-    item.sku || 'N/A',
     item.inventoryType || 'Warehouse',
     item.currentQuantity,
     item.jobNumber || 'N/A',
@@ -100,7 +98,7 @@ export async function generateInventoryReport(items: any[], activeFilters?: any)
 }
 
 export async function generateTransactionsReport(transactions: any[], options: TransactionReportOptions = {}) {
-  const { includeSku = false, includeNotes = false, dateRange, typeFilter = 'ALL', activeFilters } = options;
+  const { includeNotes = false, dateRange, typeFilter = 'ALL', activeFilters } = options;
   const doc = new jsPDF();
   
   // Title
@@ -145,7 +143,7 @@ export async function generateTransactionsReport(transactions: any[], options: T
   const tableData = transactions.map(tx => {
     const row = [
       new Date(tx.date).toLocaleDateString(),
-      `${tx.itemName}${tx.brand ? ` (${tx.brand} ${tx.modelNumber || ''})` : ''}${includeSku && tx.itemSku ? ` [${tx.itemSku}]` : ''}`,
+      `${tx.itemName}${tx.brand ? ` (${tx.brand} ${tx.modelNumber || ''})` : ''}`,
       tx.type === 'IN' ? 'STOCK IN' : 'STOCK OUT',
       tx.quantity,
       tx.jobNumber || 'N/A',

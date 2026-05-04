@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { 
   Heart, 
   MessageCircle, 
@@ -22,7 +22,8 @@ import {
   updateDoc, 
   arrayUnion, 
   arrayRemove,
-  limit
+  limit,
+  serverTimestamp
 } from 'firebase/firestore';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { UserProfile, Post, Comment } from '../types';
@@ -58,7 +59,7 @@ export default function SocialFeed({ user }: SocialFeedProps) {
         authorPhoto: user.photoURL,
         content: newPost,
         imageUrl: imageUrl,
-        createdAt: Date.now(),
+        createdAt: serverTimestamp(),
         likes: []
       });
       setNewPost('');
@@ -141,7 +142,7 @@ export default function SocialFeed({ user }: SocialFeedProps) {
   );
 }
 
-function PostCard({ post, currentUser }: { post: Post, currentUser: UserProfile }) {
+const PostCard = memo(({ post, currentUser }: { post: Post, currentUser: UserProfile }) => {
   const [likes, setLikes] = useState(post.likes || []);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -183,7 +184,7 @@ function PostCard({ post, currentUser }: { post: Post, currentUser: UserProfile 
         authorName: currentUser.displayName,
         authorPhoto: currentUser.photoURL,
         content: newComment,
-        createdAt: Date.now()
+        createdAt: serverTimestamp()
       });
       setNewComment('');
     } catch (error) { console.error(error); }
@@ -273,7 +274,13 @@ function PostCard({ post, currentUser }: { post: Post, currentUser: UserProfile 
                 <div className="flex-1 bg-white/[0.03] p-3 rounded-2xl shadow-sm border border-white/5">
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-xs font-bold text-white">{comment.authorName}</span>
-                    <span className="text-[10px] text-slate-500 font-bold uppercase">{formatDistanceToNow(comment.createdAt)} ago</span>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase">
+                      {formatDistanceToNow(
+                        typeof comment.createdAt?.toDate === 'function' 
+                          ? comment.createdAt.toDate() 
+                          : comment.createdAt || Date.now()
+                      )} ago
+                    </span>
                   </div>
                   <p className="text-xs text-slate-300">{comment.content}</p>
                 </div>
@@ -303,4 +310,6 @@ function PostCard({ post, currentUser }: { post: Post, currentUser: UserProfile 
       )}
     </motion.div>
   );
-}
+});
+
+PostCard.displayName = 'PostCard';

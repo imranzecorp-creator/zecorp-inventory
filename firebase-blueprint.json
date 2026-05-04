@@ -20,23 +20,22 @@
       "type": "object",
       "properties": {
         "name": { "type": "string" },
-        "sku": { "type": "string" },
         "description": { "type": "string" },
         "location": { "type": "string" },
         "currentQuantity": { "type": "number" },
         "minStock": { "type": "number" },
         "imageUrl": { "type": "string" },
-        "lastUpdated": { "type": "string", "format": "date-time" },
+        "lastUpdated": { "type": "number" },
         "jobNumber": { "type": "string" },
         "client": { "type": "string" },
-        "stockInDate": { "type": "string", "format": "date-time" },
+        "stockInDate": { "type": "number" },
         "brand": { "type": "string" },
         "modelNumber": { "type": "string" },
         "supplier": { "type": "string" },
         "outlet": { "type": "string" },
         "inventoryType": { "type": "string", "enum": ["Warehouse Stock", "Client Stock"] }
       },
-      "required": ["name", "sku", "currentQuantity"]
+      "required": ["name", "currentQuantity"]
     },
     "StockTransaction": {
       "title": "Stock Transaction",
