@@ -135,66 +135,80 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    let profileUnsub: (() => void) | null = null;
+    
     const unsubscribe = onAuthStateChanged(auth, async (idUser) => {
       if (idUser) {
-        const userDoc = await getDoc(doc(db, 'users', idUser.uid));
         const email = idUser.email?.toLowerCase() || '';
-
-        if (userDoc.exists()) {
-          let userData = userDoc.data() as UserProfile;
-          const isAdmin = email === 'imranzecorp@gmail.com';
-          
-          // Force admin role if it's the specified admin email
-          if (isAdmin && userData.role !== 'admin') {
-            await updateDoc(doc(db, 'users', idUser.uid), { role: 'admin', isApproved: true });
-            userData = { ...userData, role: 'admin', isApproved: true };
-          }
-
-          // Cross-check with approved_emails if not already approved/admin
-          if (userData.role !== 'admin' && !userData.isApproved) {
-            const approvedQuery = query(collection(db, 'approved_emails'), where('email', '==', email));
-            const approvedSnap = await getDocs(approvedQuery);
-            if (!approvedSnap.empty) {
-              await updateDoc(doc(db, 'users', idUser.uid), { isApproved: true });
-              setUser({ ...userData, isApproved: true });
-            } else {
-              setUser(userData);
+        const userRef = doc(db, 'users', idUser.uid);
+        
+        // Listen to the user document for real-time profile updates (like approval)
+        profileUnsub = onSnapshot(userRef, async (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            const isAdmin = email === 'imranzecorp@gmail.com';
+            let userData = {
+               ...data,
+               isApproved: !!data.isApproved || data.role === 'admin' || isAdmin
+            } as UserProfile;
+            
+            // Auto-promote hardcoded admin
+            if (isAdmin && (userData.role !== 'admin' || !userData.isApproved)) {
+              await updateDoc(userRef, { role: 'admin', isApproved: true });
+              // onSnapshot will trigger again after this update
             }
-          } else {
-            setUser(userData);
-          }
-        } else {
-          const isAdmin = email === 'imranzecorp@gmail.com';
-          
-          let isApproved = isAdmin;
-          if (!isAdmin) {
-            const approvedQuery = query(collection(db, 'approved_emails'), where('email', '==', email));
-            const approvedSnap = await getDocs(approvedQuery);
-            isApproved = !approvedSnap.empty;
-          }
 
-          const newUser: UserProfile = {
-            uid: idUser.uid,
-            email: email,
-            displayName: idUser.displayName || 'User',
-            photoURL: idUser.photoURL || '',
-            role: isAdmin ? 'admin' : 'user',
-            isApproved: isApproved,
-            createdAt: Date.now(), // Use number for immediate local usage to avoid crash in ProfileSettings
-          };
-          await setDoc(doc(db, 'users', idUser.uid), {
-            ...newUser,
-            createdAt: serverTimestamp() // Use server timestamp in DB
-          });
-          setUser(newUser);
-        }
+            // Cross-check with approved_emails whitelist if not admin or approved
+            if (userData.role !== 'admin' && !userData.isApproved) {
+              const approvedQuery = query(collection(db, 'approved_emails'), where('email', '==', email));
+              const approvedSnap = await getDocs(approvedQuery);
+              if (!approvedSnap.empty) {
+                await updateDoc(userRef, { isApproved: true });
+                // onSnapshot will trigger again
+              }
+            }
+            
+            setUser(userData);
+            setLoading(false);
+          } else {
+            // New User flow
+            const isAdmin = email === 'imranzecorp@gmail.com';
+            let isApproved = isAdmin;
+            
+            if (!isAdmin) {
+              const approvedQuery = query(collection(db, 'approved_emails'), where('email', '==', email));
+              const approvedSnap = await getDocs(approvedQuery);
+              isApproved = !approvedSnap.empty;
+            }
+
+            const newUser: UserProfile = {
+              uid: idUser.uid,
+              email: email,
+              displayName: idUser.displayName || 'User',
+              photoURL: idUser.photoURL || '',
+              role: isAdmin ? 'admin' : 'user',
+              isApproved: isApproved,
+              createdAt: Date.now(),
+            };
+            
+            await setDoc(userRef, {
+              ...newUser,
+              createdAt: serverTimestamp()
+            });
+            // onSnapshot will handle setting the user state once document is created
+          }
+        });
       } else {
+        if (profileUnsub) profileUnsub();
         setUser(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (profileUnsub) profileUnsub();
+    };
   }, []);
 
   // Sync Data
@@ -308,45 +322,7 @@ export default function App() {
     return <Login />;
   }
 
-  if (!user.isApproved && user.role !== 'admin') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#020617] p-4 text-center">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-md w-full glass-morphism p-12 rounded-[40px] border border-white/10 shadow-2xl space-y-8"
-        >
-          <div className="w-20 h-20 bg-amber-500/10 rounded-3xl flex items-center justify-center mx-auto ring-1 ring-amber-500/20">
-            <AlertCircle className="w-10 h-10 text-amber-500" />
-          </div>
-          <div>
-            <h2 className="text-3xl font-black text-white uppercase tracking-tight mb-3">Awaiting Approval</h2>
-            <p className="text-slate-400 font-medium leading-relaxed">
-              Your account (<span className="text-white font-bold">{user.email}</span>) is currently pending admin approval. 
-              Please contact your administrator to grant access to the ZECORP Inventory System.
-            </p>
-          </div>
-          <div className="pt-4 flex flex-col space-y-3">
-             <button 
-              onClick={() => window.location.reload()}
-              className="w-full py-4 bg-primary text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-primary/20 hover:bg-primary/80 transition-all active:scale-95"
-            >
-              Check Status
-            </button>
-            <button 
-              onClick={() => signOut(auth)}
-              className="w-full py-4 bg-white/5 text-slate-400 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-white/10 hover:text-white transition-all active:scale-95 border border-white/5"
-            >
-              Log Out
-            </button>
-          </div>
-          <div className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] pt-4">
-            Security Status: Authenticated / Unauthorized
-          </div>
-        </motion.div>
-      </div>
-    );
-  }
+  const isApproved = user.isApproved || user.role === 'admin';
 
   return (
     <div className="flex h-screen overflow-hidden selection:bg-primary/30 selection:text-white bg-[#020617]/90 relative">
@@ -364,6 +340,21 @@ export default function App() {
           setActiveTab={setActiveTab}
         />
         
+        {!isApproved && (
+          <div className="bg-amber-500/10 border-y border-amber-500/20 px-4 py-2 flex items-center justify-center space-x-3 backdrop-blur-md">
+            <AlertCircle className="w-4 h-4 text-amber-500 animate-pulse" />
+            <p className="text-[10px] md:text-xs font-black text-amber-500 uppercase tracking-[0.2em]">
+              Guest Mode / Awaiting Admin Verification • Some features are restricted
+            </p>
+            <button 
+              onClick={() => signOut(auth)}
+              className="text-[10px] font-black text-white bg-amber-500/20 px-2 py-0.5 rounded hover:bg-amber-500/30 transition-all uppercase tracking-widest"
+            >
+              Sign Out
+            </button>
+          </div>
+        )}
+
         <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8 custom-scrollbar">
           <div className="max-w-7xl mx-auto">
             <AnimatePresence mode="wait">

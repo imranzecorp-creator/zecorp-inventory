@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { InventoryItem, StockTransaction } from "../types";
+import { InventoryItem, StockTransaction, ProjectItem } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
 
@@ -174,6 +174,142 @@ export async function getAiResponse(message: string): Promise<string> {
 
     console.error("Gemini Chat Error:", error);
     return "I'm experiencing some technical difficulties at the moment.";
+  }
+}
+
+export async function mapExcelItems(rawData: any[]): Promise<Partial<ProjectItem>[]> {
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `
+        Map this raw data from an Excel file to the application's ProjectItem schema.
+        
+        ProjectItem Schema & Guidance:
+        - name: string (Mapping to "Item description" or similar)
+        - brand: string (The manufacturer or brand)
+        - model: string (The model number or specific identifier)
+        - quantity: number (The quantity of items)
+        - supplier: string (Who supplied the item)
+        - location: string (Mapping to "unit location" or where the item is stored)
+        - approvedQuote: string (Mapping to "Approved quote column" or pricing/quote info)
+        - category: string (Mapping to "category description")
+        - posNo: string (Mapping to "pos no")
+        - eta: string (Estimated Time of Arrival)
+        - delivery: string (Delivery status or details)
+        
+        Raw Data (sample or all):
+        ${JSON.stringify(rawData.slice(0, 50))}
+        
+        Identify which columns correspond to the fields above. If a field is missing, leave it as an empty string (or 0 for quantity).
+        Return a JSON array of objects that strictly follow the schema. Ensure quantity is a number.
+      `,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              name: { type: Type.STRING },
+              brand: { type: Type.STRING },
+              model: { type: Type.STRING },
+              quantity: { type: Type.NUMBER },
+              supplier: { type: Type.STRING },
+              location: { type: Type.STRING },
+              approvedQuote: { type: Type.STRING },
+              category: { type: Type.STRING },
+              posNo: { type: Type.STRING },
+              eta: { type: Type.STRING },
+              delivery: { type: Type.STRING }
+            },
+            required: ['name', 'quantity']
+          }
+        }
+      }
+    });
+
+    return JSON.parse(response.text || "[]");
+  } catch (error: any) {
+    console.error("Gemini Excel Mapping Error:", error);
+    return [];
+  }
+}
+
+export async function mapExcelProjects(rawData: any[]): Promise<any[]> {
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `
+        Map this raw data from an Excel file to the application's Project and ProjectItem schema.
+        The data might contain multiple rows for the same project (identified by Job Number).
+        
+        Project Schema:
+        - client: string
+        - jobNumber: string
+        - outlet: string
+        - location: string
+        
+        ProjectItem Schema (belonging to a project):
+        - name: string (Mapping to "Item description")
+        - brand: string
+        - model: string
+        - quantity: number
+        - supplier: string
+        - location: string (Mapping to "unit location")
+        - approvedQuote: string (Mapping to "Approved quote column")
+        - category: string (Mapping to "category description")
+        - posNo: string (Mapping to "pos no")
+        - eta: string
+        - delivery: string
+        
+        Raw Data (sample):
+        ${JSON.stringify(rawData.slice(0, 50))}
+        
+        Return a JSON array of projects, where each project has the fields above and an "items" array of ProjectItems.
+        Ensure quantity is a number.
+      `,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              client: { type: Type.STRING },
+              jobNumber: { type: Type.STRING },
+              outlet: { type: Type.STRING },
+              location: { type: Type.STRING },
+              items: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    name: { type: Type.STRING },
+                    brand: { type: Type.STRING },
+                    model: { type: Type.STRING },
+                    quantity: { type: Type.NUMBER },
+                    supplier: { type: Type.STRING },
+                    location: { type: Type.STRING },
+                    approvedQuote: { type: Type.STRING },
+                    category: { type: Type.STRING },
+                    posNo: { type: Type.STRING },
+                    eta: { type: Type.STRING },
+                    delivery: { type: Type.STRING }
+                  },
+                  required: ['name', 'quantity']
+                }
+              }
+            },
+            required: ['client', 'jobNumber', 'items']
+          }
+        }
+      }
+    });
+
+    return JSON.parse(response.text || "[]");
+  } catch (error: any) {
+    console.error("Gemini Project Mapping Error:", error);
+    return [];
   }
 }
 

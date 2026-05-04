@@ -103,6 +103,11 @@ export interface ProjectItem {
   location?: string;
   quantityIn?: number;
   quantityOut?: number;
+  approvedQuote?: string;
+  category?: string;
+  posNo?: string;
+  eta?: string;
+  delivery?: string;
 }
 
 export interface Project {

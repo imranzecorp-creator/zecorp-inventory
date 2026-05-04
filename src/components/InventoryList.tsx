@@ -23,9 +23,11 @@ import {
   User,
   Warehouse,
   ChevronDown,
-  Hash
+  Hash,
+  FileUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import * as XLSX from 'xlsx';
 import { 
   collection, 
   addDoc, 
@@ -43,7 +45,7 @@ import { db, OperationType, handleFirestoreError, auth } from '../lib/firebase';
 import { InventoryItem, UserProfile, Project } from '../types';
 import { cn, formatDate } from '../lib/utils';
 import { generateInventoryReport } from '../services/pdfService';
-import { suggestItemDetails, processAiSearch } from '../services/geminiService';
+import { suggestItemDetails, processAiSearch, mapExcelItems } from '../services/geminiService';
 
 import { FilterDropdown } from './ui/FilterDropdown';
 
@@ -57,8 +59,62 @@ interface InventoryListProps {
 export default function InventoryList({ items, clients, user, projects }: InventoryListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAiSearching, setIsAiSearching] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [aiFilteredIds, setAiFilteredIds] = useState<string[] | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const inventoryFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleInventoryExcelUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        if (data.length === 0) {
+          alert('Excel file is empty');
+          return;
+        }
+
+        const aiMappedItems = await mapExcelItems(data);
+        
+        const batch = writeBatch(db);
+        for (const itemData of aiMappedItems) {
+          const newDocRef = doc(collection(db, 'inventory'));
+          batch.set(newDocRef, {
+            name: itemData.name || 'Unnamed Item',
+            brand: itemData.brand || '',
+            modelNumber: itemData.model || '',
+            currentQuantity: itemData.quantity || 0,
+            minStock: 5,
+            description: `Imported via AI: ${itemData.category || ''} ${itemData.brand || ''}`,
+            location: itemData.location || 'Warehouse',
+            supplier: itemData.supplier || '',
+            lastUpdated: serverTimestamp(),
+            inventoryType: 'Warehouse Stock',
+            createdAt: serverTimestamp()
+          });
+        }
+        await batch.commit();
+
+        alert(`Successfully AI-imported ${aiMappedItems.length} inventory items!`);
+      } catch (err) {
+        console.error('Error importing inventory:', err);
+        alert('Failed to import inventory items.');
+      } finally {
+        setIsImporting(false);
+        if (inventoryFileInputRef.current) inventoryFileInputRef.current.value = '';
+      }
+    };
+    reader.readAsBinaryString(file);
+  }, []);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -370,13 +426,30 @@ export default function InventoryList({ items, clients, user, projects }: Invent
             <span>Export</span>
           </button>
           {isApproved && (
-            <button 
-              onClick={() => setShowAddModal(true)}
-              className="flex-shrink-0 flex items-center space-x-2 px-3 md:px-4 py-2 md:py-2.5 text-xs md:text-sm font-black md:font-medium text-white bg-primary rounded-xl hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all active:scale-95 group uppercase md:normal-case tracking-widest md:tracking-normal"
-            >
-              <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />
-              <span>Add Item</span>
-            </button>
+            <>
+              <button 
+                onClick={() => inventoryFileInputRef.current?.click()}
+                disabled={isImporting}
+                className="flex-shrink-0 flex items-center space-x-2 px-3 md:px-4 py-2 md:py-2.5 text-xs md:text-sm font-black md:font-medium text-slate-300 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all active:scale-95 group uppercase md:normal-case tracking-widest md:tracking-normal"
+              >
+                {isImporting ? <Loader2 className="w-3.5 h-3.5 md:w-4 md:h-4 animate-spin" /> : <FileUp className="w-3.5 h-3.5 md:w-4 md:h-4" />}
+                <span>{isImporting ? 'AI MAPPING...' : 'AI EXCEL IMPORT'}</span>
+              </button>
+              <input 
+                type="file" 
+                ref={inventoryFileInputRef} 
+                onChange={handleInventoryExcelUpload} 
+                accept=".xlsx, .xls, .csv" 
+                className="hidden" 
+              />
+              <button 
+                onClick={() => setShowAddModal(true)}
+                className="flex-shrink-0 flex items-center space-x-2 px-3 md:px-4 py-2 md:py-2.5 text-xs md:text-sm font-black md:font-medium text-white bg-primary rounded-xl hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all active:scale-95 group uppercase md:normal-case tracking-widest md:tracking-normal"
+              >
+                <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                <span>Add Item</span>
+              </button>
+            </>
           )}
         </div>
       </div>

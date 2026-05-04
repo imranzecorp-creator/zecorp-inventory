@@ -39,6 +39,7 @@ import { Project, InventoryItem, UserProfile, ProjectItem, StockTransaction } fr
 import { cn, formatDate } from '../lib/utils';
 import { FilterDropdown } from './ui/FilterDropdown';
 import { Clock, History } from 'lucide-react';
+import { analyzeInventory, processAiSearch, mapExcelItems, mapExcelProjects } from '../services/geminiService';
 
 interface ProjectsProps {
   projects: Project[];
@@ -50,6 +51,8 @@ interface ProjectsProps {
 
 export default function Projects({ projects, inventory, clients, user, transactions }: ProjectsProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const isAdmin = user.role === 'admin' || user.email.toLowerCase() === 'imranzecorp@gmail.com';
+  const isApproved = user.isApproved || isAdmin;
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
@@ -75,59 +78,46 @@ export default function Projects({ projects, inventory, clients, user, transacti
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
 
-        // Group rows by Job Number
-        const projectsMap = new Map<string, any>();
+        if (data.length === 0) {
+          alert('Excel file is empty');
+          return;
+        }
 
-        data.forEach((row: any) => {
-          const jobNumber = String(row['Job Number'] || row['jobNumber'] || '').trim();
-          if (!jobNumber) return;
+        // Use AI to map projects and items
+        const aiMappedProjects = await mapExcelProjects(data);
 
-          if (!projectsMap.has(jobNumber)) {
-            projectsMap.set(jobNumber, {
-              client: String(row['Client'] || row['client'] || 'Unknown').trim(),
-              jobNumber: jobNumber,
-              outlet: String(row['Project'] || row['outlet'] || 'General').trim(),
-              location: String(row['Project Outlet'] || row['location'] || row['Site Location'] || '').trim(),
-              status: 'Active',
-              items: [],
+        for (const projectPayload of aiMappedProjects) {
+          try {
+            const finalPayload = {
+              ...projectPayload,
+              items: projectPayload.items.map((item: any) => ({
+                ...item,
+                inventoryItemId: `EXT-${Math.random().toString(36).substr(2, 9)}`,
+                quantityIn: 0,
+                quantityOut: 0,
+                approvedQuote: item.approvedQuote || '',
+                category: item.category || '',
+                posNo: item.posNo || '',
+                eta: item.eta || '',
+                delivery: item.delivery || ''
+              })),
+              status: projectPayload.status || 'Active',
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
               userId: user.uid,
               totalQuantityIn: 0,
               totalQuantityOut: 0
-            });
-          }
-
-          const projectData = projectsMap.get(jobNumber);
-          const itemName = String(row['Item Name'] || row['name'] || '').trim();
-          if (itemName) {
-            projectData.items.push({
-              inventoryItemId: `EXT-${Math.random().toString(36).substr(2, 9)}`,
-              name: itemName,
-              brand: String(row['Brand'] || row['brand'] || '').trim(),
-              model: String(row['Model'] || row['model'] || '').trim(),
-              quantity: Number(row['Quantity'] || row['quantity'] || 0),
-              supplier: String(row['Supplier'] || row['supplier'] || '').trim(),
-              quantityIn: 0,
-              quantityOut: 0
-            });
-          }
-        });
-
-        // Upload to Firestore
-        const batch = Array.from(projectsMap.values());
-        for (const projectPayload of batch) {
-          try {
-            await addDoc(collection(db, 'projects'), projectPayload);
+            };
+            await addDoc(collection(db, 'projects'), finalPayload);
           } catch (error) {
             handleFirestoreError(error, OperationType.CREATE, 'projects');
           }
         }
 
-        alert(`Successfully imported ${batch.length} projects!`);
+        alert(`Successfully AI-imported ${aiMappedProjects.length} projects!`);
       } catch (err) {
         console.error('Error parsing Excel:', err);
-        alert('Failed to parse Excel file. Please ensure correct format.');
+        alert('Failed to parse Excel file. AI mapping failed or file is corrupt.');
       } finally {
         setIsImporting(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
@@ -223,41 +213,47 @@ export default function Projects({ projects, inventory, clients, user, transacti
             <Filter className="w-3.5 h-3.5 md:w-4 md:h-4" />
             <span>Filter</span>
           </button>
-          <button 
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isImporting}
-            className="flex-shrink-0 flex items-center space-x-2 px-3 md:px-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl border border-white/10 bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-all text-[10px] md:text-xs font-black uppercase tracking-widest active:scale-95"
-          >
-            {isImporting ? <Loader2 className="w-3.5 h-3.5 md:w-4 md:h-4 animate-spin" /> : <FileUp className="w-3.5 h-3.5 md:w-4 md:h-4" />}
-            <span>{isImporting ? 'Importing...' : 'Excel'}</span>
-          </button>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleExcelUpload} 
-            accept=".xlsx, .xls, .csv" 
-            className="hidden" 
-          />
-          <button 
-            onClick={() => setShowAddModal(true)}
-            className="hidden md:flex flex-shrink-0 items-center space-x-2 px-5 py-3 text-xs font-black text-white bg-primary rounded-2xl hover:bg-primary/90 shadow-xl shadow-primary/30 transition-all active:scale-95 group uppercase tracking-widest"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Engage New Project</span>
-          </button>
+          {(isApproved) && (
+            <>
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isImporting}
+                className="flex-shrink-0 flex items-center space-x-2 px-3 md:px-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl border border-white/10 bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-all text-[10px] md:text-xs font-black uppercase tracking-widest active:scale-95"
+              >
+                {isImporting ? <Loader2 className="w-3.5 h-3.5 md:w-4 md:h-4 animate-spin" /> : <FileUp className="w-3.5 h-3.5 md:w-4 md:h-4" />}
+                <span>{isImporting ? 'AI MAPPING...' : 'AI EXCEL IMPORT'}</span>
+              </button>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleExcelUpload} 
+                accept=".xlsx, .xls, .csv" 
+                className="hidden" 
+              />
+              <button 
+                onClick={() => setShowAddModal(true)}
+                className="hidden md:flex flex-shrink-0 items-center space-x-2 px-5 py-3 text-xs font-black text-white bg-primary rounded-2xl hover:bg-primary/90 shadow-xl shadow-primary/30 transition-all active:scale-95 group uppercase tracking-widest"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Engage New Project</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
       {/* Floating Action Button for Mobile */}
-      <motion.button
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        whileTap={{ scale: 0.9 }}
-        onClick={() => setShowAddModal(true)}
-        className="md:hidden fixed bottom-24 right-5 w-16 h-16 bg-primary text-white rounded-full shadow-2xl shadow-primary/40 flex items-center justify-center z-[55] border-4 border-slate-900"
-      >
-        <Plus className="w-8 h-8" />
-      </motion.button>
+      {(isApproved) && (
+        <motion.button
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => setShowAddModal(true)}
+          className="md:hidden fixed bottom-24 right-5 w-16 h-16 bg-primary text-white rounded-full shadow-2xl shadow-primary/40 flex items-center justify-center z-[55] border-4 border-slate-900"
+        >
+          <Plus className="w-8 h-8" />
+        </motion.button>
+      )}
 
       {/* DASHBOARD SUMMARY */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
@@ -388,8 +384,10 @@ export default function Projects({ projects, inventory, clients, user, transacti
             <ProjectCard 
               key={project.id} 
               project={project} 
+              user={user}
               onClick={() => setSelectedProject(project)}
-              onEdit={() => setEditingProject(project)}
+              onEdit={(e) => { e.stopPropagation(); setEditingProject(project); }}
+              onDelete={(e) => { e.stopPropagation(); handleDeleteProject(project.id); }}
             />
           ))}
         </AnimatePresence>
@@ -420,7 +418,7 @@ export default function Projects({ projects, inventory, clients, user, transacti
             transactions={transactions}
             onClose={() => setSelectedProject(null)}
             onDelete={() => handleDeleteProject(selectedProject.id)}
-            isApproved={user.role === 'admin' || user.isApproved}
+            isApproved={isApproved}
           />
         )}
       </AnimatePresence>
@@ -428,7 +426,7 @@ export default function Projects({ projects, inventory, clients, user, transacti
   );
 }
 
-function ProjectCard({ project, onClick, onEdit }: { project: Project, onClick: () => void, onEdit: (e: any) => void }) {
+function ProjectCard({ project, user, onClick, onEdit, onDelete }: { project: Project, user: UserProfile, onClick: () => void, onEdit: (e: any) => void, onDelete: (e: any) => void }) {
   const itemCount = project.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
   
   return (
@@ -438,13 +436,23 @@ function ProjectCard({ project, onClick, onEdit }: { project: Project, onClick: 
       className="glass-morphism p-5 md:p-6 rounded-3xl border border-white/5 shadow-sm group cursor-pointer relative overflow-hidden"
       onClick={onClick}
     >
-      <div className="absolute top-0 right-0 p-4 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-        <button 
-          onClick={(e) => { e.stopPropagation(); onEdit(e); }}
-          className="p-2.5 bg-white/10 active:bg-white/20 rounded-xl text-slate-300 transition-all shadow-inner"
-        >
-          <Edit className="w-4 h-4" />
-        </button>
+      <div className="absolute top-0 right-0 p-4 flex items-center space-x-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+        {(project.userId === user.uid || user.role === 'admin') && (
+          <>
+            <button 
+              onClick={onEdit}
+              className="p-2.5 bg-white/10 active:bg-white/20 rounded-xl text-slate-300 transition-all shadow-inner hover:text-primary"
+            >
+              <Edit className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={onDelete}
+              className="p-2.5 bg-white/10 active:bg-white/20 rounded-xl text-slate-300 transition-all shadow-inner hover:text-red-500"
+            >
+              <Trash className="w-4 h-4" />
+            </button>
+          </>
+        )}
       </div>
 
       <div className="space-y-4">
@@ -529,6 +537,8 @@ function ProjectCard({ project, onClick, onEdit }: { project: Project, onClick: 
 }
 
 function ProjectFormModal({ project, inventory, clients, onClose, user }: { project: Project | null, inventory: InventoryItem[], clients: any[], onClose: () => void, user: UserProfile }) {
+  const isAdmin = user.role === 'admin' || user.email.toLowerCase() === 'imranzecorp@gmail.com';
+  const isApproved = user.isApproved || isAdmin;
   const generateJobNumber = () => {
     const year = new Date().getFullYear();
     const random = Math.floor(1000 + Math.random() * 9000);
@@ -545,7 +555,60 @@ function ProjectFormModal({ project, inventory, clients, onClose, user }: { proj
   
   const [items, setItems] = useState<ProjectItem[]>(project?.items || []);
   const [loading, setLoading] = useState(false);
+  const [isMappingItems, setIsMappingItems] = useState(false);
+  const itemFileInputRef = useRef<HTMLInputElement>(null);
   const [showItemPicker, setShowItemPicker] = useState(false);
+
+  const handleItemExcelUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsMappingItems(true);
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        if (data.length === 0) {
+          alert('No data found in Excel file.');
+          return;
+        }
+
+        const aiMappedItems = await mapExcelItems(data);
+        
+        const newProjectItems: ProjectItem[] = aiMappedItems.map(item => ({
+          inventoryItemId: `EXT-${Math.random().toString(36).substr(2, 9)}`,
+          name: item.name || 'Unnamed Item',
+          brand: item.brand || '',
+          model: item.model || '',
+          quantity: item.quantity || 0,
+          supplier: item.supplier || '',
+          location: item.location || '',
+          quantityIn: 0,
+          quantityOut: 0,
+          approvedQuote: item.approvedQuote || '',
+          category: item.category || '',
+          posNo: item.posNo || '',
+          eta: item.eta || '',
+          delivery: item.delivery || ''
+        }));
+
+        setItems(prev => [...prev, ...newProjectItems]);
+        alert(`AI successfully mapped and added ${newProjectItems.length} items from Excel!`);
+      } catch (err) {
+        console.error('Error mapping Excel items:', err);
+        alert('Failed to process Excel with AI.');
+      } finally {
+        setIsMappingItems(false);
+        if (itemFileInputRef.current) itemFileInputRef.current.value = '';
+      }
+    };
+    reader.readAsBinaryString(file);
+  }, []);
   const [itemSearch, setItemSearch] = useState('');
   const [showClientSuggestions, setShowClientSuggestions] = useState(false);
 
@@ -753,15 +816,36 @@ function ProjectFormModal({ project, inventory, clients, onClose, user }: { proj
 
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Project Stock Index</h3>
-              <button 
-                type="button"
-                onClick={() => setShowItemPicker(true)}
-                className="text-xs font-black text-primary hover:text-white transition-colors flex items-center space-x-2"
-              >
-                <Plus className="w-3 h-3" />
-                <span>LINK INVENTORY ITEM</span>
-              </button>
+              <div className="flex items-center space-x-3">
+                {isApproved && (
+                  <>
+                    <button 
+                      type="button"
+                      onClick={() => itemFileInputRef.current?.click()}
+                      disabled={isMappingItems}
+                      className="text-xs font-black text-blue-400 hover:text-white transition-colors flex items-center space-x-2 bg-blue-500/5 px-3 py-1.5 rounded-xl border border-blue-500/10"
+                    >
+                      {isMappingItems ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileUp className="w-3 h-3" />}
+                      <span>{isMappingItems ? 'AI MAPPING...' : 'AI EXCEL IMPORT'}</span>
+                    </button>
+                    <input 
+                      type="file" 
+                      ref={itemFileInputRef} 
+                      onChange={handleItemExcelUpload} 
+                      accept=".xlsx, .xls, .csv" 
+                      className="hidden" 
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => setShowItemPicker(true)}
+                      className="text-xs font-black text-primary hover:text-white transition-colors flex items-center space-x-2 bg-primary/5 px-3 py-1.5 rounded-xl border border-primary/10"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>LINK INVENTORY ITEM</span>
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
 
             <div className="space-y-3">
@@ -798,14 +882,16 @@ function ProjectFormModal({ project, inventory, clients, onClose, user }: { proj
           </div>
           <div className="flex items-center space-x-4">
             <button type="button" onClick={onClose} className="px-6 py-3 text-sm font-bold text-slate-400 hover:text-white transition-colors">Discard</button>
-            <button 
-              onClick={handleSubmit}
-              disabled={loading}
-              className="flex items-center space-x-2 px-8 py-3 bg-primary text-white rounded-2xl font-bold shadow-xl shadow-primary/25 hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
-            >
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-              <span>{project ? 'Update Project' : 'Commit Project'}</span>
-            </button>
+            {isApproved && (
+              <button 
+                onClick={handleSubmit}
+                disabled={loading}
+                className="flex items-center space-x-2 px-8 py-3 bg-primary text-white rounded-2xl font-bold shadow-xl shadow-primary/25 hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                <span>{project ? 'Update Project' : 'Commit Project'}</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -1002,9 +1088,9 @@ function ProjectItemRow({ item, inventory, onRemove, onUpdate }: { item: Project
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-5 grid grid-cols-2 gap-4">
+        <div className="lg:col-span-5 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Brand Reference</label>
+            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Brand</label>
             <input 
               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:border-primary/50 outline-none transition-all"
               value={item.brand}
@@ -1019,6 +1105,69 @@ function ProjectItemRow({ item, inventory, onRemove, onUpdate }: { item: Project
               value={item.model}
               onChange={e => onUpdate({ model: e.target.value })}
               placeholder="e.g., QE55Q70"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Category</label>
+            <input 
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:border-primary/50 outline-none transition-all"
+              value={item.category || ''}
+              onChange={e => onUpdate({ category: e.target.value })}
+              placeholder="e.g. Displays"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">POS Number</label>
+            <input 
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:border-primary/50 outline-none transition-all"
+              value={item.posNo || ''}
+              onChange={e => onUpdate({ posNo: e.target.value })}
+              placeholder="e.g. POS-990"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Approved Quote</label>
+            <input 
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:border-primary/50 outline-none transition-all"
+              value={item.approvedQuote || ''}
+              onChange={e => onUpdate({ approvedQuote: e.target.value })}
+              placeholder="Quote info..."
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">ETA</label>
+            <input 
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:border-primary/50 outline-none transition-all"
+              value={item.eta || ''}
+              onChange={e => onUpdate({ eta: e.target.value })}
+              placeholder="e.g. Next Week"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Supplier</label>
+            <input 
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:border-primary/50 outline-none transition-all"
+              value={item.supplier || ''}
+              onChange={e => onUpdate({ supplier: e.target.value })}
+              placeholder="e.g. Acme Corp"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Unit Location</label>
+            <input 
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:border-primary/50 outline-none transition-all"
+              value={item.location || ''}
+              onChange={e => onUpdate({ location: e.target.value })}
+              placeholder="e.g. Shelf A1"
+            />
+          </div>
+          <div className="md:col-span-2 space-y-1.5">
+            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Delivery Status</label>
+            <input 
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:border-primary/50 outline-none transition-all"
+              value={item.delivery || ''}
+              onChange={e => onUpdate({ delivery: e.target.value })}
+              placeholder="e.g. In Transit"
             />
           </div>
         </div>
@@ -1193,12 +1342,47 @@ function ProjectDetailModal({ project, inventory, transactions, onClose, onDelet
                         </div>
                         <div>
                           <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{item.name}</p>
-                          <div className="flex items-center space-x-2 text-[10px] text-slate-500 font-medium tracking-wide">
-                            <span>Brand: {item.brand || 'Generic'}</span>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500 font-medium tracking-wide mt-1">
+                            <span className="flex items-center space-x-1">
+                               <span className="text-slate-600 font-black">BRAND:</span>
+                               <span>{item.brand || 'Generic'}</span>
+                            </span>
+                            <span className="w-1 h-1 rounded-full bg-slate-700" />
+                            <span className="flex items-center space-x-1">
+                               <span className="text-slate-600 font-black">CAT:</span>
+                               <span>{item.category || 'Unset'}</span>
+                            </span>
+                            {item.posNo && (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-slate-700" />
+                                <span className="flex items-center space-x-1">
+                                   <span className="text-slate-600 font-black">POS:</span>
+                                   <span>{item.posNo}</span>
+                                </span>
+                              </>
+                            )}
                             {item.location && (
                               <>
                                 <span className="w-1 h-1 rounded-full bg-slate-700" />
                                 <span className="text-fuchsia-400/70">{item.location}</span>
+                              </>
+                            )}
+                            {item.approvedQuote && (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-slate-700" />
+                                <span className="text-amber-500/70">QUOTE: {item.approvedQuote}</span>
+                              </>
+                            )}
+                            {item.eta && (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-slate-700" />
+                                <span className="text-blue-400/70">ETA: {item.eta}</span>
+                              </>
+                            )}
+                            {item.delivery && (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-slate-700" />
+                                <span className="text-green-400/70">DELIVERY: {item.delivery}</span>
                               </>
                             )}
                           </div>

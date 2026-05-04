@@ -78,19 +78,21 @@ export default function SocialFeed({ user }: SocialFeedProps) {
     >
       <div className="flex items-center justify-between px-4 md:px-0">
         <h1 className="text-2xl font-bold text-white tracking-tight">Community Feed</h1>
-        <motion.button 
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={() => setShowForm(!showForm)}
-          className="fixed bottom-24 right-6 z-40 md:static p-4 md:p-2 bg-primary text-white rounded-full shadow-2xl shadow-primary/40 md:shadow-primary/20 transition-all border border-white/10"
-        >
-          <motion.div
-            initial={false}
-            animate={{ rotate: showForm ? 90 : 0 }}
+        {(user.isApproved || user.role === 'admin') && (
+          <motion.button 
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setShowForm(!showForm)}
+            className="fixed bottom-24 right-6 z-40 md:static p-4 md:p-2 bg-primary text-white rounded-full shadow-2xl shadow-primary/40 md:shadow-primary/20 transition-all border border-white/10"
           >
-            {showForm ? <X className="w-6 h-6 md:w-5 md:h-5" /> : <Plus className="w-6 h-6 md:w-5 md:h-5" />}
-          </motion.div>
-        </motion.button>
+            <motion.div
+              initial={false}
+              animate={{ rotate: showForm ? 90 : 0 }}
+            >
+              {showForm ? <X className="w-6 h-6 md:w-5 md:h-5" /> : <Plus className="w-6 h-6 md:w-5 md:h-5" />}
+            </motion.div>
+          </motion.button>
+        )}
       </div>
 
       <AnimatePresence>
@@ -227,22 +229,24 @@ const PostCard = memo(({ post, currentUser }: { post: Post, currentUser: UserPro
       )}
 
       <div className="px-4 py-3 border-t border-white/5 flex items-center space-x-6 bg-white/[0.01]">
-        <motion.button 
-          whileTap={{ scale: 1.4 }}
-          onClick={handleLike}
-          className={cn(
-            "flex items-center space-x-2 transition-colors",
-            isLiked ? "text-red-500" : "text-slate-500 hover:text-slate-300"
-          )}
-        >
-          <motion.div
-            animate={{ scale: isLiked ? [1, 1.3, 1] : 1 }}
-            transition={{ duration: 0.3 }}
+        {(currentUser.isApproved || currentUser.role === 'admin') && (
+          <motion.button 
+            whileTap={{ scale: 1.4 }}
+            onClick={handleLike}
+            className={cn(
+              "flex items-center space-x-2 transition-colors",
+              isLiked ? "text-red-500" : "text-slate-500 hover:text-slate-300"
+            )}
           >
-            <Heart className={cn("w-5 h-5", isLiked && "fill-current")} />
-          </motion.div>
-          <span className="text-xs font-bold">{likes.length}</span>
-        </motion.button>
+            <motion.div
+              animate={{ scale: isLiked ? [1, 1.3, 1] : 1 }}
+              transition={{ duration: 0.3 }}
+            >
+              <Heart className={cn("w-5 h-5", isLiked && "fill-current")} />
+            </motion.div>
+            <span className="text-xs font-bold">{likes.length}</span>
+          </motion.button>
+        )}
         <motion.button 
           whileHover={{ scale: 1.1, x: 2 }}
           onClick={() => setShowComments(!showComments)}
@@ -259,7 +263,7 @@ const PostCard = memo(({ post, currentUser }: { post: Post, currentUser: UserPro
         </motion.button>
       </div>
 
-      {showComments && (
+          {showComments && (
         <div className="bg-black/20 p-4 space-y-4 border-t border-white/5">
           <div className="space-y-4 max-h-60 overflow-y-auto custom-scrollbar pr-2">
             {comments.map((comment) => (
@@ -286,26 +290,31 @@ const PostCard = memo(({ post, currentUser }: { post: Post, currentUser: UserPro
                 </div>
               </div>
             ))}
+            {comments.length === 0 && (
+              <p className="text-center text-xs text-slate-600 py-4 italic">No comments yet</p>
+            )}
           </div>
 
-          <form onSubmit={handleAddComment} className="flex items-center space-x-2 pt-2">
-            <input 
-              type="text" 
-              placeholder="Write a comment..." 
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              className="flex-1 px-4 py-2 border border-white/10 bg-white/5 rounded-full text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary/20"
-            />
-            <motion.button 
-              whileHover={{ x: [0, 5, 0], y: [0, -5, 0] }}
-              whileTap={{ scale: 0.9, x: 10, y: -10, opacity: 0 }}
-              type="submit"
-              disabled={!newComment.trim()}
-              className="p-2 bg-primary text-white rounded-full transition-all disabled:opacity-50 shadow-lg shadow-primary/20"
-            >
-              <Send className="w-4 h-4" />
-            </motion.button>
-          </form>
+          {(currentUser.isApproved || currentUser.role === 'admin') && (
+            <form onSubmit={handleAddComment} className="flex items-center space-x-2 pt-2">
+              <input 
+                type="text" 
+                placeholder="Write a comment..." 
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                className="flex-1 px-4 py-2 border border-white/10 bg-white/5 rounded-full text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+              <motion.button 
+                whileHover={{ x: [0, 5, 0], y: [0, -5, 0] }}
+                whileTap={{ scale: 0.9, x: 10, y: -10, opacity: 0 }}
+                type="submit"
+                disabled={!newComment.trim()}
+                className="p-2 bg-primary text-white rounded-full transition-all disabled:opacity-50 shadow-lg shadow-primary/20"
+              >
+                <Send className="w-4 h-4" />
+              </motion.button>
+            </form>
+          )}
         </div>
       )}
     </motion.div>
