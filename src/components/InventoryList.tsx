@@ -44,7 +44,7 @@ import {
 } from 'firebase/firestore';
 import { db, OperationType, handleFirestoreError, auth } from '../lib/firebase';
 import { InventoryItem, UserProfile, Project } from '../types';
-import { cn, formatDate } from '../lib/utils';
+import { cn, formatDate, formatDateForInput } from '../lib/utils';
 import { generateInventoryReport } from '../services/pdfService';
 import { suggestItemDetails, processAiSearch, mapExcelItems } from '../services/geminiService';
 
@@ -61,7 +61,7 @@ import { VariableSizeList as List } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
 
 const InventoryRow = memo(({ index, style, data }: { index: number, style: React.CSSProperties, data: any }) => {
-  const { items, expandedId, selectedIds, toggleSelectItem, toggleExpand, isApproved, isAdmin, canUpdateStock, adjustmentItem, setAdjustmentType, setAdjustmentItem, setEditingItem, setItemToDelete } = data;
+  const { items, expandedId, selectedIds, toggleSelectItem, toggleExpand, isApproved, isAdmin, canUpdateStock, openAdjustment, setEditingItem, setItemToDelete } = data;
   const item = items[index];
   if (!item) return null;
   const isExpanded = expandedId === item.id;
@@ -155,13 +155,13 @@ const InventoryRow = memo(({ index, style, data }: { index: number, style: React
             <div className="w-32 flex items-center justify-end pr-4 space-x-2 shrink-0" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center space-x-1">
                 <button 
-                  onClick={() => { setAdjustmentType('IN'); setAdjustmentItem(item); }}
+                  onClick={() => openAdjustment('IN', item)}
                   className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg hover:bg-emerald-500/20 hover:scale-110 transition-all border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.2)] hover:shadow-[0_0_15px_rgba(16,185,129,0.4)]"
                 >
                   <Plus className="w-3.5 h-3.5" />
                 </button>
                 <button 
-                  onClick={() => { setAdjustmentType('OUT'); setAdjustmentItem(item); }}
+                  onClick={() => openAdjustment('OUT', item)}
                   className="p-1.5 bg-amber-500/10 text-amber-500 rounded-lg hover:bg-amber-500/20 hover:scale-110 transition-all border border-amber-500/20 shadow-[0_0_10px_rgba(245,158,11,0.2)] hover:shadow-[0_0_15px_rgba(245,158,11,0.4)]"
                 >
                   <Minus className="w-3.5 h-3.5" />
@@ -336,9 +336,24 @@ export default function InventoryList({ items, clients, user, projects }: Invent
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [initialAction, setInitialAction] = useState<'IN' | 'OUT' | null>(null);
   const [adjustmentItem, setAdjustmentItem] = useState<InventoryItem | null>(null);
   const [adjustmentType, setAdjustmentType] = useState<'IN' | 'OUT' | null>(null);
+  const [initialAction, setInitialAction] = useState<'IN' | 'OUT' | null>(null);
+
+  const toggleSelectItem = useCallback((id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  }, []);
+
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedId(prev => prev === id ? null : id);
+  }, []);
+
+  const openAdjustment = useCallback((type: 'IN' | 'OUT', item: InventoryItem) => {
+    setAdjustmentType(type);
+    setAdjustmentItem(item);
+  }, []);
 
   // Advanced Filters
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -469,16 +484,6 @@ export default function InventoryList({ items, clients, user, projects }: Invent
     } else {
       setSelectedIds(filteredItems.map(i => i.id));
     }
-  };
-
-  const toggleSelectItem = (id: string) => {
-    setSelectedIds(prev => 
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
-  };
-
-  const toggleExpand = (id: string) => {
-    setExpandedId(expandedId === id ? null : id);
   };
 
   const handleDelete = async (item: InventoryItem) => {
@@ -615,9 +620,7 @@ export default function InventoryList({ items, clients, user, projects }: Invent
     isApproved,
     isAdmin,
     canUpdateStock,
-    adjustmentItem,
-    setAdjustmentType,
-    setAdjustmentItem,
+    openAdjustment,
     setEditingItem,
     setItemToDelete,
     deletingId
@@ -630,9 +633,7 @@ export default function InventoryList({ items, clients, user, projects }: Invent
     isApproved,
     isAdmin,
     canUpdateStock,
-    adjustmentItem,
-    setAdjustmentType,
-    setAdjustmentItem,
+    openAdjustment,
     setEditingItem,
     setItemToDelete,
     deletingId
@@ -1130,7 +1131,7 @@ function BulkUpdateModal({ items, clients, projects, onClose, user }: { items: I
   const [clientAssignment, setClientAssignment] = useState('');
   const [outlet, setOutlet] = useState('');
   const [location, setLocation] = useState('');
-  const [transactionDate, setTransactionDate] = useState(new Date().toISOString().split('T')[0]);
+  const [transactionDate, setTransactionDate] = useState(formatDateForInput(new Date()));
   const [notes, setNotes] = useState('');
   const [processing, setProcessing] = useState(false);
 
@@ -1561,7 +1562,7 @@ function StockAdjustmentModal({ item, type, clients, onClose, user }: { item: In
   }, [clients, client]);
   const [outlet, setOutlet] = useState(item.outlet || '');
   const [location, setLocation] = useState(item.location || '');
-  const [transactionDate, setTransactionDate] = useState(new Date().toISOString().split('T')[0]);
+  const [transactionDate, setTransactionDate] = useState(formatDateForInput(new Date()));
   const [notes, setNotes] = useState('');
   const [processing, setProcessing] = useState(false);
 
@@ -1853,7 +1854,7 @@ function ItemDetailModal({ item, clients, onClose, onDelete, user, initialAction
   }, [clients, client]);
   const [outlet, setOutlet] = useState(item.outlet || '');
   const [location, setLocation] = useState(item.location || '');
-  const [transactionDate, setTransactionDate] = useState(new Date().toISOString().split('T')[0]);
+  const [transactionDate, setTransactionDate] = useState(formatDateForInput(new Date()));
   const [notes, setNotes] = useState('');
   const isApproved = user.role === 'admin' || user.isApproved;
 
@@ -2238,7 +2239,7 @@ function ItemFormModal({ item, items, clients, projects, onClose, user }: any) {
     imageUrl: item?.imageUrl || '',
     jobNumber: item?.jobNumber || '',
     client: item?.client || '',
-    stockInDate: item?.stockInDate ? new Date(item.stockInDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+    stockInDate: formatDateForInput(item?.stockInDate || new Date()),
     brand: item?.brand || '',
     modelNumber: item?.modelNumber || '',
     supplier: item?.supplier || '',
@@ -2757,7 +2758,7 @@ function ItemFormModal({ item, items, clients, projects, onClose, user }: any) {
           <div className="grid grid-cols-1 gap-6">
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Project Outlet</label>
-              <input required value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} placeholder="e.g., Store Front, Main Hall" className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
+              <input value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} placeholder="e.g., Store Front, Main Hall" className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
             </div>
           </div>
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import { 
   User, 
   Mail, 
@@ -14,13 +14,14 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { UserProfile } from '../types';
 import { motion } from 'framer-motion';
+import { formatDate } from '../lib/utils';
 
 interface ProfileSettingsProps {
   user: UserProfile;
   setUser: (user: UserProfile) => void;
 }
 
-export default function ProfileSettings({ user, setUser }: ProfileSettingsProps) {
+export default memo(function ProfileSettings({ user, setUser }: ProfileSettingsProps) {
   const [name, setName] = useState(user.displayName || '');
   const [photo, setPhoto] = useState(user.photoURL || '');
   const [email, setEmail] = useState(user.email || '');
@@ -214,10 +215,10 @@ export default function ProfileSettings({ user, setUser }: ProfileSettingsProps)
                <div className="w-3 h-3 rounded-full bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.6)]" />
                <span className="text-sm font-bold text-slate-200">Active - {user.role === 'admin' ? 'Administrator' : 'Standard Member'}</span>
              </div>
-             <p className="text-xs text-slate-500">Member since {new Date(user.createdAt).toLocaleDateString()}</p>
+             <p className="text-xs text-slate-500">Member since {formatDate(user.createdAt)}</p>
           </div>
         </div>
       </div>
     </motion.div>
   );
-}
+});

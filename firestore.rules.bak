@@ -14,11 +14,19 @@ service cloud.firestore {
     function existing() { return resource.data; }
     function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
     
-    // Auth tokens never contain custom claims. Admin roles looked up or bootstrapped.
+    // Admin roles looked up or bootstrapped. imranzecorp@gmail.com is primary admin.
     function isAdmin() { 
       return isVerified() && (
-        request.auth.token.email == 'imranzecorp@gmail.com' ||
+        request.auth.token.email.lower() == 'imranzecorp@gmail.com' ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isApprovedUser() {
+      return isAdmin() || (
+        isVerified() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isApproved == true
       );
     }
 
@@ -26,9 +34,9 @@ service cloud.firestore {
 
     function isValidUser(data) {
       return data.keys().hasAll(['uid', 'email']) &&
-             data.keys().size() <= 10 &&
-             data.uid == request.auth.uid &&
-             data.email is string && data.email.size() <= 256;
+             data.email is string && data.email.size() <= 256 &&
+             data.uid is string &&
+             (data.get('emailVerified', false) is bool);
     }
 
     function isValidInventoryItem(data) {
@@ -37,16 +45,19 @@ service cloud.firestore {
              data.currentQuantity is number &&
              (data.get('description', '') is string && data.get('description', '').size() <= 2000) &&
              (data.get('brand', '') is string && data.get('brand', '').size() <= 100) &&
+             (data.get('outlet', '') is string && data.get('outlet', '').size() <= 200) &&
+             (data.get('location', '') is string && data.get('location', '').size() <= 200) &&
              (data.get('inventoryType', '') in ['Warehouse Stock', 'Client Stock']);
     }
 
     function isValidProject(data) {
-      return data.keys().hasAll(['client', 'jobNumber', 'userId', 'items']) &&
+      return data.keys().hasAll(['client', 'jobNumber', 'userId', 'items', 'outlet', 'location']) &&
              data.client is string && data.client.size() <= 200 &&
              data.jobNumber is string && data.jobNumber.size() <= 50 &&
+             data.outlet is string && data.outlet.size() <= 200 &&
+             data.location is string && data.location.size() <= 200 &&
              data.userId == request.auth.uid &&
              data.items is list && data.items.size() <= 500;
-             // Relational sync would be checked in operation block
     }
 
     function isValidTransaction(data) {
@@ -55,7 +66,7 @@ service cloud.firestore {
              data.type in ['IN', 'OUT'] &&
              data.quantity is number && data.quantity > 0 &&
              data.userId == request.auth.uid &&
-             data.date is number;
+             (data.date is number || data.date is timestamp);
     }
 
     // --- Match Rules ---
@@ -63,9 +74,16 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
-      allow create: if isOwner(userId) && isValidUser(incoming());
-      allow update: if (isOwner(userId) || isAdmin()) && isValidUser(incoming()) &&
-                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'updatedAt']);
+      allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().uid == userId;
+      allow update: if (isOwner(userId) || isAdmin()) && isValidUser(incoming()) && (
+        (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'updatedAt', 'emailVerified'])) ||
+        (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'isApproved', 'displayName', 'photoURL', 'updatedAt', 'emailVerified']))
+      );
+    }
+
+    match /approved_emails/{emailId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.email == request.auth.token.email.lower());
+      allow write: if isAdmin();
     }
 
     match /admins/{adminId} {
@@ -76,35 +94,34 @@ service cloud.firestore {
     match /inventory/{itemId} {
       allow get: if isSignedIn();
       allow list: if isSignedIn(); 
-      allow create: if isAdmin() && isValidInventoryItem(incoming());
-      allow update: if (isAdmin() || isVerified()) && isValidInventoryItem(incoming()) && (
-        isAdmin() || 
-        incoming().diff(existing()).affectedKeys().hasOnly(['currentQuantity', 'lastUpdated', 'jobNumber', 'client', 'outlet', 'location'])
-      );
-      allow delete: if isAdmin();
+      allow create: if isApprovedUser() && isValidInventoryItem(incoming());
+      allow update: if isApprovedUser() && isValidInventoryItem(incoming());
+      allow delete: if isApprovedUser();
     }
 
     match /projects/{projectId} {
-      allow get: if isSignedIn() && (isOwner(existing().userId) || isAdmin());
-      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && isValidProject(incoming());
-      allow update: if (isOwner(existing().userId) || isAdmin()) && isValidProject(incoming()) && (
-        isAdmin() ||
-        incoming().diff(existing()).affectedKeys().hasOnly(['items', 'status', 'updatedAt', 'totalQuantityIn', 'totalQuantityOut', 'location', 'outlet'])
-      );
-      allow delete: if isAdmin() || isOwner(existing().userId);
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isApprovedUser() && isValidProject(incoming());
+      allow update: if isApprovedUser() && isValidProject(incoming());
+      allow delete: if isApprovedUser();
     }
 
     match /transactions_log/{txId} {
       allow get: if isSignedIn();
-      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isVerified() && isValidTransaction(incoming());
-      allow update, delete: if isAdmin();
+      allow list: if isSignedIn();
+      allow create: if isApprovedUser() && isValidTransaction(incoming());
+      allow update, delete: if isApprovedUser();
+    }
+
+    match /activity_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
     }
 
     match /clients/{clientId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow write: if isApprovedUser();
     }
 
     match /posts/{postId} {
@@ -121,8 +138,8 @@ service cloud.firestore {
     }
 
     match /notifications/{notificationId} {
-      allow read: if isOwner(existing().userId) || isAdmin();
-      allow write: if isOwner(existing().userId) || isAdmin();
+      allow read: if isOwner(resource.data.userId) || isAdmin() || resource.data.get('isPublic', false) == true;
+      allow write: if isOwner(resource.data.userId) || isAdmin();
     }
 
     match /chats/{chatId}/messages/{messageId} {

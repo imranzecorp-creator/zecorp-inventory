@@ -25,11 +25,12 @@ import {
   Box,
   Layout,
   CornerDownRight,
-  RotateCcw
+  RotateCcw,
+  Cloud
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { StockTransaction } from '../types';
-import { formatDate, cn } from '../lib/utils';
+import { formatDate, formatTime, cn } from '../lib/utils';
 import { generateTransactionsReport } from '../services/pdfService';
 import { summarizeTransactions } from '../services/geminiService';
 import { VariableSizeList as List } from 'react-window';
@@ -171,7 +172,7 @@ const TransactionRow = memo(({ index, style, data }: { index: number, style: Rea
                      </span>
                      <span className="flex items-center space-x-2">
                        <Clock className="w-3 h-3" />
-                       <span>STAMP: {new Date(tx.date).toLocaleTimeString()}</span>
+                       <span>STAMP: {formatTime(tx.date)}</span>
                      </span>
                    </div>
                 </div>

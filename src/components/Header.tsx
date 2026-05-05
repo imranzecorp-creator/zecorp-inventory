@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import { 
   Bell, 
   Search, 
@@ -23,7 +23,7 @@ interface HeaderProps {
 
 import Logo from './Logo';
 
-export default function Header({ user, unreadCount, notifications, setActiveTab }: HeaderProps) {
+export default memo(function Header({ user, unreadCount, notifications, setActiveTab }: HeaderProps) {
   const [showNotify, setShowNotify] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
 
@@ -209,4 +209,4 @@ export default function Header({ user, unreadCount, notifications, setActiveTab 
       </div>
     </header>
   );
-}
+});

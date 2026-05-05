@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { motion } from 'framer-motion';
 
-const BackgroundAnimation: React.FC = () => {
+const BackgroundAnimation: React.FC = memo(() => {
   return (
     <div className="fixed inset-0 pointer-events-none z-[-1] overflow-hidden select-none bg-[#0f172a]">
       {/* Dynamic Gradient Orbs */}
@@ -36,18 +36,18 @@ const BackgroundAnimation: React.FC = () => {
       />
 
       {/* Floating ZECORP Text - Top */}
-      <div className="absolute top-[15%] left-0 w-full opacity-[0.03]">
+      <div className="absolute top-[15%] left-0 w-full opacity-[0.02]">
         <motion.div
           style={{ willChange: 'transform' }}
-          animate={{ x: ['-100%', '100%'] }}
+          animate={{ x: ['-50%', '50%'] }}
           transition={{
-            duration: 60,
+            duration: 90,
             repeat: Infinity,
             ease: "linear"
           }}
           className="flex whitespace-nowrap"
         >
-          {Array.from({ length: 10 }).map((_, i) => (
+          {Array.from({ length: 4 }).map((_, i) => (
             <span key={i} className="text-[15vw] font-black uppercase tracking-[-0.05em] px-20">
               ZECORP
             </span>
@@ -56,18 +56,18 @@ const BackgroundAnimation: React.FC = () => {
       </div>
 
       {/* Floating ZECORP Text - Bottom (Reverse) */}
-      <div className="absolute bottom-[15%] left-0 w-full opacity-[0.03]">
+      <div className="absolute bottom-[15%] left-0 w-full opacity-[0.02]">
         <motion.div
           style={{ willChange: 'transform' }}
-          animate={{ x: ['100%', '-100%'] }}
+          animate={{ x: ['50%', '-50%'] }}
           transition={{
-            duration: 80,
+            duration: 110,
             repeat: Infinity,
             ease: "linear"
           }}
           className="flex whitespace-nowrap"
         >
-          {Array.from({ length: 10 }).map((_, i) => (
+          {Array.from({ length: 4 }).map((_, i) => (
             <span key={i} className="text-[20vw] font-black uppercase tracking-[-0.05em] px-20">
               ZECORP
             </span>
@@ -96,6 +96,6 @@ const BackgroundAnimation: React.FC = () => {
       />
     </div>
   );
-};
+});
 
 export default BackgroundAnimation;

@@ -39,7 +39,7 @@ import {
 } from 'firebase/firestore';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { Project, InventoryItem, UserProfile, ProjectItem, StockTransaction } from '../types';
-import { cn, formatDate } from '../lib/utils';
+import { cn, formatDate, formatDateTime } from '../lib/utils';
 import { FilterDropdown } from './ui/FilterDropdown';
 import { Clock, History } from 'lucide-react';
 import { analyzeInventory, processAiSearch, mapExcelItems, mapExcelProjects } from '../services/geminiService';
@@ -1494,7 +1494,7 @@ function ProjectDetailModal({ project, inventory, transactions, onClose, onDelet
                         <div className="flex items-center justify-between text-[10px] text-slate-500">
                           <div className="flex items-center space-x-2">
                             <Clock className="w-3 h-3" />
-                            <span>{new Date(tx.date).toLocaleString()}</span>
+                            <span>{formatDateTime(tx.date)}</span>
                           </div>
                           <span>by {tx.userName}</span>
                         </div>

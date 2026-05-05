@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo, useMemo } from 'react';
 import { 
   LayoutDashboard, 
   Briefcase,
@@ -25,22 +25,24 @@ interface SidebarProps {
 
 import Logo from './Logo';
 
-export default function Sidebar({ activeTab, setActiveTab, role }: SidebarProps) {
-  const [uptime, setUptime] = useState('99.9%');
+export default memo(function Sidebar({ activeTab, setActiveTab, role }: SidebarProps) {
+  const [uptime] = useState('99.9%');
   
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'projects', label: 'Projects', icon: Briefcase },
-    { id: 'inventory', label: 'Inventory', icon: Package },
-    { id: 'transactions', label: 'Transactions', icon: History },
-    { id: 'social', label: 'Social Feed', icon: ImageIcon },
-    { id: 'intelligence', label: 'AI Intelligence', icon: Sparkles },
-    { id: 'chat', label: 'Messages', icon: MessageSquare },
-  ];
-
-  if (role === 'admin') {
-    menuItems.push({ id: 'admin', label: 'Admin Panel', icon: ShieldCheck });
-  }
+  const menuItems = useMemo(() => {
+    const items = [
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { id: 'projects', label: 'Projects', icon: Briefcase },
+      { id: 'inventory', label: 'Inventory', icon: Package },
+      { id: 'transactions', label: 'Transactions', icon: History },
+      { id: 'social', label: 'Social Feed', icon: ImageIcon },
+      { id: 'intelligence', label: 'AI Intelligence', icon: Sparkles },
+      { id: 'chat', label: 'Messages', icon: MessageSquare },
+    ];
+    if (role === 'admin') {
+      items.push({ id: 'admin', label: 'Admin Panel', icon: ShieldCheck });
+    }
+    return items;
+  }, [role]);
 
   return (
     <div className="hidden md:flex flex-col w-64 bg-[#020617]/95 backdrop-blur-2xl border-r border-white/10 relative z-50 overflow-hidden shadow-[20px_0_50px_-20px_rgba(0,0,0,0.5)]">
@@ -206,4 +208,4 @@ export default function Sidebar({ activeTab, setActiveTab, role }: SidebarProps)
       </div>
     </div>
   );
-}
+});

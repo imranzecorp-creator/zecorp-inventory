@@ -124,64 +124,76 @@ export default function App() {
         
         // Listen to the user document for real-time profile updates (like approval)
         profileUnsub = onSnapshot(userRef, async (docSnap) => {
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            const isAdmin = email === 'imranzecorp@gmail.com';
-            let userData = {
-               ...data,
-               emailVerified: idUser.emailVerified,
-               isApproved: !!data.isApproved || data.role === 'admin' || isAdmin
-            } as UserProfile;
-            
-            // Auto-promote hardcoded admin
-            if (isAdmin && (userData.role !== 'admin' || !userData.isApproved)) {
-              await updateDoc(userRef, { role: 'admin', isApproved: true });
-            }
-
-            // Update emailVerified in DB if it changed
-            if (data.emailVerified !== idUser.emailVerified) {
-              await updateDoc(userRef, { emailVerified: idUser.emailVerified });
-            }
-
-            // Cross-check with approved_emails whitelist if not admin or approved
-            if (userData.role !== 'admin' && !userData.isApproved) {
-              const approvedQuery = query(collection(db, 'approved_emails'), where('email', '==', email));
-              const approvedSnap = await getDocs(approvedQuery);
-              if (!approvedSnap.empty) {
-                await updateDoc(userRef, { isApproved: true });
+          try {
+            if (docSnap.exists()) {
+              const data = docSnap.data();
+              const isAdmin = email === 'imranzecorp@gmail.com';
+              let userData = {
+                 ...data,
+                 emailVerified: idUser.emailVerified,
+                 isApproved: !!data.isApproved || data.role === 'admin' || isAdmin
+              } as UserProfile;
+              
+              // Auto-promote hardcoded admin
+              if (isAdmin && (userData.role !== 'admin' || !userData.isApproved)) {
+                await updateDoc(userRef, { role: 'admin', isApproved: true });
               }
-            }
-            
-            setUser(userData);
-            setLoading(false);
-          } else {
-            // New User flow
-            const isAdmin = email === 'imranzecorp@gmail.com';
-            let isApproved = isAdmin;
-            
-            if (!isAdmin) {
-              const approvedQuery = query(collection(db, 'approved_emails'), where('email', '==', email));
-              const approvedSnap = await getDocs(approvedQuery);
-              isApproved = !approvedSnap.empty;
-            }
 
-            const newUser: UserProfile = {
-              uid: idUser.uid,
-              email: email,
-              displayName: idUser.displayName || 'User',
-              photoURL: idUser.photoURL || '',
-              role: isAdmin ? 'admin' : 'user',
-              isApproved: isApproved,
-              emailVerified: idUser.emailVerified,
-              createdAt: Date.now(),
-            };
-            
-            await setDoc(userRef, {
-              ...newUser,
-              createdAt: serverTimestamp()
-            });
-            // onSnapshot will handle setting the user state once document is created
+              // Update emailVerified in DB if it changed
+              if (data.emailVerified !== idUser.emailVerified) {
+                await updateDoc(userRef, { emailVerified: idUser.emailVerified });
+              }
+
+              // Cross-check with approved_emails whitelist if not admin or approved
+              if (userData.role !== 'admin' && !userData.isApproved) {
+                const approvedQuery = query(collection(db, 'approved_emails'), where('email', '==', email));
+                const approvedSnap = await getDocs(approvedQuery);
+                if (!approvedSnap.empty) {
+                  await updateDoc(userRef, { isApproved: true });
+                }
+              }
+              
+              setUser(userData);
+              setLoading(false);
+            } else {
+              // New User flow
+              const isAdmin = email === 'imranzecorp@gmail.com';
+              let isApproved = isAdmin;
+              
+              if (!isAdmin) {
+                const approvedQuery = query(collection(db, 'approved_emails'), where('email', '==', email));
+                const approvedSnap = await getDocs(approvedQuery);
+                isApproved = !approvedSnap.empty;
+              }
+
+              const newUser: UserProfile = {
+                uid: idUser.uid,
+                email: email,
+                displayName: idUser.displayName || 'User',
+                photoURL: idUser.photoURL || '',
+                role: isAdmin ? 'admin' : 'user',
+                isApproved: isApproved,
+                emailVerified: idUser.emailVerified,
+                createdAt: Date.now(),
+              };
+              
+              await setDoc(userRef, {
+                ...newUser,
+                createdAt: serverTimestamp()
+              });
+              
+              // Set initial user state to move past loading screen immediately
+              setUser(newUser);
+              setLoading(false);
+            }
+          } catch (err) {
+            console.error("Profile sync error:", err);
+            setLoading(false);
           }
+        }, (err) => {
+          console.error("Profile onSnapshot error:", err);
+          handleFirestoreError(err, OperationType.GET, 'users');
+          setLoading(false);
         });
       } else {
         if (profileUnsub) profileUnsub();
@@ -200,43 +212,69 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
 
-    const itemsQuery = query(collection(db, 'inventory'), orderBy('lastUpdated', 'desc'));
+    const itemsQuery = query(collection(db, 'inventory'));
     const itemsUnsub = onSnapshot(itemsQuery, (snapshot) => {
-      setItems(snapshot.docs.map(d => ({ 
+      const data = snapshot.docs.map(d => ({ 
         id: d.id, 
         ...d.data({ serverTimestamps: 'estimate' }) 
-      } as InventoryItem)));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'inventory'));
+      } as InventoryItem));
+      // Sort manually locally to avoid index requirement frustrations and missing field exclusion
+      setItems(data.sort((a, b) => {
+        const timeA = a.lastUpdated?.toMillis?.() || a.lastUpdated || 0;
+        const timeB = b.lastUpdated?.toMillis?.() || b.lastUpdated || 0;
+        return timeB - timeA;
+      }));
+    }, (err) => {
+      console.error("Inventory sync error:", err);
+      // Don't throw here to avoid crashing the sync loop, just log
+      try {
+        handleFirestoreError(err, OperationType.LIST, 'inventory');
+      } catch (e) {
+        // Log the JSON error but don't re-throw
+        console.error("Formatted Inventory Error:", e);
+      }
+    });
 
-    const projectsQuery = query(collection(db, 'projects'), orderBy('updatedAt', 'desc'));
+    const projectsQuery = query(collection(db, 'projects'));
     const projectsUnsub = onSnapshot(projectsQuery, (snapshot) => {
-      setProjects(snapshot.docs.map(d => ({ 
+      const data = snapshot.docs.map(d => ({ 
         id: d.id, 
         ...d.data({ serverTimestamps: 'estimate' }) 
-      } as Project)));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'projects'));
+      } as Project));
+      setProjects(data.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)));
+    }, (err) => {
+      console.error("Projects sync error:", err);
+      try { handleFirestoreError(err, OperationType.LIST, 'projects'); } catch (e) {}
+    });
 
-    const transQuery = query(collection(db, 'transactions_log'), orderBy('date', 'desc'), limit(150));
+    const transQuery = query(collection(db, 'transactions_log'), limit(300));
     const transUnsub = onSnapshot(transQuery, (snapshot) => {
-      setTransactions(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as StockTransaction)));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'transactions_log'));
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as StockTransaction));
+      setTransactions(data.sort((a, b) => (b.date || 0) - (a.date || 0)));
+    }, (err) => {
+      console.error("Transactions sync error:", err);
+      try { handleFirestoreError(err, OperationType.LIST, 'transactions_log'); } catch (e) {}
+    });
 
-    const clientsQuery = query(collection(db, 'clients'), orderBy('name', 'asc'));
+    const clientsQuery = query(collection(db, 'clients'));
     const clientsUnsub = onSnapshot(clientsQuery, (snapshot) => {
       setClients(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'clients'));
+    }, (err) => {
+      console.error("Clients sync error:", err);
+      try { handleFirestoreError(err, OperationType.LIST, 'clients'); } catch (e) {}
+    });
 
+    // Simplify notification query to avoid complex OR index issues
     const notifyQuery = query(
-      collection(db, 'notifications'), 
-      or(
-        where('userId', '==', user.uid), 
-        where('isPublic', '==', true)
-      ),
-      orderBy('createdAt', 'desc'),
-      limit(20)
+      collection(db, 'notifications'),
+      limit(50)
     );
     const notifyUnsub = onSnapshot(notifyQuery, (snapshot) => {
-      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as AppNotification));
+      const data = snapshot.docs
+        .map(d => ({ id: d.id, ...d.data() } as AppNotification))
+        .filter(n => n.isPublic || n.userId === user.uid)
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
       setNotifications(data);
       setUnreadCount(data.filter(n => !n.read).length);
 
@@ -245,17 +283,23 @@ export default function App() {
         snapshot.docChanges().forEach((change) => {
           if (change.type === 'added') {
             const newNotify = { id: change.doc.id, ...change.doc.data() } as AppNotification;
-            const toast: Toast = {
-              id: newNotify.id,
-              message: newNotify.message,
-              type: newNotify.type
-            };
-            setToasts(prev => [toast, ...prev].slice(0, 5));
+            // Only toast if relevant to user
+            if (newNotify.isPublic || newNotify.userId === user.uid) {
+              const toast: Toast = {
+                id: newNotify.id,
+                message: newNotify.message,
+                type: newNotify.type
+              };
+              setToasts(prev => [toast, ...prev].slice(0, 5));
+            }
           }
         });
       }
       setIsInitialLoad(false);
-    }, (err) => handleFirestoreError(err, OperationType.LIST, 'notifications'));
+    }, (err) => {
+      console.error("Notifications sync error:", err);
+      try { handleFirestoreError(err, OperationType.LIST, 'notifications'); } catch (e) {}
+    });
 
     return () => {
       itemsUnsub();
@@ -269,6 +313,14 @@ export default function App() {
   const removeToast = (id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   };
+
+  const isApproved = user?.isApproved || user?.role === 'admin';
+  const dashboardProps = useMemo(() => user ? ({ items, transactions, projects, user }) : null, [items, transactions, projects, user]);
+  const inventoryProps = useMemo(() => user ? ({ items, clients, user, projects }) : null, [items, clients, user, projects]);
+  const projectsProps = useMemo(() => user ? ({ projects, inventory: items, clients, user, transactions }) : null, [projects, items, clients, user, transactions]);
+  const historyProps = useMemo(() => ({ transactions }), [transactions]);
+  const adminProps = useMemo(() => user ? ({ user, clients }) : null, [user, clients]);
+  const profileProps = useMemo(() => user ? ({ user, setUser }) : null, [user, setUser]);
 
   if (loading) {
     return (
@@ -308,8 +360,6 @@ export default function App() {
     return <Login />;
   }
 
-  const isApproved = user.isApproved || user.role === 'admin';
-
   return (
     <div className="flex h-screen overflow-hidden selection:bg-primary/30 selection:text-white bg-[#020617]/90 relative">
       <BackgroundAnimation />
@@ -317,11 +367,11 @@ export default function App() {
       <AmbientStorageBox />
       
       {/* Sidebar for Desktop */}
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} role={user.role} />
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} role={user!.role} />
       
       <div className="flex flex-col flex-1 overflow-hidden">
         <Header 
-          user={user} 
+          user={user!} 
           unreadCount={unreadCount} 
           notifications={notifications} 
           setActiveTab={setActiveTab}
@@ -342,7 +392,7 @@ export default function App() {
           </div>
         )}
         
-        {user.isApproved && !user.emailVerified && (
+        {user!.isApproved && !user!.emailVerified && (
           <div className="bg-rose-500/10 border-y border-rose-500/20 px-4 py-2 flex items-center justify-center space-x-3 backdrop-blur-md">
             <ShieldCheck className="w-4 h-4 text-rose-500 animate-pulse" />
             <p className="text-[10px] md:text-xs font-black text-rose-500 uppercase tracking-[0.2em]">
@@ -357,32 +407,32 @@ export default function App() {
               </div>
             }>
               <AnimatePresence mode="wait">
-              {activeTab === 'dashboard' && (
-                <Dashboard items={items} transactions={transactions} projects={projects} user={user} />
+              {activeTab === 'dashboard' && dashboardProps && (
+                <Dashboard {...dashboardProps} />
               )}
-              {activeTab === 'inventory' && (
-                <InventoryList items={items} clients={clients} user={user} projects={projects} />
+              {activeTab === 'inventory' && inventoryProps && (
+                <InventoryList {...inventoryProps} />
               )}
-              {activeTab === 'projects' && (
-                <Projects projects={projects} inventory={items} clients={clients} user={user} transactions={transactions} />
+              {activeTab === 'projects' && projectsProps && (
+                <Projects {...projectsProps} />
               )}
-              {activeTab === 'transactions' && (
-                <TransactionHistory transactions={transactions} />
+              {activeTab === 'transactions' && historyProps && (
+                <TransactionHistory {...historyProps} />
               )}
               {activeTab === 'social' && (
-                <SocialFeed user={user} />
+                <SocialFeed user={user!} />
               )}
               {activeTab === 'intelligence' && (
                 <AIReports inventory={items} transactions={transactions} />
               )}
               {activeTab === 'chat' && (
-                <ChatView user={user} />
+                <ChatView user={user!} />
               )}
-              {activeTab === 'admin' && user.role === 'admin' && (
-                <AdminPanel user={user} clients={clients} />
+              {activeTab === 'admin' && user!.role === 'admin' && adminProps && (
+                <AdminPanel {...adminProps} />
               )}
-              {activeTab === 'profile' && (
-                <ProfileSettings user={user} setUser={setUser} />
+              {activeTab === 'profile' && profileProps && (
+                <ProfileSettings {...profileProps} />
               )}
               {activeTab === 'permissions' && (
                 <PermissionList />

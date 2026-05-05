@@ -38,7 +38,21 @@ export default function ChatView({ user }: ChatViewProps) {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [selectedRecipient, setSelectedRecipient] = useState<UserProfile | null>(null);
   const [showMobileList, setShowMobileList] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'team' | 'ai'>('all');
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Filter users based on search term and active filter
+  const filteredUsers = users.filter(u => {
+    const matchesSearch = u.displayName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (u.role && u.role.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    if (activeFilter === 'ai') return false;
+    return matchesSearch;
+  });
+
+  const showAiAssistant = (activeFilter === 'all' || activeFilter === 'ai') && 
+    ('ai assistant'.includes(searchTerm.toLowerCase()) || 'masterai'.includes(searchTerm.toLowerCase()));
 
   // Sync users for chat
   useEffect(() => {
@@ -141,40 +155,71 @@ export default function ChatView({ user }: ChatViewProps) {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 group-focus-within:text-primary transition-colors" />
             <input 
               type="text" 
-              placeholder="Search chat..." 
-              className="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/5 rounded-xl text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+              placeholder="Search team or AI..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/5 rounded-xl text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
             />
+            {searchTerm && (
+              <button 
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+              >
+                <div className="w-4 h-4 flex items-center justify-center rounded-full bg-white/10 text-[10px]">✕</div>
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center space-x-2 mt-4">
+            {(['all', 'team', 'ai'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setActiveFilter(f)}
+                className={cn(
+                  "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all",
+                  activeFilter === f 
+                    ? "bg-primary/20 border-primary/30 text-primary" 
+                    : "bg-white/5 border-white/5 text-slate-500 hover:bg-white/10"
+                )}
+              >
+                {f}
+              </button>
+            ))}
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-2 custom-scrollbar">
           {/* AI Chat Selector */}
-          <button 
-            onClick={() => { 
-                setIsAiMode(true); 
-                setSelectedRecipient(null); 
-                setShowMobileList(false);
-            }}
-            className={cn(
-              "w-full flex items-center p-3 rounded-2xl transition-all duration-300",
-              isAiMode ? "bg-primary text-white shadow-xl shadow-primary/20 scale-[1.02]" : "bg-white/5 text-slate-400 hover:bg-white/10"
-            )}
-          >
-            <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center mr-3 shadow-inner", isAiMode ? "bg-white/20" : "bg-primary/20")}>
-              <Bot className={cn("w-6 h-6", isAiMode ? "text-white" : "text-primary")} />
-            </div>
-            <div className="text-left flex-1">
-              <p className="text-sm font-bold">AI Assistant</p>
-              <p className={cn("text-[10px] font-medium", isAiMode ? "text-blue-100" : "text-slate-500")}>Always online to help</p>
-            </div>
-            <Sparkles className={cn("w-4 h-4 transition-all", isAiMode ? "text-yellow-200 animate-pulse scale-110" : "text-slate-600")} />
-          </button>
+          {showAiAssistant && (
+            <button 
+              onClick={() => { 
+                  setIsAiMode(true); 
+                  setSelectedRecipient(null); 
+                  setShowMobileList(false);
+              }}
+              className={cn(
+                "w-full flex items-center p-3 rounded-2xl transition-all duration-300 mb-2",
+                isAiMode ? "bg-primary text-white shadow-xl shadow-primary/20 scale-[1.02]" : "bg-white/5 text-slate-400 hover:bg-white/10"
+              )}
+            >
+              <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center mr-3 shadow-inner", isAiMode ? "bg-white/20" : "bg-primary/20")}>
+                <Bot className={cn("w-6 h-6", isAiMode ? "text-white" : "text-primary")} />
+              </div>
+              <div className="text-left flex-1">
+                <p className="text-sm font-bold">AI Assistant</p>
+                <p className={cn("text-[10px] font-medium", isAiMode ? "text-blue-100" : "text-slate-500")}>Always online to help</p>
+              </div>
+              <Sparkles className={cn("w-4 h-4 transition-all", isAiMode ? "text-yellow-200 animate-pulse scale-110" : "text-slate-600")} />
+            </button>
+          )}
 
-          <div className="pt-6 pb-2">
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Team Members</p>
-          </div>
+          {filteredUsers.length > 0 && (
+            <div className="pt-6 pb-2">
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-2">Team Members</p>
+            </div>
+          )}
 
-          {users.map((u) => (
+          {filteredUsers.map((u) => (
             <button 
               key={u.uid}
               onClick={() => { 
@@ -203,6 +248,24 @@ export default function ChatView({ user }: ChatViewProps) {
               <ChevronRight className={cn("w-4 h-4 transition-all transform", selectedRecipient?.uid === u.uid ? "text-primary rotate-90 scale-125" : "text-slate-700 group-hover:text-slate-400 group-hover:translate-x-1")} />
             </button>
           ))}
+
+          {filteredUsers.length === 0 && !showAiAssistant && (
+            <div className="py-20 text-center flex flex-col items-center justify-center space-y-4 px-6">
+              <div className="w-16 h-16 rounded-3xl bg-white/5 flex items-center justify-center border border-white/5">
+                <Search className="w-8 h-8 text-slate-700" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-500">No matches found</p>
+                <p className="text-[10px] text-slate-600 uppercase font-black tracking-widest mt-1">Try a different name or role</p>
+              </div>
+              <button 
+                onClick={() => setSearchTerm('')}
+                className="text-xs font-black text-primary uppercase tracking-widest hover:text-white transition-colors"
+              >
+                Clear Search
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

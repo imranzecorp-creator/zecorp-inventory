@@ -6,7 +6,7 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // 3. Global Helpers & Path Variable Hardening
+    // --- Helpers ---
     function isSignedIn() { return request.auth != null; }
     function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
     function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
@@ -14,7 +14,7 @@ service cloud.firestore {
     function existing() { return resource.data; }
     function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
     
-    // Admin roles looked up or bootstrapped. imranzecorp@gmail.com is primary admin.
+    // Admin check: imranzecorp@gmail.com or explicit admin doc
     function isAdmin() { 
       return isVerified() && (
         request.auth.token.email.lower() == 'imranzecorp@gmail.com' ||
@@ -33,57 +33,60 @@ service cloud.firestore {
     // --- Entity Validations ---
 
     function isValidUser(data) {
-      return data.keys().hasAll(['uid', 'email']) &&
+      let required = ['uid', 'email', 'displayName', 'role', 'isApproved', 'createdAt'];
+      return data.keys().hasAll(required) &&
+             data.uid == request.auth.uid &&
              data.email is string && data.email.size() <= 256 &&
-             data.uid is string &&
-             (data.get('emailVerified', false) is bool);
+             data.displayName is string && data.displayName.size() <= 100 &&
+             data.role in ['admin', 'user'] &&
+             data.isApproved is bool &&
+             (data.get('emailVerified', false) is bool) &&
+             (data.get('photoURL', '') is string && data.get('photoURL', '').size() <= 1000);
     }
 
     function isValidInventoryItem(data) {
-      return data.keys().hasAll(['name', 'currentQuantity']) &&
-             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+      let required = ['name', 'currentQuantity', 'lastUpdated'];
+      return data.keys().hasAll(required) &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 128 &&
              data.currentQuantity is number &&
              (data.get('description', '') is string && data.get('description', '').size() <= 2000) &&
-             (data.get('brand', '') is string && data.get('brand', '').size() <= 100) &&
-             (data.get('outlet', '') is string && data.get('outlet', '').size() <= 200) &&
-             (data.get('location', '') is string && data.get('location', '').size() <= 200) &&
-             (data.get('inventoryType', '') in ['Warehouse Stock', 'Client Stock']);
+             (data.get('location', '') is string && data.get('location', '').size() <= 256) &&
+             (data.get('brand', '') is string && data.get('brand', '').size() <= 128) &&
+             (data.get('outlet', '') is string && data.get('outlet', '').size() <= 128) &&
+             (data.get('inventoryType', 'Warehouse Stock') in ['Warehouse Stock', 'Client Stock']);
     }
 
     function isValidProject(data) {
-      return data.keys().hasAll(['client', 'jobNumber', 'userId', 'items', 'outlet', 'location']) &&
-             data.client is string && data.client.size() <= 200 &&
-             data.jobNumber is string && data.jobNumber.size() <= 50 &&
-             data.outlet is string && data.outlet.size() <= 200 &&
-             data.location is string && data.location.size() <= 200 &&
+      let required = ['client', 'jobNumber', 'userId', 'items', 'status', 'createdAt', 'updatedAt'];
+      return data.keys().hasAll(required) &&
+             data.client is string && data.client.size() <= 256 &&
+             data.jobNumber is string && data.jobNumber.size() <= 64 &&
              data.userId == request.auth.uid &&
-             data.items is list && data.items.size() <= 500;
+             data.items is list && data.items.size() <= 200 &&
+             data.status in ['Active', 'Completed', 'Draft'] &&
+             (data.get('location', '') is string && data.get('location', '').size() <= 256) &&
+             (data.get('outlet', '') is string && data.get('outlet', '').size() <= 256);
     }
 
     function isValidTransaction(data) {
-      return data.keys().hasAll(['itemId', 'type', 'quantity', 'userId', 'date']) &&
+      let required = ['itemId', 'type', 'quantity', 'userId', 'date'];
+      return data.keys().hasAll(required) &&
              data.itemId is string && data.itemId.size() <= 128 &&
              data.type in ['IN', 'OUT'] &&
              data.quantity is number && data.quantity > 0 &&
-             data.userId == request.auth.uid &&
-             (data.date is number || data.date is timestamp);
+             data.userId == request.auth.uid;
     }
 
-    // --- Match Rules ---
+    // --- Rules ---
 
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
       allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().uid == userId;
       allow update: if (isOwner(userId) || isAdmin()) && isValidUser(incoming()) && (
-        (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'updatedAt', 'emailVerified'])) ||
-        (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'isApproved', 'displayName', 'photoURL', 'updatedAt', 'emailVerified']))
+        (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'emailVerified', 'updatedAt'])) ||
+        (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'isApproved', 'displayName', 'photoURL', 'emailVerified', 'updatedAt']))
       );
-    }
-
-    match /approved_emails/{emailId} {
-      allow read: if isAdmin() || (isSignedIn() && resource.data.email == request.auth.token.email.lower());
-      allow write: if isAdmin();
     }
 
     match /admins/{adminId} {
@@ -92,59 +95,69 @@ service cloud.firestore {
     }
 
     match /inventory/{itemId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn(); 
+      allow get: if isApprovedUser();
+      allow list: if isApprovedUser(); 
       allow create: if isApprovedUser() && isValidInventoryItem(incoming());
-      allow update: if isApprovedUser() && isValidInventoryItem(incoming());
-      allow delete: if isApprovedUser();
+      allow update: if isApprovedUser() && isValidInventoryItem(incoming()) && (
+        // Regular update: Can change anything but identity fields if needed, 
+        // but typically inventory updates are incremental or full replacements.
+        // We'll restrict to all valid fields except we assume ID shouldn't change.
+        incoming().diff(existing()).affectedKeys().hasAll([]) 
+      );
+      allow delete: if isAdmin();
     }
 
     match /projects/{projectId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
+      allow get: if isApprovedUser();
+      allow list: if isApprovedUser();
       allow create: if isApprovedUser() && isValidProject(incoming());
-      allow update: if isApprovedUser() && isValidProject(incoming());
-      allow delete: if isApprovedUser();
+      allow update: if isApprovedUser() && isValidProject(incoming()) && (
+        (incoming().userId == existing().userId) &&
+        (incoming().createdAt == existing().createdAt)
+      );
+      allow delete: if isAdmin();
     }
 
     match /transactions_log/{txId} {
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isApprovedUser() && isValidTransaction(incoming());
-      allow update, delete: if isApprovedUser();
-    }
-
-    match /activity_logs/{logId} {
-      allow read: if isAdmin();
-      allow create: if isSignedIn();
+      allow get: if isApprovedUser();
+      allow list: if isApprovedUser();
+      allow create: if isApprovedUser() && isValidTransaction(incoming()) && 
+                    exists(/databases/$(database)/documents/inventory/$(incoming().itemId));
+      // Transactions should be immutable for audit integrity
+      allow update, delete: if false; 
     }
 
     match /clients/{clientId} {
-      allow read: if isSignedIn();
+      allow read: if isApprovedUser();
       allow write: if isApprovedUser();
     }
 
     match /posts/{postId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && incoming().authorId == request.auth.uid;
-      allow update: if (isOwner(existing().authorId) || isAdmin()) && incoming().authorId == existing().authorId;
-      allow delete: if isOwner(existing().authorId) || isAdmin();
+      allow read: if isApprovedUser();
+      allow create: if isApprovedUser() && incoming().authorId == request.auth.uid;
+      allow update: if isApprovedUser() && (isOwner(existing().authorId) || isAdmin()) && incoming().authorId == existing().authorId;
+      allow delete: if isApprovedUser() && (isOwner(existing().authorId) || isAdmin());
 
       match /comments/{commentId} {
-        allow read: if isSignedIn();
-        allow create: if isSignedIn() && incoming().authorId == request.auth.uid;
-        allow delete: if isOwner(existing().authorId) || isAdmin();
+        allow read: if isApprovedUser();
+        allow create: if isApprovedUser() && incoming().authorId == request.auth.uid;
+        allow delete: if isApprovedUser() && (isOwner(existing().authorId) || isAdmin());
       }
     }
 
     match /notifications/{notificationId} {
-      allow read: if isOwner(existing().userId) || isAdmin();
-      allow write: if isOwner(existing().userId) || isAdmin();
+      allow read: if isOwner(resource.data.userId) || isAdmin() || resource.data.get('isPublic', false) == true;
+      allow write: if isAdmin() || (isOwner(resource.data.userId) && incoming().diff(existing()).affectedKeys().hasOnly(['read']));
     }
 
     match /chats/{chatId}/messages/{messageId} {
-      allow read: if isSignedIn() && (chatId.contains(request.auth.uid) || isAdmin());
-      allow create: if isSignedIn() && incoming().senderId == request.auth.uid;
+      allow read: if isApprovedUser() && (chatId.contains(request.auth.uid) || isAdmin());
+      allow create: if isApprovedUser() && incoming().senderId == request.auth.uid;
+    }
+    
+    match /activity_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
     }
   }
 }

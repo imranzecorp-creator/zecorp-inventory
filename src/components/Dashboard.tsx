@@ -177,19 +177,28 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
     let runningStock = currentTotalStock;
     const sortedTx = [...filteredTxs].sort((a, b) => b.date - a.date);
 
+    // Pre-group transactions by day for faster lookup
+    const txByDay: Record<string, StockTransaction[]> = {};
+    sortedTx.forEach(tx => {
+      const d = new Date(tx.date);
+      if (isNaN(d.getTime())) return;
+      const day = d.toISOString().split('T')[0];
+      if (!txByDay[day]) txByDay[day] = [];
+      txByDay[day].push(tx);
+    });
+
     last7Days.slice().reverse().forEach(day => {
       if (dailyData[day]) {
         dailyData[day].stock = runningStock;
         
-        // Find transactions on this specific day and adjust running totals
-        const dayTxs = sortedTx.filter(tx => new Date(tx.date).toISOString().split('T')[0] === day);
+        const dayTxs = txByDay[day] || [];
         dayTxs.forEach(tx => {
           if (tx.type === 'IN') {
             dailyData[day].in += tx.quantity;
-            runningStock -= tx.quantity; // Remove added stock to go back in time
+            runningStock -= tx.quantity; 
           } else {
             dailyData[day].out += tx.quantity;
-            runningStock += tx.quantity; // Add back removed stock to go back in time
+            runningStock += tx.quantity;
           }
         });
       }

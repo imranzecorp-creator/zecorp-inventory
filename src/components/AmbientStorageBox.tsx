@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { motion } from 'framer-motion';
 import { Box } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-export default function AmbientStorageBox() {
+export default memo(function AmbientStorageBox() {
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
       {/* Intense Energetic Orbs - Brighter and More Saturated */}
@@ -11,28 +11,28 @@ export default function AmbientStorageBox() {
         animate={{
           x: [0, 400, 200, 600, 0],
           y: [0, 200, 500, 100, 0],
-          scale: [1, 2, 0.8, 1.6, 1],
+          scale: [1, 1.5, 0.8, 1.3, 1],
         }}
         transition={{
-          duration: 15,
+          duration: 25,
           repeat: Infinity,
           ease: "easeInOut"
         }}
-        className="absolute -top-60 -left-60 w-[800px] h-[800px] bg-primary/40 blur-[150px] rounded-full mix-blend-screen"
+        className="absolute -top-60 -left-60 w-[800px] h-[800px] bg-primary/20 blur-[150px] rounded-full mix-blend-screen"
       />
 
       <motion.div
         animate={{
           x: [800, 200, 500, 100, 800],
           y: [600, 100, 300, 600, 600],
-          scale: [0.8, 1.5, 0.6, 1.2, 0.8],
+          scale: [0.8, 1.2, 0.6, 1.1, 0.8],
         }}
         transition={{
-          duration: 20,
+          duration: 30,
           repeat: Infinity,
           ease: "easeInOut"
         }}
-        className="absolute -bottom-60 -right-60 w-[700px] h-[700px] bg-fuchsia-500/40 blur-[130px] rounded-full mix-blend-plus-lighter"
+        className="absolute -bottom-60 -right-60 w-[700px] h-[700px] bg-fuchsia-500/20 blur-[130px] rounded-full mix-blend-plus-lighter"
       />
 
       <motion.div
@@ -78,9 +78,9 @@ export default function AmbientStorageBox() {
       ></div>
     </div>
   );
-}
+});
 
-function MovingBox({ color, delay, duration, size }: { color: string, delay: number, duration: number, size: number }) {
+const MovingBox = memo(({ color, delay, duration, size }: { color: string, delay: number, duration: number, size: number }) => {
   return (
     <motion.div
       initial={{ 
@@ -126,4 +126,4 @@ function MovingBox({ color, delay, duration, size }: { color: string, delay: num
       </div>
     </motion.div>
   );
-}
+});

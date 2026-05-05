@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import html2canvas from 'html2canvas';
+import { formatDate } from '../lib/utils';
 
 export interface TransactionReportOptions {
   includeNotes?: boolean;
@@ -142,7 +143,7 @@ export async function generateTransactionsReport(transactions: any[], options: T
 
   const tableData = transactions.map(tx => {
     const row = [
-      new Date(tx.date).toLocaleDateString(),
+      formatDate(tx.date),
       `${tx.itemName}${tx.brand ? ` (${tx.brand} ${tx.modelNumber || ''})` : ''}`,
       tx.type === 'IN' ? 'STOCK IN' : 'STOCK OUT',
       tx.quantity,
