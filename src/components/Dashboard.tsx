@@ -37,7 +37,7 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UserProfile, InventoryItem, StockTransaction, Project } from '../types';
-import { formatDate, cn } from '../lib/utils';
+import { formatDate, cn, getDateObject } from '../lib/utils';
 import { generateInventoryReport, generateTransactionsReport } from '../services/pdfService';
 import { analyzeSupplyChain, analyzeInventory, processAiSearch, InventoryInsight } from '../services/geminiService';
 import AIPoweredNews from './AIPoweredNews';
@@ -185,12 +185,8 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
 
   useEffect(() => {
     const fetchInsights = async () => {
-      // Data fingerprinting to avoid redundant calls
-      const currentDataHash = JSON.stringify({
-        itemCount: items.length,
-        projectCount: projects.length,
-        stockSummary: items.reduce((sum, i) => sum + i.currentQuantity, 0)
-      });
+      // Data fingerprinting to avoid redundant calls - much faster than JSON.stringify
+      const currentDataHash = `${items.length}-${projects.length}-${items.reduce((sum, i) => sum + i.currentQuantity, 0)}`;
 
       // 5-minute cooldown + verify data has actually changed
       const coolingDown = lastAnalysisTime > 0 && Date.now() - lastAnalysisTime < 300000;
@@ -248,78 +244,83 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
 
     const totalItems = filteredItems.length;
     const totalProjects = projects.length;
-    const lowStock = filteredItems.filter(i => i.currentQuantity <= i.minStock).length;
-    const outOfStock = filteredItems.filter(i => i.currentQuantity === 0).length;
+    let lowStock = 0;
+    let outOfStock = 0;
+    let currentTotalStock = 0;
+
+    // Single pass for counters
+    for (const item of filteredItems) {
+      currentTotalStock += item.currentQuantity;
+      if (item.currentQuantity === 0) {
+        outOfStock++;
+      } else if (item.currentQuantity <= item.minStock) {
+        lowStock++;
+      }
+    }
     
-    // Calculate real historical stock trend (aggregate for filtered items)
+    // Calculate real historical stock trend
     const now = new Date();
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
-      d.setDate(now.getDate() - (6 - i));
-      return d.toISOString().split('T')[0];
-    });
-
-    // Build snapshots
-    let currentTotalStock = filteredItems.reduce((acc, item) => acc + item.currentQuantity, 0);
+    const last7Days: string[] = [];
     const dailyData: Record<string, { name: string, stock: number, in: number, out: number }> = {};
-    
-    // Initialize base days
-    last7Days.forEach(day => {
-      dailyData[day] = { name: day.split('-')[2], stock: 0, in: 0, out: 0 };
-    });
 
-    // We work backwards from today
+    for (let i = 0; i < 7; i++) {
+        const d = new Date();
+        d.setDate(now.getDate() - (6 - i));
+        const dayString = d.toISOString().split('T')[0];
+        last7Days.push(dayString);
+        dailyData[dayString] = { name: dayString.split('-')[2], stock: 0, in: 0, out: 0 };
+    }
+
+    // Work backwards from today using pre-grouped logic if possible, 
+    // but here we just optimize the iteration
     let runningStock = currentTotalStock;
-    const sortedTx = [...filteredTxs].sort((a, b) => b.date - a.date);
-
-    // Pre-group transactions by day for faster lookup
-    const txByDay: Record<string, StockTransaction[]> = {};
-    sortedTx.forEach(tx => {
-      const d = new Date(tx.date);
-      if (isNaN(d.getTime())) return;
-      const day = d.toISOString().split('T')[0];
-      if (!txByDay[day]) txByDay[day] = [];
-      txByDay[day].push(tx);
+    const sortedTx = [...filteredTxs].sort((a, b) => {
+      const dateA = getDateObject(a.date)?.getTime() || 0;
+      const dateB = getDateObject(b.date)?.getTime() || 0;
+      return dateB - dateA;
     });
+
+    // AI Analytics: Most frequently moved items
+    const moveCounts: Record<string, number> = {};
 
     last7Days.slice().reverse().forEach(day => {
       if (dailyData[day]) {
         dailyData[day].stock = runningStock;
         
-        const dayTxs = txByDay[day] || [];
-        dayTxs.forEach(tx => {
-          if (tx.type === 'IN') {
-            dailyData[day].in += tx.quantity;
-            runningStock -= tx.quantity; 
-          } else {
-            dailyData[day].out += tx.quantity;
-            runningStock += tx.quantity;
+        // Find transactions for this day
+        for (const tx of sortedTx) {
+          const d = getDateObject(tx.date);
+          if (!d) continue;
+          const txDay = d.toISOString().split('T')[0];
+          if (txDay === day) {
+              if (tx.type === 'IN') {
+                dailyData[day].in += tx.quantity;
+                runningStock -= tx.quantity; 
+              } else {
+                dailyData[day].out += tx.quantity;
+                runningStock += tx.quantity;
+              }
+              // Transaction count for AI sidebar
+              moveCounts[tx.itemName] = (moveCounts[tx.itemName] || 0) + 1;
           }
-        });
+        }
       }
     });
 
     const monthlyStockData = Object.values(dailyData);
 
-    // AI Analytics Calculations
-    // 1. Most frequently moved items
-    const moveCounts: Record<string, number> = {};
-    filteredTxs.forEach(tx => {
-      moveCounts[tx.itemName] = (moveCounts[tx.itemName] || 0) + 1;
-    });
     const mostMovedItems = Object.entries(moveCounts)
       .map(([name, count]) => ({ name: name.substring(0, 12), count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
-    // 2. Critical Stock Count
     const distribution = [
       { name: 'Healthy', value: filteredItems.filter(i => i.currentQuantity > i.minStock * 2).length },
       { name: 'Warning', value: filteredItems.filter(i => i.currentQuantity <= i.minStock * 2 && i.currentQuantity > i.minStock).length },
-      { name: 'Critical', value: lowStock },
+      { name: 'Critical', value: lowStock + outOfStock },
     ];
 
-    return { totalItems, totalProjects, lowStock, outOfStock, monthlyStockData, mostMovedItems, distribution };
+    return { totalItems, totalProjects, lowStock: lowStock + outOfStock, outOfStock, monthlyStockData, mostMovedItems, distribution };
   }, [items, transactions, projects, stockTypeFilter]);
 
   const uniqueValues = useMemo(() => {

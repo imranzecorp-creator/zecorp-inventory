@@ -48,7 +48,7 @@ import {
 } from 'firebase/firestore';
 import { db, OperationType, handleFirestoreError, auth } from '../lib/firebase';
 import { InventoryItem, UserProfile, Project } from '../types';
-import { cn, formatDate, formatDateForInput } from '../lib/utils';
+import { cn, formatDate, formatDateForInput, getDateObject } from '../lib/utils';
 import { generateInventoryReport } from '../services/pdfService';
 import { suggestItemDetails, processAiSearch, mapExcelItems, getExcelMapping } from '../services/geminiService';
 
@@ -585,16 +585,20 @@ export default function InventoryList({ items, clients, user, projects, initialS
 
       // Date Range Filters
       if (stockInStart) {
-        if (!item.stockInDate || item.stockInDate < new Date(stockInStart).getTime()) return false;
+        const itemDate = getDateObject(item.stockInDate)?.getTime();
+        if (!itemDate || itemDate < new Date(stockInStart).getTime()) return false;
       }
       if (stockInEnd) {
-        if (!item.stockInDate || item.stockInDate > new Date(stockInEnd).setHours(23, 59, 59, 999)) return false;
+        const itemDate = getDateObject(item.stockInDate)?.getTime();
+        if (!itemDate || itemDate > new Date(stockInEnd).setHours(23, 59, 59, 999)) return false;
       }
       if (updatedStart) {
-        if (!item.lastUpdated || item.lastUpdated < new Date(updatedStart).getTime()) return false;
+        const itemDate = getDateObject(item.lastUpdated)?.getTime();
+        if (!itemDate || itemDate < new Date(updatedStart).getTime()) return false;
       }
       if (updatedEnd) {
-        if (!item.lastUpdated || item.lastUpdated > new Date(updatedEnd).setHours(23, 59, 59, 999)) return false;
+        const itemDate = getDateObject(item.lastUpdated)?.getTime();
+        if (!itemDate || itemDate > new Date(updatedEnd).setHours(23, 59, 59, 999)) return false;
       }
 
       return true;

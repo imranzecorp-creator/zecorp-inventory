@@ -65,6 +65,7 @@ import ToastContainer, { Toast } from './components/ToastContainer';
 import Logo from './components/Logo';
 import BackgroundAnimation from './components/BackgroundAnimation';
 import { ZecorpMascot } from './components/ZecorpMascot';
+import { FloatingEquipments } from './components/FloatingEquipments';
 
 // Lazy load heavy components
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
@@ -377,8 +378,9 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden selection:bg-primary/30 selection:text-white bg-[#020617]/90 relative">
+    <div className="flex h-screen overflow-hidden selection:bg-primary/30 selection:text-white bg-[#020617] relative">
       <BackgroundAnimation />
+      <FloatingEquipments />
       <ToastContainer toasts={toasts} removeToast={removeToast} />
       <AmbientStorageBox />
       
@@ -558,7 +560,7 @@ export default function App() {
           />
         </nav>
       </div>
-      <ZecorpMascot />
+      <ZecorpMascot userDisplayName={user?.displayName || 'User'} />
     </div>
   );
 }

@@ -18,7 +18,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Markdown from 'react-markdown';
 import { InventoryItem, StockTransaction } from '../types';
 import { generateInventoryReport } from '../services/geminiService';
-import { cn } from '../lib/utils';
+import { cn, getDateObject } from '../lib/utils';
 
 interface AIReportsProps {
   inventory: InventoryItem[];
@@ -59,8 +59,10 @@ export function AIReports({ inventory, transactions }: AIReportsProps) {
       else if (dateRange === '90d') startDate = new Date(now.setDate(now.getDate() - 90));
 
       const filteredTransactions = transactions.filter(tx => {
-        const txDate = new Date(tx.date);
-        const matchesDate = startDate ? txDate >= startDate : true;
+        const d = getDateObject(tx.date);
+        if (!d) return false;
+        const txDate = d.getTime();
+        const matchesDate = startDate ? txDate >= startDate.getTime() : true;
         const matchesType = transactionType === 'ALL' ? true : tx.type === transactionType;
         // For categories, we might need to find the item's category
         const item = inventory.find(i => i.id === tx.itemId || i.name === tx.itemName);

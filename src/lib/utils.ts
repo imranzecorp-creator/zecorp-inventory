@@ -6,16 +6,8 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatDate(date: any) {
-  if (!date) return 'N/A';
-  
-  let d: Date;
-  if (typeof date.toDate === 'function') {
-    d = date.toDate();
-  } else {
-    d = new Date(date);
-  }
-
-  if (isNaN(d.getTime())) return 'Invalid Date';
+  const d = getDateObject(date);
+  if (!d) return 'N/A';
 
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
@@ -25,16 +17,8 @@ export function formatDate(date: any) {
 }
 
 export function formatTime(date: any) {
-  if (!date) return 'N/A';
-  
-  let d: Date;
-  if (typeof date.toDate === 'function') {
-    d = date.toDate();
-  } else {
-    d = new Date(date);
-  }
-
-  if (isNaN(d.getTime())) return 'N/A';
+  const d = getDateObject(date);
+  if (!d) return 'N/A';
 
   return d.toLocaleTimeString('en-US', {
     hour: '2-digit',
@@ -43,16 +27,8 @@ export function formatTime(date: any) {
 }
 
 export function formatDateTime(date: any) {
-  if (!date) return 'N/A';
-  
-  let d: Date;
-  if (typeof date.toDate === 'function') {
-    d = date.toDate();
-  } else {
-    d = new Date(date);
-  }
-
-  if (isNaN(d.getTime())) return 'N/A';
+  const d = getDateObject(date);
+  if (!d) return 'N/A';
 
   return d.toLocaleString('en-US', {
     month: 'short',
@@ -64,12 +40,27 @@ export function formatDateTime(date: any) {
 }
 
 export function formatDateForInput(date: any) {
-  if (!date) return '';
-  const d = (typeof date.toDate === 'function') ? date.toDate() : new Date(date);
-  if (isNaN(d.getTime())) return '';
+  const d = getDateObject(date);
+  if (!d) return '';
   try {
     return d.toISOString().split('T')[0];
   } catch (e) {
     return '';
   }
+}
+
+export function getDateObject(date: any): Date | null {
+  if (!date) return null;
+  
+  let d: Date;
+  if (typeof date.toDate === 'function') {
+    d = date.toDate();
+  } else if (typeof date === 'number') {
+    // Basic heuristic: if it's less than 10^11, it's likely seconds
+    d = new Date(date < 10000000000 ? date * 1000 : date);
+  } else {
+    d = new Date(date);
+  }
+
+  return isNaN(d.getTime()) ? null : d;
 }

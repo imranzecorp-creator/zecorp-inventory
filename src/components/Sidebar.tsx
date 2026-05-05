@@ -45,7 +45,7 @@ export default memo(function Sidebar({ activeTab, setActiveTab, role }: SidebarP
   }, [role]);
 
   return (
-    <div className="hidden md:flex flex-col w-64 bg-[#020617]/95 backdrop-blur-2xl border-r border-white/10 relative z-50 overflow-hidden shadow-[20px_0_50px_-20px_rgba(0,0,0,0.5)]">
+    <div className="hidden md:flex flex-col w-64 bg-[#020617] border-r border-white/10 relative z-50 overflow-hidden shadow-[20px_0_50px_-20px_rgba(0,0,0,0.5)]">
       {/* Dynamic Background Glows */}
       <motion.div 
         animate={{ 

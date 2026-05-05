@@ -3,12 +3,25 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Newspaper, X, MessageSquare, Sparkles, Cpu, Bot, Zap } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-export const ZecorpMascot: React.FC = () => {
-  const [position, setPosition] = useState({ x: 20, y: 80 }); // Percentage
+interface ZecorpMascotProps {
+  userDisplayName?: string;
+}
+
+export const ZecorpMascot: React.FC<ZecorpMascotProps> = ({ userDisplayName = 'User' }) => {
+  const [position, setPosition] = useState({ x: 85, y: 80 }); // Percentage based on viewport - changed default to closer to sidebar/bottom
+  const [isDragging, setIsDragging] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [showMessage, setShowMessage] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
-  const [currentNews, setCurrentNews] = useState("Zecorp Supply Chain is optimized.");
+  const [currentNews, setCurrentNews] = useState(`Hi ${userDisplayName.split(' ')[0]}! I'm Zec AI, Your Assistant.`);
+  const [updateIndex, setUpdateIndex] = useState(0);
+
+  const todayUpdates = [
+    { label: "Status", value: "Optimal", color: "text-emerald-400" },
+    { label: "AI Prediction", value: "99.4%", color: "text-primary" },
+    { label: "Refilling", value: "Auto-Mode", color: "text-amber-400" },
+    { label: "Fleet", value: "Active", color: "text-cyan-400" }
+  ];
 
   const aboutPoints = [
     "AI-Powered Prediction Engine",
@@ -23,28 +36,46 @@ export const ZecorpMascot: React.FC = () => {
     "AI predicted 3 stockouts today.",
     "Zecorp expanding to new regions.",
     "New inventory batch arriving shortly.",
-    "Smart alerts are active."
+    "Smart alerts are active.",
+    `Ready to help you, ${userDisplayName.split(' ')[0]}!`
   ];
 
+  // Autonomous movement logic
   useEffect(() => {
-    if (showAbout) return;
+    if (showAbout || isDragging) return;
 
     const moveInterval = setInterval(() => {
-      // Random movement within bounds, avoiding the center too much
+      // Random movement within bounds
       const newX = Math.random() * 80 + 10;
       const newY = Math.random() * 80 + 10;
       setPosition({ x: newX, y: newY });
-      
-      // Occasionally show a message
-      if (Math.random() > 0.7) {
+    }, 15000);
+
+    return () => clearInterval(moveInterval);
+  }, [showAbout, isDragging]);
+
+  // Periodic messages
+  useEffect(() => {
+    if (showAbout) return;
+
+    const messageInterval = setInterval(() => {
+      if (Math.random() > 0.6) {
         setCurrentNews(newsItems[Math.floor(Math.random() * newsItems.length)]);
         setShowMessage(true);
         setTimeout(() => setShowMessage(false), 5000);
       }
-    }, 15000);
+    }, 12000);
 
-    return () => clearInterval(moveInterval);
-  }, []);
+    return () => clearInterval(messageInterval);
+  }, [showAbout, newsItems]);
+
+  // Cycle today's updates
+  useEffect(() => {
+    const updateInterval = setInterval(() => {
+      setUpdateIndex((prev) => (prev + 1) % todayUpdates.length);
+    }, 4000);
+    return () => clearInterval(updateInterval);
+  }, [todayUpdates.length]);
 
   if (!isVisible) return null;
 
@@ -54,6 +85,19 @@ export const ZecorpMascot: React.FC = () => {
       style={{ overflow: 'hidden' }}
     >
       <motion.div
+        drag
+        dragMomentum={false}
+        onDragStart={() => setIsDragging(true)}
+        onDragEnd={(e, info) => {
+          setIsDragging(false);
+          const xPercent = (info.point.x / window.innerWidth) * 100;
+          const yPercent = (info.point.y / window.innerHeight) * 100;
+          setPosition({ 
+            x: Math.min(Math.max(xPercent, 5), 95), 
+            y: Math.min(Math.max(yPercent, 5), 95) 
+          });
+        }}
+        initial={false}
         animate={{ 
           left: `${position.x}%`, 
           top: `${position.y}%`,
@@ -61,15 +105,20 @@ export const ZecorpMascot: React.FC = () => {
           rotate: [0, 5, -5, 0]
         }}
         transition={{ 
-          left: { duration: 10, ease: "easeInOut" },
-          top: { duration: 10, ease: "easeInOut" },
+          left: isDragging ? { duration: 0 } : { duration: 10, ease: "easeInOut" },
+          top: isDragging ? { duration: 0 } : { duration: 10, ease: "easeInOut" },
           scale: { duration: 3, repeat: Infinity, ease: "easeInOut" },
           rotate: { duration: 5, repeat: Infinity, ease: "easeInOut" }
         }}
-        className="absolute pointer-events-auto group cursor-pointer"
-        onMouseEnter={() => !showAbout && setShowMessage(true)}
+        className="absolute pointer-events-auto group cursor-grab active:cursor-grabbing gpu-accelerated"
+        onMouseEnter={() => {
+          if (!showAbout && !isDragging) {
+            setCurrentNews(`Hi ${userDisplayName.split(' ')[0]}! I'm Zec AI, Your Assistant.`);
+            setShowMessage(true);
+          }
+        }}
         onMouseLeave={() => setShowMessage(false)}
-        onClick={() => setShowAbout(!showAbout)}
+        onClick={() => !isDragging && setShowAbout(!showAbout)}
       >
         {/* Mascot Figure - "AI Powered Robot in Zecorp uniform" */}
         <div className="relative group/mascot">
@@ -136,6 +185,39 @@ export const ZecorpMascot: React.FC = () => {
 
           {/* Glowing Aura */}
           <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full -z-10 animate-pulse" />
+          
+          {/* Today's Update Box */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 15 }}
+            className="absolute top-0 -right-24 z-30"
+          >
+            <div className="bg-[#020617]/80 backdrop-blur-md border border-primary/30 rounded-lg p-2 shadow-2xl min-w-[80px] overflow-hidden group-hover:scale-110 transition-transform">
+              <div className="flex items-center space-x-1 border-b border-primary/20 pb-1 mb-1">
+                <div className="w-1 h-1 rounded-full bg-primary animate-ping" />
+                <span className="text-[6px] font-black text-primary uppercase tracking-tighter">Today's Update</span>
+              </div>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={updateIndex}
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <div className="flex flex-col">
+                    <span className="text-[5px] text-white/50 uppercase tracking-widest leading-none mb-0.5">{todayUpdates[updateIndex].label}</span>
+                    <span className={cn("text-[8px] font-black uppercase tracking-tight", todayUpdates[updateIndex].color)}>
+                      {todayUpdates[updateIndex].value}
+                    </span>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+              <div className="absolute bottom-0 right-0 p-0.5 opacity-20">
+                <Cpu className="w-3 h-3 text-primary" />
+              </div>
+            </div>
+          </motion.div>
         </div>
 
         {/* Speech Bubble / News Board Message */}
@@ -177,7 +259,7 @@ export const ZecorpMascot: React.FC = () => {
               className="absolute z-[100]"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="w-64 bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+              <div className="w-64 bg-[#020617]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
                 <div className="bg-primary/20 p-4 border-b border-white/10">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
@@ -204,9 +286,16 @@ export const ZecorpMascot: React.FC = () => {
                        </div>
                      ))}
                   </div>
-                  <div className="pt-2">
+                  <div className="pt-2 flex flex-col space-y-2">
                      <button className="w-full py-2 bg-primary/10 hover:bg-primary/20 text-primary text-[10px] font-black uppercase tracking-widest rounded-lg border border-primary/20 transition-all">
                         Launch Documentation
+                     </button>
+                     <button 
+                        onClick={() => setIsVisible(false)}
+                        className="w-full py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[10px] font-black uppercase tracking-widest rounded-lg border border-red-500/20 transition-all flex items-center justify-center space-x-1"
+                     >
+                        <X className="w-3 h-3" />
+                        <span>Dismiss Mascot</span>
                      </button>
                   </div>
                 </div>
@@ -214,7 +303,7 @@ export const ZecorpMascot: React.FC = () => {
                    <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Powered by Gemini Pro</span>
                 </div>
               </div>
-              <div className="w-4 h-4 bg-slate-900 border-r border-b border-white/10 rotate-45 absolute -bottom-2 left-1/2 translate-x-[40px] z-[-1]" />
+              <div className="w-4 h-4 bg-[#020617] border-r border-b border-white/10 rotate-45 absolute -bottom-2 left-1/2 translate-x-[40px] z-[-1]" />
             </motion.div>
           )}
         </AnimatePresence>
