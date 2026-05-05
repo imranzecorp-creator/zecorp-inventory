@@ -76,7 +76,9 @@ export default function Header({ user, unreadCount, notifications, setActiveTab 
               transition={{ 
                 duration: 0.5, 
                 repeat: unreadCount > 0 ? Infinity : 0, 
-                repeatDelay: 2 
+                repeatDelay: 2,
+                type: "tween",
+                ease: "easeInOut"
               }}
             >
               <Bell className="w-5 h-5 group-hover:text-primary transition-colors" />

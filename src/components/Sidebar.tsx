@@ -110,22 +110,19 @@ export default function Sidebar({ activeTab, setActiveTab, role }: SidebarProps)
             <motion.div
               animate={{ 
                 scale: activeTab === item.id ? 1.2 : 1,
-                rotate: activeTab === item.id ? [0, -15, 15, 0] : 0,
-                filter: activeTab === item.id ? "drop-shadow(0 0 8px rgba(0,0,0,0.3))" : "none"
+                rotate: activeTab === item.id ? [0, -10, 10, 0] : 0,
               }}
               whileHover={{ 
                 scale: 1.3,
-                rotate: activeTab === item.id ? [0, -15, 15, 0] : [0, -20, 20, 0],
+                rotate: [0, -15, 15, 0],
               }}
               whileTap={{ scale: 0.9 }}
               transition={{ 
-                type: "spring", 
-                stiffness: 300, 
-                damping: 15,
+                scale: { type: "spring", stiffness: 400, damping: 10 },
                 rotate: { 
-                  duration: 0.5, 
+                  duration: 0.4, 
                   repeat: activeTab === item.id ? Infinity : 0, 
-                  repeatDelay: 3,
+                  repeatDelay: 2,
                   type: "tween",
                   ease: "easeInOut"
                 }
@@ -191,9 +188,12 @@ export default function Sidebar({ activeTab, setActiveTab, role }: SidebarProps)
             whileHover={{ 
               rotate: 360,
               scale: 1.3,
-              filter: "drop-shadow(0 0 8px rgba(var(--primary-rgb),0.5))"
+              filter: "drop-shadow(0 0 12px rgba(var(--primary-rgb),0.6))"
             }}
-            transition={{ type: "spring", stiffness: 250, damping: 15 }}
+            transition={{ 
+              rotate: { type: "spring", stiffness: 200, damping: 15 },
+              scale: { type: "spring", stiffness: 400, damping: 10 }
+            }}
             className="mr-3"
           >
             <Settings className={cn(

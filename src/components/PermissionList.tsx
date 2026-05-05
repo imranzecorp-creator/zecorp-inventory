@@ -64,6 +64,7 @@ export default function PermissionList({ className }: PermissionListProps) {
     <div className="flex flex-col items-center text-center p-4">
       <motion.div 
         whileHover={{ scale: 1.1, rotate: [0, -5, 5, 0] }}
+        transition={{ rotate: { duration: 0.5, type: "tween", ease: "easeInOut" } }}
         className={cn("w-12 h-12 rounded-2xl flex items-center justify-center mb-3 shadow-lg", color)}
       >
         <Icon className="w-6 h-6 text-white" />

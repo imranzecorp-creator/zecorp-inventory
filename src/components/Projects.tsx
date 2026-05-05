@@ -1,5 +1,7 @@
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback, memo } from 'react';
 import * as XLSX from 'xlsx';
+import { VariableSizeList as List } from 'react-window';
+import AutoSizer from 'react-virtualized-auto-sizer';
 import { 
   Plus, 
   Search, 
@@ -41,6 +43,64 @@ import { cn, formatDate } from '../lib/utils';
 import { FilterDropdown } from './ui/FilterDropdown';
 import { Clock, History } from 'lucide-react';
 import { analyzeInventory, processAiSearch, mapExcelItems, mapExcelProjects } from '../services/geminiService';
+
+const ManifestRow = memo(({ index, style, data }: { index: number, style: React.CSSProperties, data: { items: ProjectItem[] } }) => {
+  const item = data.items[index];
+  if (!item) return null;
+
+  return (
+    <div style={style} className="px-1 pb-4">
+      <div className="bg-white/[0.03] p-5 rounded-3xl border border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:bg-white/[0.05] transition-all overflow-hidden relative">
+        <div className="absolute top-0 left-0 w-1 h-full bg-primary/20 group-hover:bg-primary transition-colors" />
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center text-white shrink-0 shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform">
+            <Package className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{item.name}</p>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500 font-medium tracking-wide mt-1">
+              <span className="flex items-center space-x-1">
+                 <span className="text-slate-600 font-black">BRAND:</span>
+                 <span className="text-slate-300">{item.brand || 'Generic'}</span>
+              </span>
+              <span className="w-1 h-1 rounded-full bg-slate-700" />
+              <span className="flex items-center space-x-1">
+                 <span className="text-slate-600 font-black">CAT:</span>
+                 <span className="text-slate-300">{item.category || 'Unset'}</span>
+              </span>
+              {item.posNo && (
+                <>
+                  <span className="w-1 h-1 rounded-full bg-slate-700" />
+                  <span className="flex items-center space-x-1">
+                     <span className="text-slate-600 font-black">POS:</span>
+                     <span className="text-slate-300">{item.posNo}</span>
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-6 md:gap-8 bg-black/40 p-4 rounded-2xl border border-white/5 shadow-inner">
+          <div className="text-center min-w-[40px]">
+            <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Req</p>
+            <span className="text-lg font-black text-white">{item.quantity}</span>
+          </div>
+          <div className="w-px h-6 bg-white/10" />
+          <div className="text-center min-w-[40px]">
+            <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-1">In</p>
+            <span className="text-lg font-black text-emerald-400">{item.quantityIn || 0}</span>
+          </div>
+          <div className="w-px h-6 bg-white/10" />
+          <div className="text-center min-w-[40px]">
+            <p className="text-[8px] font-black text-red-500 uppercase tracking-widest mb-1">Out</p>
+            <span className="text-lg font-black text-red-400">{item.quantityOut || 0}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
 
 interface ProjectsProps {
   projects: Project[];
@@ -928,9 +988,12 @@ function ProjectFormModal({
             <button 
               type="button" 
               onClick={onClose} 
-              className="px-6 py-3 text-sm font-black text-slate-500 hover:text-red-500 transition-all uppercase tracking-widest hover:bg-red-500/10 rounded-xl"
+              className="px-6 py-3 text-sm font-black text-rose-500 hover:text-white transition-all uppercase tracking-widest hover:bg-rose-500/20 rounded-2xl border border-rose-500/10 hover:border-rose-500/40 shadow-lg shadow-rose-500/5 group"
             >
-              Discard
+              <span className="flex items-center space-x-2">
+                <X className="w-4 h-4 group-hover:rotate-90 transition-transform" />
+                <span>Discard Changes</span>
+              </span>
             </button>
             {isApproved && (
               <button 
@@ -1383,80 +1446,21 @@ function ProjectDetailModal({ project, inventory, transactions, onClose, onDelet
                     <span className="text-[10px] font-bold text-slate-500">{project.items?.length || 0} SKU References</span>
                   </div>
                 </div>
-                <div className="space-y-4">
-                  {project.items?.map((item, idx) => (
-                    <div key={idx} className="bg-white/[0.03] p-5 rounded-3xl border border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4 group">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center text-white shrink-0">
-                          <Package className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{item.name}</p>
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500 font-medium tracking-wide mt-1">
-                            <span className="flex items-center space-x-1">
-                               <span className="text-slate-600 font-black">BRAND:</span>
-                               <span>{item.brand || 'Generic'}</span>
-                            </span>
-                            <span className="w-1 h-1 rounded-full bg-slate-700" />
-                            <span className="flex items-center space-x-1">
-                               <span className="text-slate-600 font-black">CAT:</span>
-                               <span>{item.category || 'Unset'}</span>
-                            </span>
-                            {item.posNo && (
-                              <>
-                                <span className="w-1 h-1 rounded-full bg-slate-700" />
-                                <span className="flex items-center space-x-1">
-                                   <span className="text-slate-600 font-black">POS:</span>
-                                   <span>{item.posNo}</span>
-                                </span>
-                              </>
-                            )}
-                            {item.location && (
-                              <>
-                                <span className="w-1 h-1 rounded-full bg-slate-700" />
-                                <span className="text-fuchsia-400/70">{item.location}</span>
-                              </>
-                            )}
-                            {item.approvedQuote && (
-                              <>
-                                <span className="w-1 h-1 rounded-full bg-slate-700" />
-                                <span className="text-amber-500/70">QUOTE: {item.approvedQuote}</span>
-                              </>
-                            )}
-                            {item.eta && (
-                              <>
-                                <span className="w-1 h-1 rounded-full bg-slate-700" />
-                                <span className="text-blue-400/70">ETA: {item.eta}</span>
-                              </>
-                            )}
-                            {item.delivery && (
-                              <>
-                                <span className="w-1 h-1 rounded-full bg-slate-700" />
-                                <span className="text-green-400/70">DELIVERY: {item.delivery}</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-6 md:gap-8 bg-black/20 p-4 rounded-2xl border border-white/5">
-                        <div className="text-center">
-                          <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Req</p>
-                          <span className="text-lg font-black text-white">{item.quantity}</span>
-                        </div>
-                        <div className="w-px h-6 bg-white/5" />
-                        <div className="text-center">
-                          <p className="text-[8px] font-black text-green-500 uppercase tracking-widest mb-1">In</p>
-                          <span className="text-lg font-black text-green-400">{item.quantityIn || 0}</span>
-                        </div>
-                        <div className="w-px h-6 bg-white/5" />
-                        <div className="text-center">
-                          <p className="text-[8px] font-black text-red-500 uppercase tracking-widest mb-1">Out</p>
-                          <span className="text-lg font-black text-red-400">{item.quantityOut || 0}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                <div className="h-[500px]">
+                  <AutoSizer>
+                    {({ height, width }) => (
+                      <List
+                        height={height}
+                        width={width}
+                        itemCount={project.items?.length || 0}
+                        itemSize={() => 120}
+                        itemData={{ items: project.items || [] }}
+                        className="scrollbar-hide"
+                      >
+                        {ManifestRow}
+                      </List>
+                    )}
+                  </AutoSizer>
                 </div>
               </div>
             </div>

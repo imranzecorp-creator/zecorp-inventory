@@ -667,20 +667,20 @@ export default function InventoryList({ items, clients, user, projects }: Invent
           <p className="text-[10px] md:text-sm text-slate-500 md:text-slate-400 uppercase font-black md:font-normal tracking-[0.1em]">Central Asset Grid • {items.length} Units</p>
         </div>
         <div className="flex items-center space-x-2 md:space-x-3 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
-          <button 
-            onClick={() => generateInventoryReport(filteredItems, {
-              search: searchTerm,
-              brand: selectedBrands.join(', '),
-              client: clientFilter,
-              job: jobFilter,
-              project: selectedOutlets.join(', '),
-              location: locationFilter
-            })}
-            className="flex-shrink-0 flex items-center space-x-2 px-5 py-3 text-xs md:text-sm font-black text-white bg-slate-800/50 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-white/20 transition-all active:scale-95 group uppercase tracking-[0.15em] shadow-xl hover:shadow-white/5 backdrop-blur-md"
-          >
-            <Download className="w-3.5 h-3.5 md:w-4 md:h-4 group-hover:animate-bounce" />
-            <span>Export Data</span>
-          </button>
+            <button 
+              onClick={() => generateInventoryReport(filteredItems, {
+                search: searchTerm,
+                brand: selectedBrands.join(', '),
+                client: clientFilter,
+                job: jobFilter,
+                project: selectedOutlets.join(', '),
+                location: locationFilter
+              })}
+              className="flex-shrink-0 flex items-center space-x-2 px-6 py-3.5 text-xs md:text-sm font-black text-amber-950 bg-gradient-to-r from-amber-400 to-orange-500 rounded-2xl hover:scale-105 transition-all active:scale-95 group uppercase tracking-[0.15em] shadow-[0_0_20px_rgba(251,191,36,0.3)] hover:shadow-[0_0_30px_rgba(251,191,36,0.5)]"
+            >
+              <Download className="w-3.5 h-3.5 md:w-4 md:h-4 group-hover:translate-y-0.5 transition-transform" />
+              <span>Export PDF Data</span>
+            </button>
           {isApproved && (
             <div className="flex items-center space-x-2 md:space-x-3">
               <button 

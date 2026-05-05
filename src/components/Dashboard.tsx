@@ -521,7 +521,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
             <form onSubmit={handleAiSearch} className="relative group">
               <motion.div
                 animate={{ rotate: [0, 15, -15, 0] }}
-                transition={{ duration: 3, repeat: Infinity }}
+                transition={{ duration: 3, repeat: Infinity, type: "tween", ease: "easeInOut" }}
                 className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none"
               >
                 <Sparkles className="w-4 h-4 text-primary group-focus-within:text-white transition-colors" />
