@@ -34,7 +34,7 @@ import { useVoiceSearch } from '../hooks/useVoiceSearch';
 import { VoiceLanguageSelector } from './VoiceLanguageSelector';
 import { motion, AnimatePresence } from 'framer-motion';
 import { StockTransaction } from '../types';
-import { formatDate, formatTime, cn } from '../lib/utils';
+import { formatDate, formatTime, cn, getDateObject } from '../lib/utils';
 import { generateTransactionsReport } from '../services/pdfService';
 import { summarizeTransactions } from '../services/geminiService';
 import { VariableSizeList as List } from 'react-window';
@@ -264,7 +264,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
       const matchesJob = !jobNumberFilter || 
         (tx.jobNumber?.toLowerCase() || '').includes(jobNumberFilter.toLowerCase());
 
-      const txDate = tx.date?.toMillis ? tx.date.toMillis() : tx.date;
+      const txDateObj = getDateObject(tx.date);
+      const txDate = txDateObj?.getTime() || 0;
       const matchesDate = (!startDate || txDate >= new Date(startDate).getTime()) &&
                           (!endDate || txDate <= new Date(endDate).getTime() + 86400000);
 
