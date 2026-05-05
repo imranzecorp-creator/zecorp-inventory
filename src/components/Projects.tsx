@@ -210,14 +210,14 @@ export default function Projects({ projects, inventory, clients, user, transacti
           <button 
             onClick={() => setShowFilters(!showFilters)}
             className={cn(
-              "flex-shrink-0 flex items-center space-x-2 px-3 md:px-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl border transition-all text-[10px] md:text-xs font-black uppercase tracking-widest active:scale-95",
+              "flex-shrink-0 flex items-center space-x-2 px-5 py-3 rounded-2xl border transition-all text-[10px] md:text-xs font-black uppercase tracking-widest active:scale-95 duration-500",
               showFilters 
-                ? "bg-primary text-white border-primary shadow-lg shadow-primary/25" 
-                : "bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10"
+                ? "bg-amber-500 text-slate-950 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.4)]" 
+                : "bg-slate-800/50 border-white/10 text-slate-400 hover:text-white hover:bg-white/10"
             )}
           >
-            <Filter className="w-3.5 h-3.5 md:w-4 md:h-4" />
-            <span>Filter</span>
+            <Filter className={cn("w-3.5 h-3.5 md:w-4 md:h-4", showFilters && "animate-bounce")} />
+            <span>{showFilters ? 'Hide Filters' : 'Show Filters'}</span>
           </button>
           {(isApproved) && (
             <>
@@ -238,9 +238,9 @@ export default function Projects({ projects, inventory, clients, user, transacti
               />
               <button 
                 onClick={() => setShowAddModal(true)}
-                className="hidden md:flex flex-shrink-0 items-center space-x-2 px-5 py-3 text-xs font-black text-white bg-primary rounded-2xl hover:bg-primary/90 shadow-xl shadow-primary/30 transition-all active:scale-95 group uppercase tracking-widest"
+                className="hidden md:flex flex-shrink-0 items-center space-x-2 px-6 py-3.5 text-xs font-black text-slate-950 bg-gradient-to-r from-primary via-emerald-400 to-primary rounded-2xl bg-[length:200%_auto] hover:bg-right shadow-[0_0_25px_rgba(var(--primary-rgb),0.4)] hover:shadow-[0_0_35px_rgba(var(--primary-rgb),0.6)] transition-all duration-500 active:scale-95 group uppercase tracking-[0.2em]"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
                 <span>Engage New Project</span>
               </button>
             </>
@@ -469,10 +469,12 @@ function ProjectCard({ project, user, onClick, onEdit, onDelete }: { project: Pr
             <Layout className="w-5 h-5 md:w-6 md:h-6 text-primary" />
           </div>
           <span className={cn(
-            "px-2 py-1 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest",
-            project.status === 'Active' ? "bg-green-500/10 text-green-400" : "bg-slate-500/10 text-slate-400"
+            "px-2.5 py-1 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] border shadow-sm transition-all",
+            project.status === 'Active' 
+              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-emerald-500/10 animate-pulse" 
+              : "bg-slate-500/10 text-slate-400 border-white/10"
           )}>
-            {project.status}
+            {project.status === 'Active' ? 'Deployment Active' : project.status}
           </span>
         </div>
 
@@ -922,15 +924,21 @@ function ProjectFormModal({
               <span className="text-sm font-bold text-primary">{items.reduce((sum, i) => sum + i.quantity, 0)} Units</span>
             </div>
           </div>
-          <div className="flex items-center space-x-4">
-            <button type="button" onClick={onClose} className="px-6 py-3 text-sm font-bold text-slate-400 hover:text-white transition-colors">Discard</button>
+          <div className="flex items-center space-x-5">
+            <button 
+              type="button" 
+              onClick={onClose} 
+              className="px-6 py-3 text-sm font-black text-slate-500 hover:text-red-500 transition-all uppercase tracking-widest hover:bg-red-500/10 rounded-xl"
+            >
+              Discard
+            </button>
             {isApproved && (
               <button 
                 onClick={handleSubmit}
                 disabled={loading}
-                className="flex items-center space-x-2 px-8 py-3 bg-primary text-white rounded-2xl font-bold shadow-xl shadow-primary/25 hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
+                className="flex items-center justify-center space-x-3 px-10 py-4 bg-gradient-to-r from-primary via-indigo-500 to-primary bg-[length:200%_auto] hover:bg-right text-slate-950 rounded-2xl font-black shadow-[0_0_30px_rgba(var(--primary-rgb),0.4)] hover:shadow-[0_0_50px_rgba(var(--primary-rgb),0.6)] hover:scale-[1.02] active:scale-95 transition-all duration-700 disabled:opacity-50 uppercase tracking-[0.2em] group"
               >
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5 group-hover:animate-pulse" />}
                 <span>{project ? 'Update Project' : 'Commit Project'}</span>
               </button>
             )}

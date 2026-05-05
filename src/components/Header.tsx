@@ -188,9 +188,14 @@ export default function Header({ user, unreadCount, notifications, setActiveTab 
                     <div className="h-px bg-white/5 mx-3 my-1" />
                     <button 
                       onClick={() => signOut(auth)}
-                      className="w-full flex items-center space-x-3 p-3 text-sm font-bold text-red-400 hover:bg-red-500/10 rounded-2xl transition-all group"
+                      className="w-full flex items-center space-x-3 p-3 text-sm font-black text-red-500 hover:bg-red-500/20 rounded-2xl transition-all group uppercase tracking-widest relative overflow-hidden"
                     >
-                      <LogOut className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+                      <motion.div
+                        whileHover={{ x: [-2, 2, -2] }}
+                        transition={{ duration: 0.2, repeat: Infinity }}
+                      >
+                        <LogOut className="w-4 h-4" />
+                      </motion.div>
                       <span>Sign Out</span>
                     </button>
                   </div>

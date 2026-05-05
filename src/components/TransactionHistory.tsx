@@ -117,10 +117,18 @@ const TransactionRow = memo(({ index, style, data }: { index: number, style: Rea
                <div className="space-y-1">
                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Tag className="w-3 h-3" />Details</p>
                   <p className="text-sm font-bold text-white">{tx.brand || 'N/A'} {tx.modelNumber || ''}</p>
+                  <div className="flex flex-col mt-2">
+                     <span className="text-[9px] text-slate-500 uppercase font-black tracking-tighter">Warehouse-Loc</span>
+                     <span className="text-[10px] text-primary font-bold">{tx.warehouseLocation || 'N/A'}</span>
+                  </div>
                </div>
                <div className="space-y-1">
                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Briefcase className="w-3 h-3" />Project</p>
                   <p className="text-sm font-bold text-white">{tx.jobNumber || 'N/A'} - {tx.outlet || 'N/A'}</p>
+                  <div className="flex flex-col mt-2">
+                     <span className="text-[9px] text-slate-500 uppercase font-black tracking-tighter">Assignment</span>
+                     <span className="text-[10px] text-amber-500 font-bold">{tx.clientAssignment || 'N/A'}</span>
+                  </div>
                </div>
                <div className="space-y-1">
                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><MapPin className="w-3 h-3" />Location</p>
@@ -258,32 +266,32 @@ export default function TransactionHistory({ transactions }: TransactionHistoryP
           <button 
             onClick={handleGenerateAiSummary}
             disabled={filtered.length === 0}
-            className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-primary bg-primary/10 border border-primary/20 rounded-xl hover:bg-primary/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+            className="flex items-center space-x-2 px-6 py-3 text-xs md:text-sm font-black text-slate-950 bg-gradient-to-r from-emerald-400 via-primary to-indigo-500 rounded-2xl bg-[length:200%_auto] hover:bg-right shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)] hover:shadow-[0_0_30px_rgba(var(--primary-rgb),0.5)] transition-all duration-500 disabled:opacity-50 disabled:grayscale uppercase tracking-[0.15em] group"
           >
             <motion.div
               animate={{ 
-                rotate: [0, 15, -15, 0],
-                scale: [1, 1.2, 1]
+                rotate: [0, 20, -20, 0],
+                scale: [1, 1.3, 1]
               }}
               transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
             >
               <Sparkles className="w-4 h-4" />
             </motion.div>
-            <span>AI Summary</span>
+            <span>AI Insights</span>
           </button>
           
           <div className="relative">
             <button 
               onClick={() => setShowExportOptions(!showExportOptions)}
-              className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-slate-300 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors group"
+              className="flex items-center space-x-2 px-6 py-3 text-xs md:text-sm font-black text-white bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-white/20 transition-all active:scale-95 group uppercase tracking-[0.15em] backdrop-blur-xl shadow-xl shadow-black/20"
             >
               <motion.div
-                whileHover={{ y: [-1, 1, -1] }}
-                transition={{ duration: 1.5, repeat: Infinity }}
+                animate={{ y: [0, -4, 0] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
               >
-                <Download className="w-4 h-4" />
+                <Download className="w-4 h-4 group-hover:scale-125 transition-transform" />
               </motion.div>
-              <span>Export Options</span>
+              <span>Export</span>
             </button>
 
           <AnimatePresence>
@@ -407,16 +415,16 @@ export default function TransactionHistory({ transactions }: TransactionHistoryP
             <button
               onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
               className={cn(
-                "flex items-center space-x-2 px-4 py-2.5 text-sm font-medium rounded-xl border transition-all",
+                "flex items-center space-x-2 px-6 py-3 text-xs md:text-sm font-black rounded-2xl border transition-all duration-300 uppercase tracking-[0.15em]",
                 showAdvancedFilters 
-                  ? "bg-primary/20 border-primary/30 text-primary shadow-lg shadow-primary/10" 
-                  : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
+                  ? "bg-amber-500 text-slate-950 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)] animate-pulse" 
+                  : "bg-slate-800/50 border-white/10 text-slate-300 hover:bg-white/10"
               )}
             >
-              <Filter className="w-4 h-4" />
+              <Filter className={cn("w-4 h-4", showAdvancedFilters && "animate-bounce")} />
               <span>Filters</span>
               {(typeFilter !== 'ALL' || clientFilter || locationFilter || userFilter || outletFilter || inventoryTypeFilter || startDate || endDate) && (
-                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                <div className="w-2 h-2 rounded-full bg-slate-950 animate-pulse" />
               )}
             </button>
 
@@ -543,6 +551,7 @@ export default function TransactionHistory({ transactions }: TransactionHistoryP
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Type</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Client / Source</th>
                 <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Client Outlet</th>
+                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Storage Info</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -626,7 +635,18 @@ export default function TransactionHistory({ transactions }: TransactionHistoryP
                       <span className="text-[9px] font-black uppercase text-slate-500 tracking-tighter">{tx.inventoryType || 'Warehouse'}</span>
                     </td>
                     <td className="px-6 py-3 text-xs text-slate-500 font-medium italic group-hover:text-slate-400 transition-colors">{tx.client || 'System Log'}</td>
-                    <td className="px-6 py-3 text-xs text-slate-400 font-bold group-hover:text-slate-200 transition-colors">{tx.outlet || 'N/A'}</td>
+                    <td className="px-6 py-3 text-xs text-slate-400 font-bold group-hover:text-slate-200 transition-colors">
+                      <div className="flex flex-col">
+                        <span>{tx.outlet || 'N/A'}</span>
+                        {tx.location && <span className="text-[9px] text-slate-500 font-normal">{tx.location}</span>}
+                      </div>
+                    </td>
+                    <td className="px-6 py-3">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-primary font-bold">{tx.warehouseLocation || 'N/A'}</span>
+                        <span className="text-[9px] text-amber-500 font-bold">{tx.clientAssignment || 'N/A'}</span>
+                      </div>
+                    </td>
                   </tr>
                   <AnimatePresence>
                     {expandedId === tx.id && (
@@ -676,8 +696,12 @@ export default function TransactionHistory({ transactions }: TransactionHistoryP
                                 <span className="text-sm font-bold text-white">{tx.outlet || 'N/A'}</span>
                               </div>
                               <div className="flex flex-col space-y-1 mt-2">
-                                <span className="text-xs text-slate-400">Movement Location</span>
-                                <span className="text-sm font-bold text-slate-300">{tx.location || 'N/A'}</span>
+                                <span className="text-xs text-slate-400">Warehouse Location</span>
+                                <span className="text-sm font-bold text-primary">{tx.warehouseLocation || 'N/A'}</span>
+                              </div>
+                              <div className="flex flex-col space-y-1 mt-2">
+                                <span className="text-xs text-slate-400">Client Assignment</span>
+                                <span className="text-sm font-bold text-amber-500">{tx.clientAssignment || 'N/A'}</span>
                               </div>
                             </div>
 
@@ -776,6 +800,14 @@ export default function TransactionHistory({ transactions }: TransactionHistoryP
                         <div className="space-y-1">
                           <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Location</p>
                           <p className="text-xs font-bold text-slate-300 truncate">{tx.location || 'N/A'}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Warehouse-Loc</p>
+                          <p className="text-xs font-bold text-primary truncate">{tx.warehouseLocation || 'N/A'}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Assignment</p>
+                          <p className="text-xs font-bold text-amber-500 truncate">{tx.clientAssignment || 'N/A'}</p>
                         </div>
                         <div className="space-y-1">
                           <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Job Reference</p>

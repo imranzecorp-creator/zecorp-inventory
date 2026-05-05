@@ -155,10 +155,10 @@ function ClientManagement({ clients }: { clients: any[] }) {
         <button 
           type="submit"
           disabled={loading || !newClient.trim()}
-          className="px-8 py-4 bg-primary text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-primary/20 hover:bg-primary-hover disabled:opacity-50 transition-all flex items-center space-x-2"
+          className="px-8 py-4 bg-gradient-to-r from-primary to-indigo-500 text-slate-950 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)] hover:shadow-[0_0_35px_rgba(var(--primary-rgb),0.5)] hover:scale-105 active:scale-95 disabled:opacity-50 transition-all flex items-center space-x-3 duration-500"
         >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-          <span>Add Client</span>
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4 animate-bounce" />}
+          <span>Onboard Client</span>
         </button>
       </form>
 
@@ -252,10 +252,10 @@ function ApprovalManagement({ admin }: { admin: UserProfile }) {
         <button 
           type="submit"
           disabled={loading || !newEmail.trim()}
-          className="px-8 py-4 bg-primary text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg shadow-primary/20 hover:bg-primary/80 disabled:opacity-50 transition-all flex items-center space-x-2"
+          className="px-10 py-4 bg-gradient-to-r from-emerald-400 to-primary text-slate-950 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)] hover:shadow-[0_0_35px_rgba(var(--primary-rgb),0.5)] hover:scale-105 active:scale-95 disabled:opacity-50 transition-all flex items-center space-x-3 duration-500"
         >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MailPlus className="w-4 h-4" />}
-          <span>Approve Email</span>
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MailPlus className="w-4 h-4 animate-pulse" />}
+          <span>Authorize Node</span>
         </button>
       </form>
 

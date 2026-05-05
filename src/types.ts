@@ -21,6 +21,8 @@ export interface InventoryItem {
   name: string;
   description: string;
   location: string;
+  warehouseLocation?: string;
+  clientAssignment?: string;
   currentQuantity: number;
   minStock: number;
   imageUrl?: string;
@@ -30,6 +32,7 @@ export interface InventoryItem {
   stockInDate?: any;
   brand?: string;
   modelNumber?: string;
+  category?: string;
   supplier?: string;
   outlet?: string;
   inventoryType?: 'Warehouse Stock' | 'Client Stock';
@@ -41,9 +44,12 @@ export interface StockTransaction {
   itemName: string;
   brand?: string;
   modelNumber?: string;
+  category?: string;
   type: 'IN' | 'OUT';
   quantity: number;
   client: string;
+  clientAssignment?: string;
+  warehouseLocation?: string;
   date: any;
   userId: string;
   userName: string;

@@ -156,13 +156,13 @@ const InventoryRow = memo(({ index, style, data }: { index: number, style: React
               <div className="flex items-center space-x-1">
                 <button 
                   onClick={() => { setAdjustmentType('IN'); setAdjustmentItem(item); }}
-                  className="p-1.5 bg-green-500/10 text-green-400 rounded-lg hover:bg-green-500/20 transition-all border border-green-500/10"
+                  className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg hover:bg-emerald-500/20 hover:scale-110 transition-all border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.2)] hover:shadow-[0_0_15px_rgba(16,185,129,0.4)]"
                 >
                   <Plus className="w-3.5 h-3.5" />
                 </button>
                 <button 
                   onClick={() => { setAdjustmentType('OUT'); setAdjustmentItem(item); }}
-                  className="p-1.5 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-all border border-red-500/10"
+                  className="p-1.5 bg-amber-500/10 text-amber-500 rounded-lg hover:bg-amber-500/20 hover:scale-110 transition-all border border-amber-500/20 shadow-[0_0_10px_rgba(245,158,11,0.2)] hover:shadow-[0_0_15px_rgba(245,158,11,0.4)]"
                 >
                   <Minus className="w-3.5 h-3.5" />
                 </button>
@@ -192,7 +192,7 @@ const InventoryRow = memo(({ index, style, data }: { index: number, style: React
               exit={{ height: 0, opacity: 0 }}
               className="bg-white/[0.04] border-t border-white/5 p-6"
             >
-               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                   <div className="space-y-4">
                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Info className="w-3 h-3" />Item Info</p>
                      <div className="space-y-2">
@@ -204,6 +204,10 @@ const InventoryRow = memo(({ index, style, data }: { index: number, style: React
                            <span className="text-[10px] text-slate-500 uppercase font-bold">Supplier</span>
                            <span className="text-sm text-slate-200 font-medium">{item.supplier || 'Not Specified'}</span>
                         </div>
+                        <div className="flex flex-col">
+                           <span className="text-[10px] text-slate-500 uppercase font-bold">Warehouse-Loc</span>
+                           <span className="text-[10px] text-primary font-bold">{item.warehouseLocation || 'N/A'}</span>
+                        </div>
                      </div>
                   </div>
                   <div className="space-y-4">
@@ -212,6 +216,10 @@ const InventoryRow = memo(({ index, style, data }: { index: number, style: React
                         <div className="flex flex-col">
                            <span className="text-[10px] text-slate-500 uppercase font-bold">Client</span>
                            <span className="text-sm text-slate-200 font-medium">{item.client || 'Internal'}</span>
+                        </div>
+                        <div className="flex flex-col">
+                           <span className="text-[10px] text-slate-500 uppercase font-bold">Assignment</span>
+                           <span className="text-[10px] text-amber-500 font-bold">{item.clientAssignment || 'N/A'}</span>
                         </div>
                         <div className="flex flex-col">
                            <span className="text-[10px] text-slate-500 uppercase font-bold">Project Outlet</span>
@@ -301,6 +309,8 @@ export default function InventoryList({ items, clients, user, projects }: Invent
               minStock: 5,
               description: `Imported via AI: ${itemData.category || ''} ${itemData.brand || ''}`,
               location: itemData.location || 'Warehouse',
+              warehouseLocation: itemData.warehouseLocation || '',
+              clientAssignment: itemData.clientAssignment || '',
               supplier: itemData.supplier || '',
               lastUpdated: serverTimestamp(),
               inventoryType: 'Warehouse Stock',
@@ -666,20 +676,20 @@ export default function InventoryList({ items, clients, user, projects }: Invent
               project: selectedOutlets.join(', '),
               location: locationFilter
             })}
-            className="flex-shrink-0 flex items-center space-x-2 px-3 md:px-4 py-2 md:py-2.5 text-xs md:text-sm font-black md:font-medium text-slate-300 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all active:scale-95 group uppercase md:normal-case tracking-widest md:tracking-normal"
+            className="flex-shrink-0 flex items-center space-x-2 px-5 py-3 text-xs md:text-sm font-black text-white bg-slate-800/50 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-white/20 transition-all active:scale-95 group uppercase tracking-[0.15em] shadow-xl hover:shadow-white/5 backdrop-blur-md"
           >
-            <Download className="w-3.5 h-3.5 md:w-4 md:h-4" />
-            <span>Export</span>
+            <Download className="w-3.5 h-3.5 md:w-4 md:h-4 group-hover:animate-bounce" />
+            <span>Export Data</span>
           </button>
           {isApproved && (
             <div className="flex items-center space-x-2 md:space-x-3">
               <button 
                 onClick={() => inventoryFileInputRef.current?.click()}
                 disabled={isImporting}
-                className="flex-shrink-0 flex items-center space-x-2 px-3 md:px-4 py-2 md:py-2.5 text-xs md:text-sm font-black md:font-medium text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-xl hover:bg-blue-500/20 transition-all active:scale-95 group uppercase md:normal-case tracking-widest md:tracking-normal shadow-lg shadow-blue-500/10"
+                className="flex-shrink-0 flex items-center space-x-2 px-5 py-3 text-xs md:text-sm font-black text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl hover:bg-indigo-500/20 transition-all active:scale-95 group uppercase tracking-[0.15em] shadow-lg shadow-indigo-500/10"
               >
-                {isImporting ? <Loader2 className="w-3.5 h-3.5 md:w-4 md:h-4 animate-spin" /> : <Zap className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary group-hover:animate-pulse" />}
-                <span>{isImporting ? 'AI MAPPING...' : 'AI INVENTORY IMPORT'}</span>
+                {isImporting ? <Loader2 className="w-3.5 h-3.5 md:w-4 md:h-4 animate-spin" /> : <Zap className="w-3.5 h-3.5 md:w-4 md:h-4 text-indigo-400 group-hover:animate-pulse" />}
+                <span>{isImporting ? 'AI MAPPING...' : 'AI Import'}</span>
               </button>
               <input 
                 type="file" 
@@ -690,9 +700,9 @@ export default function InventoryList({ items, clients, user, projects }: Invent
               />
               <button 
                 onClick={() => setShowAddModal(true)}
-                className="flex-shrink-0 flex items-center space-x-2 px-3 md:px-4 py-2 md:py-2.5 text-xs md:text-sm font-black md:font-medium text-white bg-primary rounded-xl hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all active:scale-95 group uppercase md:normal-case tracking-widest md:tracking-normal"
+                className="flex-shrink-0 flex items-center space-x-2 px-6 py-3 text-xs md:text-sm font-black text-slate-950 bg-gradient-to-r from-primary via-emerald-400 to-primary rounded-2xl bg-[length:200%_auto] hover:bg-right shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)] hover:shadow-[0_0_30px_rgba(var(--primary-rgb),0.5)] transition-all duration-500 active:scale-95 group uppercase tracking-[0.2em]"
               >
-                <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                <Plus className="w-3.5 h-3.5 md:w-4 md:h-4 group-hover:rotate-180 transition-transform duration-500" />
                 <span>Add Item</span>
               </button>
             </div>
@@ -743,30 +753,32 @@ export default function InventoryList({ items, clients, user, projects }: Invent
                 onClick={handleAiSearch}
                 disabled={isAiSearching || !searchTerm.trim()}
                 className={cn(
-                  "flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg text-white text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-30",
-                  aiFilteredIds ? "bg-primary text-white" : "bg-white/10 hover:bg-white/20 text-slate-400 hover:text-white"
+                  "flex items-center space-x-1.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-30",
+                  aiFilteredIds 
+                    ? "bg-gradient-to-r from-primary to-indigo-500 text-slate-950 shadow-lg shadow-primary/20" 
+                    : "bg-white/10 hover:bg-primary hover:text-slate-950 text-slate-400 shadow-xl border border-white/5"
                 )}
               >
-                <Sparkles className="w-3 h-3" />
+                <Sparkles className="w-3.5 h-3.5 animate-pulse" />
                 <span>{aiFilteredIds ? 'AI Matched' : 'AI Search'}</span>
               </button>
             </div>
           </div>
           <motion.button 
-            whileHover={{ scale: 1.05 }}
+            whileHover={{ scale: 1.05, filter: "brightness(1.1)" }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
             className={cn(
-              "flex items-center space-x-2 px-4 py-2 rounded-xl border transition-all",
+              "flex items-center space-x-2 px-5 py-2.5 rounded-xl border transition-all duration-300",
               showAdvancedFilters 
-                ? "bg-primary/20 border-primary/30 text-primary shadow-lg shadow-primary/10" 
-                : "bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10"
+                ? "bg-amber-500 text-slate-950 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)]" 
+                : "bg-slate-800/50 border-white/10 text-slate-400 hover:text-white hover:bg-white/10"
             )}
           >
-            <Filter className={cn("w-4 h-4", (selectedBrands.length > 0 || selectedModels.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || clientFilter || jobFilter || locationFilter || stockInStart || stockInEnd || updatedStart || updatedEnd) && "text-primary animate-pulse")} />
-            <span className="text-sm font-medium">Advanced</span>
+            <Filter className={cn("w-4 h-4", (selectedBrands.length > 0 || selectedModels.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || clientFilter || jobFilter || locationFilter || stockInStart || stockInEnd || updatedStart || updatedEnd) && "animate-bounce")} />
+            <span className="text-sm font-black uppercase tracking-widest">Filters</span>
             {(selectedBrands.length > 0 || selectedModels.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || clientFilter || jobFilter || locationFilter || stockInStart || stockInEnd || updatedStart || updatedEnd) && (
-              <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+              <div className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-pulse" />
             )}
           </motion.button>
         </div>
@@ -1114,6 +1126,8 @@ function BulkUpdateModal({ items, clients, projects, onClose, user }: { items: I
   const [showProjectSuggestions, setShowProjectSuggestions] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [jobNumber, setJobNumber] = useState('');
+  const [warehouseLocation, setWarehouseLocation] = useState('');
+  const [clientAssignment, setClientAssignment] = useState('');
   const [outlet, setOutlet] = useState('');
   const [location, setLocation] = useState('');
   const [transactionDate, setTransactionDate] = useState(new Date().toISOString().split('T')[0]);
@@ -1165,6 +1179,8 @@ function BulkUpdateModal({ items, clients, projects, onClose, user }: { items: I
             jobNumber: jobNumber,
             outlet: outlet,
             location: location,
+            warehouseLocation: warehouseLocation,
+            clientAssignment: clientAssignment,
             inventoryType: item.inventoryType,
             notes: notes,
             date: timestamp,
@@ -1185,7 +1201,9 @@ function BulkUpdateModal({ items, clients, projects, onClose, user }: { items: I
             jobNumber: jobNumber || item.jobNumber,
             client: stockAction === 'IN' ? (client || item.client) : item.client,
             outlet: outlet || item.outlet,
-            location: location || item.location
+            location: location || item.location,
+            warehouseLocation: warehouseLocation || item.warehouseLocation || '',
+            clientAssignment: clientAssignment || item.clientAssignment || ''
           });
 
         // 3. Low Stock Alert
@@ -1298,10 +1316,10 @@ function BulkUpdateModal({ items, clients, projects, onClose, user }: { items: I
                   <button 
                     onClick={() => setStockAction('IN')}
                     className={cn(
-                      "py-4 font-black uppercase tracking-widest rounded-2xl transition-all active:scale-95 border",
+                      "py-4 font-black uppercase tracking-[0.2em] rounded-2xl transition-all active:scale-95 border duration-500",
                       stockAction === 'IN' 
-                        ? "bg-green-500 text-white border-green-400 shadow-lg shadow-green-500/30" 
-                        : "bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20"
+                        ? "bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 border-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.4)]" 
+                        : "bg-emerald-500/5 text-emerald-500 border-emerald-500/10 hover:bg-emerald-500/10"
                     )}
                   >
                     Stock IN
@@ -1309,10 +1327,10 @@ function BulkUpdateModal({ items, clients, projects, onClose, user }: { items: I
                   <button 
                     onClick={() => setStockAction('OUT')}
                     className={cn(
-                      "py-4 font-black uppercase tracking-widest rounded-2xl transition-all active:scale-95 border",
+                      "py-4 font-black uppercase tracking-[0.2em] rounded-2xl transition-all active:scale-95 border duration-500",
                       stockAction === 'OUT' 
-                        ? "bg-red-500 text-white border-red-400 shadow-lg shadow-red-500/30" 
-                        : "bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20"
+                        ? "bg-gradient-to-r from-amber-500 to-orange-600 text-slate-950 border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.4)]" 
+                        : "bg-amber-500/5 text-amber-500 border-amber-500/10 hover:bg-amber-500/10"
                     )}
                   >
                     Stock OUT
@@ -1439,6 +1457,35 @@ function BulkUpdateModal({ items, clients, projects, onClose, user }: { items: I
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Warehouse Location</label>
+                  <div className="relative">
+                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/40" />
+                    <input 
+                      type="text" 
+                      value={warehouseLocation} 
+                      onChange={(e) => setWarehouseLocation(e.target.value)}
+                      placeholder="Aisle/Shelf..."
+                      className="w-full pl-12 pr-5 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-mono"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Client Assignment</label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500/40" />
+                    <input 
+                      type="text" 
+                      value={clientAssignment} 
+                      onChange={(e) => setClientAssignment(e.target.value)}
+                      placeholder="Team/User..."
+                      className="w-full pl-12 pr-5 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
                   <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Project</label>
                   <input 
                     type="text" 
@@ -1460,8 +1507,8 @@ function BulkUpdateModal({ items, clients, projects, onClose, user }: { items: I
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Transaction Notes</label>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Transaction Notes</label>
                 <textarea 
                   value={notes} 
                   onChange={(e) => setNotes(e.target.value)}
@@ -1479,17 +1526,17 @@ function BulkUpdateModal({ items, clients, projects, onClose, user }: { items: I
             onClick={handleBulkUpdate}
             disabled={processing || !stockAction}
             className={cn(
-              "w-full py-5 text-white font-black uppercase tracking-widest rounded-3xl shadow-2xl transition-all active:scale-95 flex items-center justify-center space-x-3",
-              stockAction === 'IN' ? 'bg-green-600 hover:bg-green-500 shadow-green-500/20' : 
-              stockAction === 'OUT' ? 'bg-red-600 hover:bg-red-500 shadow-red-500/20' : 'bg-slate-700',
-              processing && "opacity-50 cursor-not-allowed"
+              "w-full py-5 text-slate-950 font-black uppercase tracking-[0.3em] rounded-3xl shadow-2xl transition-all active:scale-95 flex items-center justify-center space-x-4 duration-700 bg-[length:200%_auto] hover:bg-right",
+              stockAction === 'IN' ? 'bg-gradient-to-r from-emerald-400 via-teal-500 to-emerald-400 shadow-emerald-500/30' : 
+              stockAction === 'OUT' ? 'bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400 shadow-amber-500/30' : 'bg-slate-700 text-white',
+              processing && "opacity-50 cursor-not-allowed grayscale"
             )}
           >
             {processing ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Loader2 className="w-6 h-6 animate-spin" />
             ) : (
               <>
-                <Zap className="w-5 h-5" />
+                <Zap className={cn("w-6 h-6", stockAction && "animate-pulse")} />
                 <span>Execute Batch Adjustment</span>
               </>
             )}
@@ -1505,6 +1552,8 @@ function StockAdjustmentModal({ item, type, clients, onClose, user }: { item: In
   const [client, setClient] = useState('');
   const [showClientSuggestions, setShowClientSuggestions] = useState(false);
   const [jobNumber, setJobNumber] = useState(item.jobNumber || '');
+  const [warehouseLocation, setWarehouseLocation] = useState(item.warehouseLocation || '');
+  const [clientAssignment, setClientAssignment] = useState(item.clientAssignment || '');
 
   const filteredClients = useMemo(() => {
     if (!client.trim()) return clients;
@@ -1532,6 +1581,8 @@ function StockAdjustmentModal({ item, type, clients, onClose, user }: { item: In
         jobNumber: jobNumber,
         outlet: outlet,
         location: location,
+        warehouseLocation: warehouseLocation,
+        clientAssignment: clientAssignment,
         inventoryType: item.inventoryType,
         notes: notes,
         date: timestamp,
@@ -1548,7 +1599,9 @@ function StockAdjustmentModal({ item, type, clients, onClose, user }: { item: In
         jobNumber: jobNumber,
         client: type === 'IN' ? (client || item.client) : item.client,
         outlet: outlet || item.outlet,
-        location: location || item.location
+        location: location || item.location,
+        warehouseLocation: warehouseLocation || item.warehouseLocation || '',
+        clientAssignment: clientAssignment || item.clientAssignment || ''
       });
 
       // Add Notification
@@ -1674,6 +1727,35 @@ function StockAdjustmentModal({ item, type, clients, onClose, user }: { item: In
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Warehouse Location</label>
+              <div className="relative">
+                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/40" />
+                <input 
+                  type="text" 
+                  value={warehouseLocation} 
+                  onChange={(e) => setWarehouseLocation(e.target.value)}
+                  placeholder="Aisle / Shelf / Bin..."
+                  className="w-full pl-12 pr-5 py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold placeholder:text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-mono"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Client Assignment</label>
+              <div className="relative">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500/40" />
+                <input 
+                  type="text" 
+                  value={clientAssignment} 
+                  onChange={(e) => setClientAssignment(e.target.value)}
+                  placeholder="Team / Dept / User..."
+                  className="w-full pl-12 pr-5 py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold placeholder:text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-mono"
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="space-y-2 relative">
             <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">
               {type === 'IN' ? 'Supplier / Source' : 'Client / Destination'}
@@ -1734,13 +1816,21 @@ function StockAdjustmentModal({ item, type, clients, onClose, user }: { item: In
             type="submit"
             disabled={processing}
             className={cn(
-              "w-full py-5 text-white font-black uppercase tracking-widest rounded-3xl shadow-2xl transition-all active:scale-95 flex items-center justify-center space-x-3 mt-4",
-              type === 'IN' ? 'bg-green-600 hover:bg-green-500 shadow-green-500/20' : 'bg-red-600 hover:bg-red-500 shadow-red-500/20',
-              processing && "opacity-70 cursor-not-allowed"
+              "w-full py-6 text-slate-950 font-black uppercase tracking-[0.3em] rounded-3xl shadow-2xl transition-all active:scale-95 flex items-center justify-center space-x-3 mt-4 duration-700 bg-[length:200%_auto] hover:bg-right px-10 overflow-hidden relative group",
+              type === 'IN' 
+                ? 'bg-gradient-to-r from-emerald-400 via-teal-500 to-emerald-400 shadow-emerald-500/30' 
+                : 'bg-gradient-to-r from-amber-400 via-orange-600 to-amber-400 shadow-amber-500/30'
             )}
           >
-            {processing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Zap className="w-5 h-5" />}
-            <span>{type === 'IN' ? 'Confirm Reception' : 'Confirm Distribution'}</span>
+            <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 skew-x-12" />
+            {processing ? (
+              <Loader2 className="w-6 h-6 animate-spin" />
+            ) : (
+              <>
+                <Zap className="w-5 h-5 group-hover:animate-pulse" />
+                <span>{type === 'IN' ? 'Authorize Intake' : 'Release Asset'}</span>
+              </>
+            )}
           </button>
         </form>
       </motion.div>
@@ -1754,6 +1844,8 @@ function ItemDetailModal({ item, clients, onClose, onDelete, user, initialAction
   const [client, setClient] = useState('');
   const [showClientSuggestions, setShowClientSuggestions] = useState(false);
   const [jobNumber, setJobNumber] = useState(item.jobNumber || '');
+  const [warehouseLocation, setWarehouseLocation] = useState(item.warehouseLocation || '');
+  const [clientAssignment, setClientAssignment] = useState(item.clientAssignment || '');
 
   const filteredClients = useMemo(() => {
     if (!client.trim()) return clients;
@@ -1779,6 +1871,8 @@ function ItemDetailModal({ item, clients, onClose, onDelete, user, initialAction
         jobNumber: jobNumber,
         outlet: outlet,
         location: location,
+        warehouseLocation: warehouseLocation,
+        clientAssignment: clientAssignment,
         inventoryType: item.inventoryType,
         notes: notes,
         date: new Date(transactionDate).getTime(),
@@ -1795,7 +1889,9 @@ function ItemDetailModal({ item, clients, onClose, onDelete, user, initialAction
         jobNumber: jobNumber,
         client: stockAction === 'IN' ? (client || item.client) : item.client,
         outlet: outlet || item.outlet,
-        location: location || item.location
+        location: location || item.location,
+        warehouseLocation: warehouseLocation || item.warehouseLocation || '',
+        clientAssignment: clientAssignment || item.clientAssignment || ''
       });
 
       // Add Notification
@@ -1963,7 +2059,7 @@ function ItemDetailModal({ item, clients, onClose, onDelete, user, initialAction
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Job Number</label>
                       <input 
@@ -1985,14 +2081,40 @@ function ItemDetailModal({ item, clients, onClose, onDelete, user, initialAction
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Warehouse Location</label>
+                      <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Movement Location</label>
                       <input 
                         type="text" 
                         value={location} 
                         onChange={(e) => setLocation(e.target.value)}
-                        placeholder="Warehouse or Client location..."
-                        className="w-full px-5 py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold placeholder:text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                        placeholder="Floor/Zone..."
+                        className="w-full px-5 py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold placeholder:text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-mono"
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Warehouse Location</label>
+                      <div className="relative">
+                        <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/40" />
+                        <input 
+                          type="text" 
+                          value={warehouseLocation} 
+                          onChange={(e) => setWarehouseLocation(e.target.value)}
+                          placeholder="Aisle / Shelf / Bin..."
+                          className="w-full pl-12 pr-5 py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold placeholder:text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase font-black text-slate-500 tracking-widest ml-1">Client Assignment</label>
+                      <div className="relative">
+                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500/40" />
+                        <input 
+                          type="text" 
+                          value={clientAssignment} 
+                          onChange={(e) => setClientAssignment(e.target.value)}
+                          placeholder="Team / Dept / User..."
+                          className="w-full pl-12 pr-5 py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold placeholder:text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-mono"
+                        />
+                      </div>
                     </div>
                   </div>
                   <div className="space-y-2 relative">
@@ -2109,6 +2231,8 @@ function ItemFormModal({ item, items, clients, projects, onClose, user }: any) {
     name: item?.name || '',
     description: item?.description || '',
     location: item?.location || '',
+    warehouseLocation: item?.warehouseLocation || '',
+    clientAssignment: item?.clientAssignment || '',
     currentQuantity: item?.currentQuantity || 0,
     minStock: item?.minStock || 5,
     imageUrl: item?.imageUrl || '',
@@ -2184,6 +2308,8 @@ function ItemFormModal({ item, items, clients, projects, onClose, user }: any) {
       modelNumber: template.modelNumber || prev.modelNumber,
       description: template.description || prev.description,
       location: template.location || prev.location,
+      warehouseLocation: template.warehouseLocation || prev.warehouseLocation,
+      clientAssignment: template.clientAssignment || prev.clientAssignment,
       minStock: template.minStock || prev.minStock,
       supplier: template.supplier || prev.supplier,
       outlet: template.outlet || prev.outlet,
@@ -2275,6 +2401,8 @@ function ItemFormModal({ item, items, clients, projects, onClose, user }: any) {
             outlet: formData.outlet,
             location: formData.location,
             inventoryType: formData.inventoryType,
+            warehouseLocation: formData.warehouseLocation,
+            clientAssignment: formData.clientAssignment,
             notes: `Stock In adjusted during catalog edit`,
             date: serverTimestamp(),
             userId: user.uid,
@@ -2296,6 +2424,8 @@ function ItemFormModal({ item, items, clients, projects, onClose, user }: any) {
             outlet: formData.outlet,
             location: formData.location,
             inventoryType: formData.inventoryType,
+            warehouseLocation: formData.warehouseLocation,
+            clientAssignment: formData.clientAssignment,
             notes: `Stock Out adjusted during catalog edit`,
             date: serverTimestamp(),
             userId: user.uid,
@@ -2330,6 +2460,8 @@ function ItemFormModal({ item, items, clients, projects, onClose, user }: any) {
           outlet: formData.outlet,
           location: formData.location,
           inventoryType: formData.inventoryType,
+          warehouseLocation: formData.warehouseLocation,
+          clientAssignment: formData.clientAssignment,
           notes: `Initial stock record created`,
           date: serverTimestamp(),
           userId: user.uid,
@@ -2605,10 +2737,27 @@ function ItemFormModal({ item, items, clients, projects, onClose, user }: any) {
             <input value={formData.supplier} onChange={e => setFormData({...formData, supplier: e.target.value})} placeholder="Main supplier name..." className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
           </div>
 
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Warehouse Location</label>
+              <div className="relative">
+                <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/40" />
+                <input value={formData.warehouseLocation} onChange={e => setFormData({...formData, warehouseLocation: e.target.value})} placeholder="e.g., Aisle 4, Shelf B" className="w-full pl-12 pr-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Client Assignment</label>
+              <div className="relative">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-500/40" />
+                <input value={formData.clientAssignment} onChange={e => setFormData({...formData, clientAssignment: e.target.value})} placeholder="e.g., Regional Logistics" className="w-full pl-12 pr-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 gap-6">
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Project Outlet</label>
-              <input required value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} placeholder="e.g., Aisle 4, Shelf B" className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
+              <input required value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} placeholder="e.g., Store Front, Main Hall" className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
             </div>
           </div>
 
@@ -2837,11 +2986,24 @@ function ItemFormModal({ item, items, clients, projects, onClose, user }: any) {
             type="submit" 
             disabled={loading}
             className={cn(
-              "w-full py-5 text-white font-black uppercase tracking-widest rounded-2xl shadow-2xl transition-all active:scale-95 disabled:opacity-50",
-              showDuplicateWarning ? "bg-amber-500 shadow-amber-500/30 hover:bg-amber-600" : "bg-primary shadow-primary/30 hover:bg-primary-hover hover:scale-[1.01]"
+              "w-full py-6 text-slate-950 font-black uppercase tracking-[0.3em] rounded-3xl shadow-2xl transition-all active:scale-95 disabled:opacity-50 duration-700 bg-[length:200%_auto] hover:bg-right relative overflow-hidden group",
+              showDuplicateWarning 
+                ? "bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400 shadow-amber-500/40" 
+                : "bg-gradient-to-r from-primary via-indigo-500 to-primary shadow-[0_10px_40px_-10px_rgba(var(--primary-rgb),0.5)]"
             )}
           >
-            {loading ? 'Processing Registry...' : (showDuplicateWarning ? 'Proceed Anyway' : (item ? 'Update Inventory Member' : 'Deploy New Item'))}
+            <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 skew-x-12" />
+            {loading ? (
+              <div className="flex items-center justify-center space-x-3">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>Synchronizing...</span>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center space-x-3">
+                <Sparkles className="w-5 h-5 animate-pulse" />
+                <span>{showDuplicateWarning ? 'Proceed Anyway' : (item ? 'Update Registry' : 'Deploy New Asset')}</span>
+              </div>
+            )}
           </button>
           </>
           )}

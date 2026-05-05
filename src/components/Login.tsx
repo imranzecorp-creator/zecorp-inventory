@@ -27,6 +27,7 @@ import { auth, db } from '../lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 
 import Logo from './Logo';
+import BackgroundAnimation from './BackgroundAnimation';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -128,7 +129,8 @@ export default function Login() {
   }, [email, password, isReset, isSignUp, name]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 selection:bg-primary/30">
+    <div className="min-h-screen flex items-center justify-center p-4 selection:bg-primary/30 relative overflow-hidden bg-slate-950">
+      <BackgroundAnimation />
       <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 glass-morphism rounded-[40px] overflow-hidden shadow-2xl border border-white/10 relative z-10 min-h-[700px]">
         {/* Left Panel - Branding */}
         <div className="hidden lg:flex flex-col justify-between p-12 bg-white/5 relative overflow-hidden ring-1 ring-white/5">

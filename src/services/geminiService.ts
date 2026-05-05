@@ -191,6 +191,8 @@ export async function mapExcelItems(rawData: any[]): Promise<Partial<ProjectItem
         - quantity: number (The quantity of items)
         - supplier: string (Who supplied the item)
         - location: string (Mapping to "unit location" or where the item is stored)
+        - warehouseLocation: string (Mapping to warehouse storage details like Aisle, Shelf, or Bin)
+        - clientAssignment: string (Mapping to specific team, department, or user assignment)
         - approvedQuote: string (Mapping to "Approved quote column" or pricing/quote info)
         - category: string (Mapping to "category description")
         - posNo: string (Mapping to "pos no")
@@ -216,6 +218,8 @@ export async function mapExcelItems(rawData: any[]): Promise<Partial<ProjectItem
               quantity: { type: Type.NUMBER },
               supplier: { type: Type.STRING },
               location: { type: Type.STRING },
+              warehouseLocation: { type: Type.STRING },
+              clientAssignment: { type: Type.STRING },
               approvedQuote: { type: Type.STRING },
               category: { type: Type.STRING },
               posNo: { type: Type.STRING },
@@ -260,6 +264,8 @@ export async function mapExcelProjects(rawData: any[]): Promise<any[]> {
         - quantity: number
         - supplier: string
         - location: string (Mapping to "unit location")
+        - warehouseLocation: string (Mapping to warehouse storage details)
+        - clientAssignment: string (Mapping to team or user assignment)
         - approvedQuote: string (Mapping to "Approved quote column")
         - category: string (Mapping to "category description")
         - posNo: string (Mapping to "pos no")
@@ -294,6 +300,8 @@ export async function mapExcelProjects(rawData: any[]): Promise<any[]> {
                     quantity: { type: Type.NUMBER },
                     supplier: { type: Type.STRING },
                     location: { type: Type.STRING },
+                    warehouseLocation: { type: Type.STRING },
+                    clientAssignment: { type: Type.STRING },
                     approvedQuote: { type: Type.STRING },
                     category: { type: Type.STRING },
                     posNo: { type: Type.STRING },
@@ -368,5 +376,75 @@ export async function summarizeTransactions(transactions: StockTransaction[]): P
 
     console.error("Gemini Summarization Error:", error);
     return "Error generating transaction summary. Please try again later.";
+  }
+}
+
+export async function generateInventoryReport(data: {
+  inventory: InventoryItem[],
+  transactions: StockTransaction[],
+  parameters: {
+    dateRange?: { start: string, end: string },
+    transactionType?: string,
+    categories?: string[]
+  }
+}) {
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `
+        You are a specialized Supply Chain and Inventory Analyst. 
+        Generate a professional executive summary report based on the following inventory and transaction data.
+
+        PARAMETERS:
+        - Date Range: ${data.parameters.dateRange ? `${data.parameters.dateRange.start} to ${data.parameters.dateRange.end}` : 'All Time'}
+        - Transaction Type Filter: ${data.parameters.transactionType || 'All'}
+        - Categories Filter: ${data.parameters.categories?.join(', ') || 'All'}
+
+        DATA SUMMARY:
+        - Total Inventory Items: ${data.inventory.length}
+        - Total Transactions in Period: ${data.transactions.length}
+        - Low Stock Items: ${data.inventory.filter(i => i.currentQuantity <= i.minStock).length}
+
+        TRANSACTIONS (Sample/Summary):
+        ${JSON.stringify(data.transactions.slice(0, 50).map(t => ({
+          name: t.itemName,
+          type: t.type,
+          qty: t.quantity,
+          client: t.client,
+          date: t.date,
+          job: t.jobNumber
+        })))}
+
+        INVENTORY (Top Items):
+        ${JSON.stringify(data.inventory.slice(0, 50).map(i => ({
+          name: i.name,
+          category: i.category,
+          qty: i.currentQuantity,
+          min: i.minStock,
+          location: i.location,
+          warehouse: i.warehouseLocation
+        })))}
+
+        REPORT REQUIREMENTS:
+        1. Overview: High-level summary of stock levels and movement velocity.
+        2. Key Performance Indicators: Analysis of turnover, stockouts, and project fulfillment efficiency.
+        3. Critical Insights: Identify any anomalies, seasonal trends (if applicable), or efficiency gaps.
+        4. Recommendations: Actionable steps to optimize stock levels and warehouse operations.
+        
+        Format the output in clean Markdown with professional headings. Use bold text for emphasis and bullet points for lists.
+      `,
+      config: {
+        systemInstruction: "You are a senior supply chain analyst. Your reports are used by executives to make strategic decisions. Be precise, data-driven, and professional."
+      }
+    });
+
+    return response.text || "No report could be generated.";
+  } catch (error: any) {
+    const errorStr = JSON.stringify(error);
+    if (errorStr.includes('429') || errorStr.includes('RESOURCE_EXHAUSTED')) {
+      return "### ⚠️ AI Usage Limit Reached\n\nAI report generation is temporarily unavailable due to API rate limits. Please try again in 1-2 minutes.";
+    }
+    console.error('Error generating AI report:', error);
+    return "Error generating AI report. Please try again later.";
   }
 }

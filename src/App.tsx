@@ -43,7 +43,8 @@ import {
   MoreVertical,
   Loader2,
   X,
-  ShieldCheck
+  ShieldCheck,
+  Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from './lib/utils';
@@ -62,6 +63,7 @@ import Login from './components/Login';
 import AmbientStorageBox from './components/AmbientStorageBox';
 import ToastContainer, { Toast } from './components/ToastContainer';
 import Logo from './components/Logo';
+import BackgroundAnimation from './components/BackgroundAnimation';
 
 // Lazy load heavy components
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
@@ -73,6 +75,7 @@ const AdminPanel = React.lazy(() => import('./components/AdminPanel'));
 const ProfileSettings = React.lazy(() => import('./components/ProfileSettings'));
 const PermissionList = React.lazy(() => import('./components/PermissionList'));
 const Projects = React.lazy(() => import('./components/Projects'));
+const AIReports = React.lazy(() => import('./components/AIReports').then(m => ({ default: m.AIReports })));
 
 export default function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -269,7 +272,8 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-screen w-full items-center justify-center space-y-12 bg-slate-950">
+      <div className="flex flex-col h-screen w-full items-center justify-center space-y-12 bg-slate-950 relative overflow-hidden">
+        <BackgroundAnimation />
         <motion.div
            initial={{ opacity: 0, scale: 0.8 }}
            animate={{ 
@@ -308,6 +312,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen overflow-hidden selection:bg-primary/30 selection:text-white bg-[#020617]/90 relative">
+      <BackgroundAnimation />
       <ToastContainer toasts={toasts} removeToast={removeToast} />
       <AmbientStorageBox />
       
@@ -367,6 +372,9 @@ export default function App() {
               {activeTab === 'social' && (
                 <SocialFeed user={user} />
               )}
+              {activeTab === 'intelligence' && (
+                <AIReports inventory={items} transactions={transactions} />
+              )}
               {activeTab === 'chat' && (
                 <ChatView user={user} />
               )}
@@ -395,6 +403,13 @@ export default function App() {
                         >
                           <ImageIcon className="w-8 h-8 text-indigo-400" />
                           <span className="text-xs font-black uppercase text-slate-300">Social Feed</span>
+                        </button>
+                        <button 
+                          onClick={() => setActiveTab('intelligence')}
+                          className="p-6 glass-morphism rounded-3xl border border-white/5 flex flex-col items-center space-y-3 active:scale-95 transition-all bg-white/[0.02]"
+                        >
+                          <Sparkles className="w-8 h-8 text-primary" />
+                          <span className="text-xs font-black uppercase text-slate-300">Intelligence</span>
                         </button>
                         <button 
                           onClick={() => setActiveTab('transactions')}
