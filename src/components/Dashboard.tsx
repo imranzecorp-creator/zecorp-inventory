@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback, memo } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, memo, useRef } from 'react';
 import { 
   TrendingUp, 
   Package, 
@@ -17,8 +17,13 @@ import {
   Zap,
   Globe,
   Loader2,
-  ListRestart
+  ListRestart,
+  Mic,
+  MicOff,
+  Bell
 } from 'lucide-react';
+import { useVoiceSearch } from '../hooks/useVoiceSearch';
+import { VoiceLanguageSelector } from './VoiceLanguageSelector';
 import { 
   BarChart, 
   Bar, 
@@ -34,9 +39,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { UserProfile, InventoryItem, StockTransaction, Project } from '../types';
 import { formatDate, cn } from '../lib/utils';
 import { generateInventoryReport, generateTransactionsReport } from '../services/pdfService';
-import { analyzeInventory, processAiSearch, InventoryInsight } from '../services/geminiService';
+import { analyzeSupplyChain, analyzeInventory, processAiSearch, InventoryInsight } from '../services/geminiService';
 import AIPoweredNews from './AIPoweredNews';
 import AIQuickNews from './AIQuickNews';
+import { FilterDropdown } from './ui/FilterDropdown';
+import { RotateCcw } from 'lucide-react';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 interface DashboardProps {
   user: UserProfile;
@@ -67,13 +76,13 @@ const StockTableRow = memo(({ index, style, data }: { index: number, style: Reac
         <div className="flex flex-col truncate">
           <span className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors truncate">{item.name}</span>
           {(item.brand || item.modelNumber) && (
-            <span className="text-[9px] text-primary/50 font-black uppercase tracking-tighter truncate">
+            <span className="text-[9px] text-primary/80 font-black uppercase tracking-tighter truncate">
               {item.brand} {item.modelNumber}
             </span>
           )}
         </div>
       </div>
-      <div className="px-4 py-4 w-32 text-center shrink-0">
+      <div className="px-4 py-4 w-24 text-center shrink-0">
         <span className={cn(
           "text-sm font-black px-3 py-1 rounded-lg border",
           item.currentQuantity <= item.minStock 
@@ -83,16 +92,19 @@ const StockTableRow = memo(({ index, style, data }: { index: number, style: Reac
           {item.currentQuantity}
         </span>
       </div>
-      <div className="px-4 py-4 flex-1 hidden lg:block truncate text-xs text-slate-400 font-medium">
+      <div className="px-4 py-4 flex-1 hidden lg:block truncate text-[10px] text-slate-300 uppercase font-black tracking-tighter">
         {item.client || 'Internal'}
       </div>
-      <div className="px-4 py-4 flex-1 hidden lg:block truncate text-[10px] text-slate-500 uppercase font-black tracking-tighter opacity-60">
-        {item.location}
+      <div className="px-4 py-4 flex-1 hidden lg:block truncate text-[10px] text-slate-400 uppercase font-black tracking-tighter">
+        {item.outlet || item.location || '-'}
       </div>
-      <div className="px-4 py-4 w-32 hidden xl:block text-right shrink-0">
-        <span className="text-[10px] font-mono text-slate-500 bg-white/5 px-2 py-1 rounded-md border border-white/5">
+      <div className="px-4 py-4 w-24 hidden xl:block text-right shrink-0">
+        <span className="text-[10px] font-mono text-slate-400 bg-white/5 px-2 py-1 rounded-md border border-white/10">
           {item.jobNumber || 'PENDING'}
         </span>
+      </div>
+      <div className="px-4 py-4 flex-1 hidden xl:block truncate text-[10px] text-slate-300 uppercase font-black tracking-tighter">
+        {item.warehouseLocation || '-'}
       </div>
     </div>
   );
@@ -103,10 +115,31 @@ import AutoSizer from 'react-virtualized-auto-sizer';
 
 export default function Dashboard({ user, items, transactions, projects }: DashboardProps) {
   const [stockSearch, setStockSearch] = useState('');
+  const [showStockSuggestions, setShowStockSuggestions] = useState(false);
   const [stockJobFilter, setStockJobFilter] = useState('');
+  const [showJobSuggestions, setShowJobSuggestions] = useState(false);
   const [stockClientFilter, setStockClientFilter] = useState('');
+  const [showClientSuggestions, setShowClientSuggestions] = useState(false);
   const [stockLocationFilter, setStockLocationFilter] = useState('');
+  const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
   const [stockTypeFilter, setStockTypeFilter] = useState<'All' | 'Warehouse Stock' | 'Client Stock'>('All');
+  const stockListRef = React.useRef<List>(null);
+
+  const { isListening, startListening, currentLang, setCurrentLang } = useVoiceSearch((transcript) => {
+    setStockSearch(transcript);
+  });
+
+  // Advanced Filters
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
+  const [selectedModels, setSelectedModels] = useState<string[]>([]);
+  const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
+  const [selectedOutlets, setSelectedOutlets] = useState<string[]>([]);
+  const [selectedWarehouseLocations, setSelectedWarehouseLocations] = useState<string[]>([]);
+  const [stockInStart, setStockInStart] = useState('');
+  const [stockInEnd, setStockInEnd] = useState('');
+  const [updatedStart, setUpdatedStart] = useState('');
+  const [updatedEnd, setUpdatedEnd] = useState('');
 
   const [txTypeFilter, setTxTypeFilter] = useState<'ALL' | 'IN' | 'OUT'>('ALL');
 
@@ -116,23 +149,81 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
   const [aiSearchQuery, setAiSearchQuery] = useState('');
   const [isAiSearching, setIsAiSearching] = useState(false);
   const [aiResultIds, setAiResultIds] = useState<string[] | null>(null);
+  const [persistingInsights, setPersistingInsights] = useState(false);
+
+  const persistInsights = useCallback(async (insightsToSave: InventoryInsight[]) => {
+    if (!insightsToSave.length || persistingInsights) return;
+    
+    setPersistingInsights(true);
+    try {
+      const highPriority = insightsToSave.filter(i => i.type === 'WARNING');
+      for (const insight of highPriority) {
+        // Simple check if this notification already exists recently might be overkill for this turn
+        // but let's at least add some debounce/check logic if possible
+        // For now, we just add it to Firestore
+        await addDoc(collection(db, 'notifications'), {
+          type: 'AI_PREDICTION',
+          title: insight.title,
+          message: insight.message,
+          userId: user.uid,
+          read: false,
+          createdAt: serverTimestamp(),
+          isPublic: false
+        });
+      }
+      
+      // Show toast indirectly via Firestore listener in App.tsx
+    } catch (error) {
+      console.error("Failed to persist AI insights:", error);
+    } finally {
+      setPersistingInsights(false);
+    }
+  }, [user.uid, persistingInsights]);
+
+  const lastAnalyzedRef = useRef<string>('');
+  const [lastAnalysisTime, setLastAnalysisTime] = useState<number>(0);
 
   useEffect(() => {
     const fetchInsights = async () => {
-      if (items.length > 0) {
+      // Data fingerprinting to avoid redundant calls
+      const currentDataHash = JSON.stringify({
+        itemCount: items.length,
+        projectCount: projects.length,
+        stockSummary: items.reduce((sum, i) => sum + i.currentQuantity, 0)
+      });
+
+      // 5-minute cooldown + verify data has actually changed
+      const coolingDown = lastAnalysisTime > 0 && Date.now() - lastAnalysisTime < 300000;
+      const dataChanged = currentDataHash !== lastAnalyzedRef.current;
+      
+      // Only run if data changed AND not in cooldown, OR if it's a manual trigger (lastAnalysisTime === 0)
+      if (items.length > 0 && ((dataChanged && !coolingDown) || lastAnalysisTime === 0)) {
         setIsAnalyzing(true);
-        const results = await analyzeInventory(items, transactions);
-        setInsights(results);
-        setIsAnalyzing(false);
+        try {
+          const results = await analyzeSupplyChain(items, transactions, projects);
+          setInsights(results);
+          
+          lastAnalyzedRef.current = currentDataHash;
+          setLastAnalysisTime(Date.now());
+
+          const urgentInsights = results.filter(i => i.isUrgent);
+          if (urgentInsights.length > 0) {
+            persistInsights(urgentInsights);
+          }
+        } catch (error: any) {
+          console.warn("AI Quota or error:", error);
+        } finally {
+          setIsAnalyzing(false);
+        }
       }
     };
 
     const timer = setTimeout(() => {
       fetchInsights();
-    }, 5000); // 5 second debounce for insights
+    }, 10000); // 10 second delay on initial load/change
 
     return () => clearTimeout(timer);
-  }, [items, transactions]);
+  }, [items, transactions, projects, persistInsights, lastAnalysisTime]);
 
   const handleAiSearch = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,6 +237,10 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
     setAiResultIds(results);
     setIsAiSearching(false);
   }, [aiSearchQuery, items]);
+
+  useEffect(() => {
+    stockListRef.current?.scrollTo(0);
+  }, [stockSearch, stockJobFilter, stockClientFilter, stockLocationFilter, stockTypeFilter, aiResultIds, selectedBrands, selectedModels, selectedOutlets]);
 
   const stats = useMemo(() => {
     const filteredItems = stockTypeFilter === 'All' ? items : items.filter(i => i.inventoryType === stockTypeFilter);
@@ -227,6 +322,62 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
     return { totalItems, totalProjects, lowStock, outOfStock, monthlyStockData, mostMovedItems, distribution };
   }, [items, transactions, projects, stockTypeFilter]);
 
+  const uniqueValues = useMemo(() => {
+    return {
+      brands: Array.from(new Set(items.map(i => i.brand).filter(Boolean))) as string[],
+      models: Array.from(new Set(items.map(i => i.modelNumber).filter(Boolean))) as string[],
+      suppliers: Array.from(new Set(items.map(i => i.supplier).filter(Boolean))) as string[],
+      projects: Array.from(new Set(items.map(i => i.outlet).filter(Boolean))) as string[],
+      warehouseLocations: Array.from(new Set(['Dip Room 35', 'AL Quoz', 'Home Box', 'Head Office', ...items.map(i => i.warehouseLocation).filter(Boolean)])) as string[],
+    };
+  }, [items]);
+
+  const stockSuggestions = useMemo(() => {
+    if (!stockSearch || stockSearch.length < 1) return [];
+    
+    const searchLow = stockSearch.toLowerCase();
+    const matches = new Set<string>();
+    
+    items.forEach(item => {
+      if (item.name.toLowerCase().includes(searchLow)) matches.add(item.name);
+      if (item.brand && item.brand.toLowerCase().includes(searchLow)) matches.add(item.brand);
+      if (item.modelNumber && item.modelNumber.toLowerCase().includes(searchLow)) matches.add(item.modelNumber);
+    });
+    
+    return Array.from(matches).slice(0, 8);
+  }, [stockSearch, items]);
+
+  const jobSuggestions = useMemo(() => {
+    if (!stockJobFilter || stockJobFilter.length < 1) return [];
+    const searchLow = stockJobFilter.toLowerCase();
+    const matches = new Set<string>();
+    items.forEach(item => {
+      if (item.jobNumber && item.jobNumber.toLowerCase().includes(searchLow)) matches.add(item.jobNumber);
+    });
+    return Array.from(matches).slice(0, 8);
+  }, [stockJobFilter, items]);
+
+  const clientSuggestions = useMemo(() => {
+    if (!stockClientFilter || stockClientFilter.length < 1) return [];
+    const searchLow = stockClientFilter.toLowerCase();
+    const matches = new Set<string>();
+    items.forEach(item => {
+      if (item.client && item.client.toLowerCase().includes(searchLow)) matches.add(item.client);
+    });
+    return Array.from(matches).slice(0, 8);
+  }, [stockClientFilter, items]);
+
+  const locationSuggestions = useMemo(() => {
+    if (!stockLocationFilter || stockLocationFilter.length < 1) return [];
+    const searchLow = stockLocationFilter.toLowerCase();
+    const matches = new Set<string>();
+    items.forEach(item => {
+      if (item.location && item.location.toLowerCase().includes(searchLow)) matches.add(item.location);
+      if (item.warehouseLocation && item.warehouseLocation.toLowerCase().includes(searchLow)) matches.add(item.warehouseLocation);
+    });
+    return Array.from(matches).slice(0, 8);
+  }, [stockLocationFilter, items]);
+
   const recentTransactions = useMemo(() => {
     let filtered = transactions;
     if (txTypeFilter !== 'ALL') {
@@ -242,16 +393,47 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
         return aiResultIds.includes(item.id);
       }
 
-      const matchesSearch = item.name.toLowerCase().includes(stockSearch.toLowerCase()) || 
-                           (item.brand && item.brand.toLowerCase().includes(stockSearch.toLowerCase())) ||
-                           (item.modelNumber && item.modelNumber.toLowerCase().includes(stockSearch.toLowerCase()));
+      // Basic Search
+      const searchLow = stockSearch.toLowerCase();
+      const matchesSearch = item.name.toLowerCase().includes(searchLow) || 
+                           (item.brand && item.brand.toLowerCase().includes(searchLow)) ||
+                           (item.modelNumber && item.modelNumber.toLowerCase().includes(searchLow));
+      if (!matchesSearch) return false;
+
+      // New Multi-select Filters
+      if (selectedBrands.length > 0 && (!item.brand || !selectedBrands.includes(item.brand))) return false;
+      if (selectedModels.length > 0 && (!item.modelNumber || !selectedModels.includes(item.modelNumber))) return false;
+      if (selectedSuppliers.length > 0 && (!item.supplier || !selectedSuppliers.includes(item.supplier))) return false;
+      if (selectedOutlets.length > 0 && (!item.outlet || !selectedOutlets.includes(item.outlet))) return false;
+      if (selectedWarehouseLocations.length > 0 && (!item.warehouseLocation || !selectedWarehouseLocations.includes(item.warehouseLocation))) return false;
+
+      // Text Filters
       const matchesJob = !stockJobFilter || (item.jobNumber && item.jobNumber.toLowerCase().includes(stockJobFilter.toLowerCase()));
       const matchesClient = !stockClientFilter || (item.client && item.client.toLowerCase().includes(stockClientFilter.toLowerCase()));
       const matchesLocation = !stockLocationFilter || (item.location && item.location.toLowerCase().includes(stockLocationFilter.toLowerCase()));
       
-      return matchesSearch && matchesJob && matchesClient && matchesLocation;
+      if (!matchesJob || !matchesClient || !matchesLocation) return false;
+
+      // Global Stock Type
+      if (stockTypeFilter !== 'All' && item.inventoryType !== stockTypeFilter) return false;
+
+      // Date Range Filters
+      if (stockInStart) {
+        if (!item.stockInDate || item.stockInDate < new Date(stockInStart).getTime()) return false;
+      }
+      if (stockInEnd) {
+        if (!item.stockInDate || item.stockInDate > new Date(stockInEnd).setHours(23, 59, 59, 999)) return false;
+      }
+      if (updatedStart) {
+        if (!item.lastUpdated || item.lastUpdated < new Date(updatedStart).getTime()) return false;
+      }
+      if (updatedEnd) {
+        if (!item.lastUpdated || item.lastUpdated > new Date(updatedEnd).setHours(23, 59, 59, 999)) return false;
+      }
+
+      return true;
     });
-  }, [items, stockSearch, stockJobFilter, stockClientFilter, stockLocationFilter, aiResultIds]);
+  }, [items, stockSearch, stockJobFilter, stockClientFilter, stockLocationFilter, aiResultIds, stockTypeFilter, selectedBrands, selectedModels, selectedSuppliers, selectedOutlets, selectedWarehouseLocations, stockInStart, stockInEnd, updatedStart, updatedEnd]);
 
   const handleExportTransactions = useCallback(() => {
     const filteredTx = txTypeFilter === 'ALL' 
@@ -259,6 +441,24 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
       : transactions.filter(tx => tx.type === txTypeFilter);
     generateTransactionsReport(filteredTx, { typeFilter: txTypeFilter });
   }, [transactions, txTypeFilter]);
+
+  const clearAllFilters = useCallback(() => {
+    setStockSearch('');
+    setStockJobFilter('');
+    setStockClientFilter('');
+    setStockLocationFilter('');
+    setSelectedBrands([]);
+    setSelectedModels([]);
+    setSelectedSuppliers([]);
+    setSelectedOutlets([]);
+    setSelectedWarehouseLocations([]);
+    setStockInStart('');
+    setStockInEnd('');
+    setUpdatedStart('');
+    setUpdatedEnd('');
+    setAiResultIds(null);
+    setAiSearchQuery('');
+  }, []);
 
   return (
     <motion.div 
@@ -345,54 +545,95 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
                 </motion.div>
               </div>
               <div>
-                <h3 className="text-lg font-black text-white flex items-center space-x-2">
-                  <span>AI Inventory Advisor</span>
-                  <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full uppercase tracking-widest border border-primary/20">Active</span>
-                </h3>
+                <div className="flex items-center space-x-2">
+                  <h3 className="text-lg font-black text-white flex items-center space-x-2">
+                    <span>AI Inventory Advisor</span>
+                    {isAnalyzing ? (
+                      <span className="text-[10px] bg-amber-500/20 text-amber-500 px-2 py-0.5 rounded-full uppercase tracking-widest border border-amber-500/20 animate-pulse">Analyzing...</span>
+                    ) : (
+                      <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full uppercase tracking-widest border border-primary/20">Active</span>
+                    )}
+                  </h3>
+                  {lastAnalysisTime > 0 && !isAnalyzing && (
+                    <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded-md border border-white/5">
+                      Last: {new Date(lastAnalysisTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-slate-400 mt-0.5">Gemini is analyzing your stock patterns and transaction history</p>
               </div>
             </div>
 
-          <div className="flex-1 max-w-2xl px-1 md:px-4">
-              <div className="flex space-x-3 md:space-x-4 overflow-x-auto pb-4 custom-scrollbar-hide">
-                {isAnalyzing ? (
-                  Array(2).fill(0).map((_, i) => (
-                    <div key={i} className="flex-shrink-0 w-56 md:w-64 h-14 md:h-16 bg-white/5 rounded-2xl animate-pulse border border-white/5" />
-                  ))
-                ) : (
-                  insights.map((insight, idx) => (
-                    <motion.div 
-                      key={idx}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: idx * 0.1 }}
-                      className={cn(
-                        "flex-shrink-0 w-64 md:w-72 p-3 rounded-2xl border transition-all cursor-default shadow-lg",
-                        insight.type === 'WARNING' ? "bg-red-500/10 border-red-500/20 text-red-100" :
-                        insight.type === 'POSITIVE' ? "bg-green-500/10 border-green-500/20 text-green-100" :
-                        "bg-white/5 border-white/10 text-slate-200"
-                      )}
-                    >
-                      <div className="flex items-start space-x-3">
-                        <div className={cn(
-                          "p-2 rounded-xl flex-shrink-0",
-                          insight.type === 'WARNING' ? "bg-red-500/20" :
-                          insight.type === 'POSITIVE' ? "bg-green-500/20" :
-                          "bg-white/10"
-                        )}>
-                          <Lightbulb className="w-3.5 h-3.5" />
+            <div className="flex-1 max-w-2xl px-1 md:px-4">
+              <div className="flex items-center gap-3">
+                <div className="flex-1 flex space-x-3 md:space-x-4 overflow-x-auto pb-4 custom-scrollbar-hide">
+                  {!isAnalyzing && insights.length === 0 ? (
+                    <p className="text-xs text-slate-500 italic mt-4">No critical insights found yet. Click refresh to analyze.</p>
+                  ) : isAnalyzing ? (
+                    Array(2).fill(0).map((_, i) => (
+                      <div key={i} className="flex-shrink-0 w-56 md:w-64 h-14 md:h-16 bg-white/5 rounded-2xl animate-pulse border border-white/5" />
+                    ))
+                  ) : (
+                    insights.map((insight, idx) => (
+                      <motion.div 
+                        key={idx}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.1 }}
+                        className={cn(
+                          "flex-shrink-0 w-64 md:w-72 p-3 rounded-2xl border transition-all cursor-default shadow-lg",
+                          insight.type === 'WARNING' ? "bg-red-500/10 border-red-500/20 text-red-100" :
+                          insight.type === 'POSITIVE' ? "bg-green-500/10 border-green-500/20 text-green-100" :
+                          "bg-white/5 border-white/10 text-slate-200"
+                        )}
+                      >
+                        <div className="flex items-start space-x-3">
+                          <div className={cn(
+                            "p-2 rounded-xl flex-shrink-0",
+                            insight.type === 'WARNING' ? "bg-red-500/20" :
+                            insight.type === 'POSITIVE' ? "bg-green-500/20" :
+                            "bg-white/10"
+                          )}>
+                            <Lightbulb className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1">
+                              <p className="text-[10px] font-black uppercase tracking-wider opacity-60 truncate">{insight.title}</p>
+                              <div className="flex items-center space-x-1">
+                                {insight.type === 'WARNING' && (
+                                  <motion.button
+                                    whileHover={{ scale: 1.1 }}
+                                    whileTap={{ scale: 0.9 }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      persistInsights([insight]);
+                                    }}
+                                    disabled={persistingInsights}
+                                    className="p-1 rounded-md bg-red-500/20 hover:bg-red-500/40 text-red-500 transition-colors"
+                                    title="Broadcast as Proactive Alert"
+                                  >
+                                    {persistingInsights ? <Loader2 className="w-3 h-3 animate-spin" /> : <Bell className="w-3 h-3" />}
+                                  </motion.button>
+                                )}
+                              </div>
+                            </div>
+                            <p className="text-[11px] font-medium leading-tight mt-0.5 line-clamp-2">{insight.message}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-[10px] font-black uppercase tracking-wider opacity-60">{insight.title}</p>
-                          <p className="text-[11px] font-medium leading-tight mt-0.5 line-clamp-2">{insight.message}</p>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))
-                )}
-                {insights.length === 0 && !isAnalyzing && (
-                  <p className="text-xs text-slate-500 italic">No critical insights found yet.</p>
-                )}
+                      </motion.div>
+                    ))
+                  )}
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setLastAnalysisTime(0)} // Triggers re-fetch due to dependency
+                  disabled={isAnalyzing}
+                  className="p-3 rounded-2xl bg-white/5 border border-white/10 text-slate-400 hover:text-primary transition-all shadow-xl flex-shrink-0"
+                  title="Force AI Refresh"
+                >
+                  <RotateCcw className={cn("w-5 h-5", isAnalyzing && "animate-spin")} />
+                </motion.button>
               </div>
             </div>
           </div>
@@ -506,6 +747,23 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
             <p className="text-xs text-slate-500 mt-1 uppercase tracking-widest font-black">Real-time inventory valuation & tracking</p>
           </div>
           <div className="flex items-center space-x-3">
+            <motion.button 
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className={cn(
+                "flex items-center space-x-2 px-4 py-2 rounded-xl border transition-all duration-300",
+                showAdvancedFilters 
+                  ? "bg-amber-500 text-slate-950 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)]" 
+                  : "bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10"
+              )}
+            >
+              <Filter className={cn("w-3.5 h-3.5", (selectedBrands.length > 0 || selectedModels.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || selectedWarehouseLocations.length > 0 || stockJobFilter || stockClientFilter || stockLocationFilter || stockInStart || stockInEnd || updatedStart || updatedEnd) && "animate-bounce")} />
+              <span className="text-[10px] font-black uppercase tracking-widest">Filters</span>
+              {(selectedBrands.length > 0 || selectedModels.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || selectedWarehouseLocations.length > 0 || stockJobFilter || stockClientFilter || stockLocationFilter || stockInStart || stockInEnd || updatedStart || updatedEnd) && (
+                <div className="w-1 h-1 rounded-full bg-slate-950 animate-pulse" />
+              )}
+            </motion.button>
             <button 
               onClick={() => generateInventoryReport(filteredItems)}
               className="px-4 py-2 bg-indigo-500/20 text-indigo-400 text-[10px] font-bold rounded-xl border border-indigo-500/20 hover:bg-indigo-500/30 transition-all flex items-center space-x-2 group"
@@ -524,9 +782,9 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-8">
-          <div className="lg:col-span-4 relative group">
+        {/* Filters Top Bar */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-6">
+          <div className="lg:col-span-8 relative group">
             <form onSubmit={handleAiSearch} className="relative group">
               <motion.div
                 animate={{ rotate: [0, 15, -15, 0] }}
@@ -564,7 +822,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
             </form>
           </div>
 
-          <div className="lg:col-span-2 relative group">
+          <div className="lg:col-span-4 relative group">
             <motion.div
               whileHover={{ scale: 1.2 }}
               className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center pointer-events-none"
@@ -573,58 +831,328 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
             </motion.div>
             <input 
               type="text" 
-              placeholder="Search ID..." 
+              placeholder="Search Items/Brands/Models..." 
               value={stockSearch}
-              onChange={(e) => setStockSearch(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all"
+              onChange={(e) => {
+                setStockSearch(e.target.value);
+                setShowStockSuggestions(true);
+              }}
+              onFocus={() => setShowStockSuggestions(true)}
+              className="w-full pl-11 pr-32 py-3 bg-white/5 border border-white/10 rounded-2xl text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all"
             />
-          </div>
-          <div className="lg:col-span-2 relative group">
-            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-primary transition-colors" />
-            <input 
-              type="text" 
-              placeholder="Job..." 
-              value={stockJobFilter}
-              onChange={(e) => setStockJobFilter(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all"
-            />
-          </div>
-          <div className="lg:col-span-2 relative group">
-            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-primary transition-colors" />
-            <input 
-              type="text" 
-              placeholder="Client..." 
-              value={stockClientFilter}
-              onChange={(e) => setStockClientFilter(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all"
-            />
-          </div>
-          <div className="lg:col-span-2 relative group">
-            <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-primary transition-colors" />
-            <input 
-              type="text" 
-              placeholder="Project Outlet..." 
-              value={stockLocationFilter}
-              onChange={(e) => setStockLocationFilter(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all"
-            />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center space-x-2">
+              <VoiceLanguageSelector 
+                currentLang={currentLang} 
+                onLangChange={setCurrentLang} 
+              />
+              <button
+                type="button"
+                onClick={startListening}
+                className={cn(
+                  "p-2 rounded-xl transition-all",
+                  isListening ? "bg-red-500/20 text-red-500 animate-pulse" : "hover:bg-white/10 text-slate-500"
+                )}
+              >
+                {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </button>
+            </div>
+            <AnimatePresence>
+              {showStockSuggestions && stockSuggestions.length > 0 && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowStockSuggestions(false)} />
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                  >
+                    <div className="p-2 space-y-1">
+                      {stockSuggestions.map((suggestion, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            setStockSearch(suggestion);
+                            setShowStockSuggestions(false);
+                          }}
+                          className="w-full px-4 py-2.5 flex items-center space-x-3 hover:bg-white/5 transition-colors text-left rounded-xl group"
+                        >
+                          <Search className="w-4 h-4 text-slate-500 group-hover:text-primary transition-colors" />
+                          <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">{suggestion}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
           </div>
         </div>
+
+        {/* Advanced Filters Section */}
+        <AnimatePresence>
+          {showAdvancedFilters && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden mb-8"
+            >
+              <div className="p-6 bg-white/[0.02] border border-white/5 rounded-3xl space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <FilterDropdown 
+                    label="Brands" 
+                    options={uniqueValues.brands} 
+                    selected={selectedBrands} 
+                    onChange={setSelectedBrands} 
+                  />
+                  
+                  <FilterDropdown 
+                    label="Model Numbers" 
+                    options={uniqueValues.models} 
+                    selected={selectedModels} 
+                    onChange={setSelectedModels} 
+                  />
+
+                  <FilterDropdown 
+                    label="Suppliers" 
+                    options={uniqueValues.suppliers} 
+                    selected={selectedSuppliers} 
+                    onChange={setSelectedSuppliers} 
+                  />
+
+                  <FilterDropdown 
+                    label="Projects" 
+                    options={uniqueValues.projects} 
+                    selected={selectedOutlets} 
+                    onChange={setSelectedOutlets} 
+                  />
+                  
+                  <FilterDropdown 
+                    label="WH Location" 
+                    options={uniqueValues.warehouseLocations} 
+                    selected={selectedWarehouseLocations} 
+                    onChange={setSelectedWarehouseLocations} 
+                  />
+
+                   <div className="space-y-1.5 relative">
+                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Client Search</label>
+                     <div className="relative">
+                       <input 
+                         type="text"
+                         value={stockClientFilter}
+                         onChange={(e) => {
+                           setStockClientFilter(e.target.value);
+                           setShowClientSuggestions(true);
+                         }}
+                         onFocus={() => setShowClientSuggestions(true)}
+                         placeholder="Search clients..."
+                         className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
+                       />
+                       <AnimatePresence>
+                         {showClientSuggestions && clientSuggestions.length > 0 && (
+                           <>
+                             <div className="fixed inset-0 z-40" onClick={() => setShowClientSuggestions(false)} />
+                             <motion.div
+                               initial={{ opacity: 0, y: 10 }}
+                               animate={{ opacity: 1, y: 0 }}
+                               exit={{ opacity: 0, y: 10 }}
+                               className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                             >
+                               <div className="p-1 space-y-0.5">
+                                 {clientSuggestions.map((suggestion, index) => (
+                                   <button
+                                     key={index}
+                                     onClick={() => {
+                                       setStockClientFilter(suggestion);
+                                       setShowClientSuggestions(false);
+                                     }}
+                                     className="w-full px-3 py-1.5 flex items-center space-x-2 hover:bg-white/5 transition-colors text-left rounded-lg group"
+                                   >
+                                     <Search className="w-3 h-3 text-slate-600 group-hover:text-primary" />
+                                     <span className="text-[11px] font-medium text-slate-400 group-hover:text-white">{suggestion}</span>
+                                   </button>
+                                 ))}
+                               </div>
+                             </motion.div>
+                           </>
+                         )}
+                       </AnimatePresence>
+                     </div>
+                   </div>
+
+                   <div className="space-y-1.5 relative">
+                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Job Number</label>
+                     <div className="relative">
+                       <input 
+                         type="text"
+                         value={stockJobFilter}
+                         onChange={(e) => {
+                           setStockJobFilter(e.target.value);
+                           setShowJobSuggestions(true);
+                         }}
+                         onFocus={() => setShowJobSuggestions(true)}
+                         placeholder="Filter by Job#..."
+                         className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
+                       />
+                       <AnimatePresence>
+                         {showJobSuggestions && jobSuggestions.length > 0 && (
+                           <>
+                             <div className="fixed inset-0 z-40" onClick={() => setShowJobSuggestions(false)} />
+                             <motion.div
+                               initial={{ opacity: 0, y: 10 }}
+                               animate={{ opacity: 1, y: 0 }}
+                               exit={{ opacity: 0, y: 10 }}
+                               className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                             >
+                               <div className="p-1 space-y-0.5">
+                                 {jobSuggestions.map((suggestion, index) => (
+                                   <button
+                                     key={index}
+                                     onClick={() => {
+                                       setStockJobFilter(suggestion);
+                                       setShowJobSuggestions(false);
+                                     }}
+                                     className="w-full px-3 py-1.5 flex items-center space-x-2 hover:bg-white/5 transition-colors text-left rounded-lg group"
+                                   >
+                                     <Search className="w-3 h-3 text-slate-600 group-hover:text-primary" />
+                                     <span className="text-[11px] font-medium text-slate-400 group-hover:text-white">{suggestion}</span>
+                                   </button>
+                                 ))}
+                               </div>
+                             </motion.div>
+                           </>
+                         )}
+                       </AnimatePresence>
+                     </div>
+                   </div>
+
+                   <div className="space-y-1.5 relative">
+                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Project Outlet</label>
+                     <div className="relative">
+                       <input 
+                         type="text"
+                         value={stockLocationFilter}
+                         onChange={(e) => {
+                           setStockLocationFilter(e.target.value);
+                           setShowLocationSuggestions(true);
+                         }}
+                         onFocus={() => setShowLocationSuggestions(true)}
+                         placeholder="Search outlets..."
+                         className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
+                       />
+                       <AnimatePresence>
+                         {showLocationSuggestions && locationSuggestions.length > 0 && (
+                           <>
+                             <div className="fixed inset-0 z-40" onClick={() => setShowLocationSuggestions(false)} />
+                             <motion.div
+                               initial={{ opacity: 0, y: 10 }}
+                               animate={{ opacity: 1, y: 0 }}
+                               exit={{ opacity: 0, y: 10 }}
+                               className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                             >
+                               <div className="p-1 space-y-0.5">
+                                 {locationSuggestions.map((suggestion, index) => (
+                                   <button
+                                     key={index}
+                                     onClick={() => {
+                                       setStockLocationFilter(suggestion);
+                                       setShowLocationSuggestions(false);
+                                     }}
+                                     className="w-full px-3 py-1.5 flex items-center space-x-2 hover:bg-white/5 transition-colors text-left rounded-lg group"
+                                   >
+                                     <Search className="w-3 h-3 text-slate-600 group-hover:text-primary" />
+                                     <span className="text-[11px] font-medium text-slate-400 group-hover:text-white">{suggestion}</span>
+                                   </button>
+                                 ))}
+                               </div>
+                             </motion.div>
+                           </>
+                         )}
+                       </AnimatePresence>
+                     </div>
+                   </div>
+
+                  {/* Date Filters Row */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Stock In (From)</label>
+                    <input 
+                      type="date"
+                      value={stockInStart}
+                      onChange={(e) => setStockInStart(e.target.value)}
+                      className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:ring-2 focus:ring-primary/20 outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Stock In (To)</label>
+                    <input 
+                      type="date"
+                      value={stockInEnd}
+                      onChange={(e) => setStockInEnd(e.target.value)}
+                      className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:ring-2 focus:ring-primary/20 outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Updated (From)</label>
+                    <input 
+                      type="date"
+                      value={updatedStart}
+                      onChange={(e) => setUpdatedStart(e.target.value)}
+                      className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:ring-2 focus:ring-primary/20 outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Updated (To)</label>
+                    <div className="flex space-x-2">
+                      <input 
+                        type="date"
+                        value={updatedEnd}
+                        onChange={(e) => setUpdatedEnd(e.target.value)}
+                        className="flex-1 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:ring-2 focus:ring-primary/20 outline-none"
+                      />
+                      <button 
+                        onClick={clearAllFilters}
+                        className="p-2 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                        title="Clear All Filters"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between pt-4 border-t border-white/5">
+                   <p className="text-[10px] font-black text-slate-500 uppercase">
+                     Filters applied: <span className="text-primary">{
+                        [selectedBrands.length, selectedModels.length, selectedSuppliers.length, selectedOutlets.length, selectedWarehouseLocations.length, stockJobFilter, stockClientFilter, stockLocationFilter, stockInStart, stockInEnd, updatedStart, updatedEnd].filter(Boolean).length
+                     }</span>
+                   </p>
+                   <button 
+                    onClick={clearAllFilters}
+                    className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
+                  >
+                    Reset All Filters
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="overflow-hidden bg-white/[0.02] rounded-3xl border border-white/5">
           {/* Header */}
           <div className="flex items-center border-b border-white/10 bg-white/[0.03] px-4 py-3">
-            <div className="px-4 text-[10px] font-black text-slate-500 uppercase tracking-widest flex-1">Item Name</div>
-            <div className="px-4 text-[10px] font-black text-slate-500 uppercase tracking-widest w-32 text-center">Available Stock</div>
-            <div className="px-4 text-[10px] font-black text-slate-500 uppercase tracking-widest flex-1 hidden lg:block">Last Client</div>
-            <div className="px-4 text-[10px] font-black text-slate-500 uppercase tracking-widest flex-1 hidden lg:block">Project Outlet</div>
-            <div className="px-4 text-[10px] font-black text-slate-500 uppercase tracking-widest w-32 text-right hidden xl:block">Job Number</div>
+            <div className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest flex-1">Item Name</div>
+            <div className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-24 text-center">Stock</div>
+            <div className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest flex-1 hidden lg:block">Client Name</div>
+            <div className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest flex-1 hidden lg:block">Client Outlet</div>
+            <div className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-24 text-right hidden xl:block">Job #</div>
+            <div className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest flex-1 hidden xl:block">WH Location</div>
           </div>
           
           <div className="h-[500px] w-full">
             <AutoSizer>
               {({ height, width }) => (
                 <List
+                  ref={stockListRef}
                   height={height}
                   itemCount={filteredItems.length}
                   itemSize={72}

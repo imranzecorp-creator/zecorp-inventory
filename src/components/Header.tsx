@@ -1,14 +1,17 @@
-import React, { useState, memo } from 'react';
+import React, { useState, memo, useMemo } from 'react';
 import { 
   Bell, 
   Search, 
   User as UserIcon, 
   LogOut,
-  ChevronDown
+  ChevronDown,
+  Mic,
+  MicOff,
+  Sparkles
 } from 'lucide-react';
 import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
-import { UserProfile, AppNotification } from '../types';
+import { UserProfile, AppNotification, InventoryItem } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn, formatDate } from '../lib/utils';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -19,13 +22,41 @@ interface HeaderProps {
   unreadCount: number;
   notifications: AppNotification[];
   setActiveTab: (tab: string) => void;
+  items: InventoryItem[];
+  onGlobalSearch: (term: string) => void;
 }
 
 import Logo from './Logo';
 
-export default memo(function Header({ user, unreadCount, notifications, setActiveTab }: HeaderProps) {
+import { useVoiceSearch } from '../hooks/useVoiceSearch';
+import { VoiceLanguageSelector } from './VoiceLanguageSelector';
+
+export default memo(function Header({ user, unreadCount, notifications, setActiveTab, items, onGlobalSearch }: HeaderProps) {
   const [showNotify, setShowNotify] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
+  
+  const { isListening, startListening, currentLang, setCurrentLang } = useVoiceSearch((transcript) => {
+    setSearchTerm(transcript);
+    onGlobalSearch(transcript);
+  });
+
+  const searchSuggestions = useMemo(() => {
+    if (!searchTerm || searchTerm.length < 1) return [];
+    
+    const searchLow = searchTerm.toLowerCase();
+    const matches = new Set<string>();
+    
+    items.forEach(item => {
+      if (item.name.toLowerCase().includes(searchLow)) matches.add(item.name);
+      if (item.brand && item.brand.toLowerCase().includes(searchLow)) matches.add(item.brand);
+      if (item.modelNumber && item.modelNumber.toLowerCase().includes(searchLow)) matches.add(item.modelNumber);
+      if (item.category && item.category.toLowerCase().includes(searchLow)) matches.add(item.category);
+    });
+    
+    return Array.from(matches).slice(0, 8);
+  }, [searchTerm, items]);
 
   const markAsRead = async (id: string) => {
     try {
@@ -53,11 +84,63 @@ export default memo(function Header({ user, unreadCount, notifications, setActiv
           <input 
             type="text" 
             placeholder="Search items, location..." 
-            className="w-full pl-10 pr-12 py-2 bg-white/5 border border-white/10 rounded-full text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all font-display"
+            className="w-full pl-10 pr-20 py-2 bg-white/5 border border-white/10 rounded-full text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all font-display"
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setShowSearchSuggestions(true);
+            }}
+            onFocus={() => setShowSearchSuggestions(true)}
           />
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 hidden lg:flex items-center space-x-1 px-1.5 py-0.5 rounded border border-white/10 bg-white/5 pointer-events-none">
-            <span className="text-[10px] text-slate-500 font-bold tracking-tighter">⌘</span>
-            <span className="text-[10px] text-slate-500 font-bold tracking-tighter uppercase">K</span>
+          <AnimatePresence>
+            {showSearchSuggestions && searchSuggestions.length > 0 && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowSearchSuggestions(false)} />
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                >
+                  <div className="p-2 space-y-1">
+                    {searchSuggestions.map((suggestion, index) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          setSearchTerm(suggestion);
+                          setShowSearchSuggestions(false);
+                          onGlobalSearch(suggestion);
+                        }}
+                        className="w-full px-4 py-2.5 flex items-center space-x-3 hover:bg-white/5 transition-colors text-left rounded-xl group"
+                      >
+                        <Search className="w-4 h-4 text-slate-500 group-hover:text-primary transition-colors" />
+                        <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">{suggestion}</span>
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center space-x-2">
+            <VoiceLanguageSelector 
+              currentLang={currentLang} 
+              onLangChange={setCurrentLang} 
+              className="hidden sm:block"
+            />
+            <button
+              onClick={startListening}
+              className={cn(
+                "p-1.5 rounded-full transition-all",
+                isListening ? "bg-red-500/20 text-red-500 animate-pulse" : "hover:bg-white/10 text-slate-500"
+              )}
+            >
+              {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </button>
+            <div className="hidden lg:flex items-center space-x-1 px-1.5 py-0.5 rounded border border-white/10 bg-white/5 pointer-events-none">
+              <span className="text-[10px] text-slate-500 font-bold tracking-tighter">⌘</span>
+              <span className="text-[10px] text-slate-500 font-bold tracking-tighter uppercase">K</span>
+            </div>
           </div>
         </div>
       </div>
@@ -113,10 +196,23 @@ export default memo(function Header({ user, unreadCount, notifications, setActiv
                           key={n.id} 
                           onClick={() => markAsRead(n.id)}
                           className={cn(
-                            "p-4 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors group",
+                            "p-4 border-b border-white/5 cursor-pointer hover:bg-white/5 transition-colors group relative",
                             !n.read && "bg-white/[0.02]"
                           )}
                         >
+                          <div className="flex items-center space-x-2 mb-1">
+                            {n.type === 'AI_PREDICTION' ? (
+                              <div className="flex items-center space-x-1.5">
+                                <Sparkles className="w-3 h-3 text-primary" />
+                                <span className="text-[10px] font-black text-primary uppercase tracking-widest">AI Prediction</span>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{n.type}</span>
+                            )}
+                            {!n.read && (
+                              <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                            )}
+                          </div>
                           <p className="text-sm text-slate-300 leading-snug group-hover:text-white transition-colors">{n.message}</p>
                           <span className="text-[10px] text-slate-500 mt-2 block font-medium uppercase tracking-wider">{formatDate(n.createdAt)}</span>
                         </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import PermissionList from './PermissionList';
 import { 
   Shield, 
@@ -294,6 +294,7 @@ function ApprovalManagement({ admin }: { admin: UserProfile }) {
 function UserManagement() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
@@ -312,6 +313,20 @@ function UserManagement() {
     }
   };
 
+  const userSuggestions = useMemo(() => {
+    if (!searchTerm || searchTerm.length < 1) return [];
+    
+    const searchLow = searchTerm.toLowerCase();
+    const matches = new Set<string>();
+    
+    users.forEach(u => {
+      if (u.displayName?.toLowerCase().includes(searchLow)) matches.add(u.displayName);
+      if (u.email.toLowerCase().includes(searchLow)) matches.add(u.email);
+    });
+    
+    return Array.from(matches).slice(0, 8);
+  }, [searchTerm, users]);
+
   const filteredUsers = users.filter(u => 
     u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (u.displayName || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -324,15 +339,48 @@ function UserManagement() {
         <p className="text-xs text-slate-500 font-medium">Manage existing account permissions and approval status.</p>
       </div>
 
-      <div className="flex items-center bg-white/5 p-2 rounded-2xl border border-white/10 group focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+      <div className="flex items-center bg-white/5 p-2 rounded-2xl border border-white/10 group focus-within:ring-2 focus-within:ring-primary/20 transition-all relative">
         <Search className="w-4 h-4 text-slate-500 ml-3" />
         <input 
           type="text" 
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setShowSearchSuggestions(true);
+          }}
+          onFocus={() => setShowSearchSuggestions(true)}
           placeholder="Search by name or email..." 
           className="w-full bg-transparent p-3 text-sm text-white placeholder:text-slate-600 focus:outline-none" 
         />
+        <AnimatePresence>
+          {showSearchSuggestions && userSuggestions.length > 0 && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowSearchSuggestions(false)} />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+              >
+                <div className="p-2 space-y-1">
+                  {userSuggestions.map((suggestion, index) => (
+                    <button
+                      key={index}
+                      onClick={() => {
+                        setSearchTerm(suggestion);
+                        setShowSearchSuggestions(false);
+                      }}
+                      className="w-full px-4 py-2 flex items-center space-x-3 hover:bg-white/5 transition-colors text-left rounded-xl group"
+                    >
+                      <Users className="w-3.5 h-3.5 text-slate-500 group-hover:text-primary transition-colors" />
+                      <span className="text-xs font-medium text-slate-300 group-hover:text-white transition-colors">{suggestion}</span>
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
       </div>
 
       <div className="space-y-3">

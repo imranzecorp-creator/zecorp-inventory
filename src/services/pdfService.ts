@@ -40,7 +40,7 @@ export async function exportToPdf(elementId: string, filename: string) {
 }
 
 export async function generateInventoryReport(items: any[], activeFilters?: any) {
-  const doc = new jsPDF();
+  const doc = new jsPDF('l', 'mm', 'a4');
   
   doc.setFontSize(22);
   doc.setTextColor(40);
@@ -68,16 +68,17 @@ export async function generateInventoryReport(items: any[], activeFilters?: any)
     }
   }
   
-  const headers = [["Item Name", "Brand/Model", "Type", "Qty", "Job#", "Client", "Location"]];
+  const headers = [["Item", "Brand", "Model Number", "Warehouse / Client Stock", "Client Name", "Client Outlet", "Job Number", "Warehouse Location"]];
   
   const tableData = items.map(item => [
     item.name,
-    `${item.brand || '-'} / ${item.modelNumber || '-'}`,
-    item.inventoryType || 'Warehouse',
+    item.brand || '-',
+    item.modelNumber || '-',
     item.currentQuantity,
-    item.jobNumber || 'N/A',
     item.client || 'N/A',
-    item.location || 'N/A'
+    item.outlet || '-',
+    item.jobNumber || 'N/A',
+    item.warehouseLocation || item.location || 'N/A'
   ]);
 
   autoTable(doc, {
@@ -85,14 +86,9 @@ export async function generateInventoryReport(items: any[], activeFilters?: any)
     body: tableData,
     startY: activeFilters ? 42 : 40,
     theme: 'grid',
-    headStyles: { fillColor: [16, 185, 129], textColor: 255, fontStyle: 'bold' },
+    headStyles: { fillColor: [16, 184, 129], textColor: 255, fontStyle: 'bold' },
     alternateRowStyles: { fillColor: [245, 247, 250] },
     styles: { fontSize: 8, cellPadding: 2.5 },
-    columnStyles: {
-      0: { cellWidth: 35 }, // Name
-      1: { cellWidth: 35 }, // Brand/Model
-      4: { cellWidth: 15, halign: 'center' }, // Qty
-    }
   });
   
   doc.save(`zecorp_inventory_detailed_${new Date().getTime()}.pdf`);

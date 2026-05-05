@@ -7,7 +7,9 @@ import {
   Key, 
   Save, 
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Download,
+  Smartphone
 } from 'lucide-react';
 import { updateProfile, updateEmail, updatePassword } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -15,6 +17,7 @@ import { auth, db } from '../lib/firebase';
 import { UserProfile } from '../types';
 import { motion } from 'framer-motion';
 import { formatDate } from '../lib/utils';
+import { usePWA } from '../hooks/usePWA';
 
 interface ProfileSettingsProps {
   user: UserProfile;
@@ -28,6 +31,8 @@ export default memo(function ProfileSettings({ user, setUser }: ProfileSettingsP
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+
+  const { installPrompt, isInstalled, installApp } = usePWA();
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,6 +198,46 @@ export default memo(function ProfileSettings({ user, setUser }: ProfileSettingsP
             <button className="px-6 py-3 border border-white/10 rounded-xl text-sm font-bold text-slate-300 hover:bg-white/5 hover:text-white transition-colors">
               Reset Password
             </button>
+          </div>
+
+          <div className="glass-morphism p-8 rounded-3xl border border-white/5 shadow-sm space-y-6 relative overflow-hidden">
+             <div className="absolute top-0 right-0 p-8 opacity-5">
+                <Smartphone className="w-32 h-32" />
+             </div>
+             
+             <h3 className="text-xl font-bold text-white flex items-center space-x-2 group">
+              <motion.div
+                whileHover={{ scale: 1.2, rotate: 10 }}
+              >
+                <Download className="w-5 h-5 text-primary" />
+              </motion.div>
+              <span>App Experience</span>
+            </h3>
+            
+            <p className="text-sm text-slate-400">
+              Transform this web application into a high-performance native-like app on your device.
+            </p>
+
+            <div className="flex flex-col space-y-4">
+              {isInstalled ? (
+                <div className="flex items-center space-x-3 text-primary bg-primary/10 p-4 rounded-2xl border border-primary/20">
+                  <CheckCircle className="w-5 h-5" />
+                  <span className="text-sm font-bold uppercase tracking-wider">Application Installed</span>
+                </div>
+              ) : installPrompt ? (
+                <button 
+                  onClick={installApp}
+                  className="flex items-center justify-center space-x-3 px-8 py-4 bg-white text-slate-950 rounded-2xl font-black uppercase tracking-widest hover:bg-opacity-90 transition-all active:scale-95 shadow-xl shadow-white/10"
+                >
+                  <Download className="w-5 h-5" />
+                  <span>Install Web App</span>
+                </button>
+              ) : (
+                <div className="p-4 rounded-2xl bg-white/5 border border-white/5 text-slate-500 text-xs italic">
+                  To install, use your browser's "Add to Home Screen" option if not prompted.
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

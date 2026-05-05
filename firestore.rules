@@ -49,11 +49,16 @@ service cloud.firestore {
       return data.keys().hasAll(required) &&
              data.name is string && data.name.size() >= 1 && data.name.size() <= 128 &&
              data.currentQuantity is number &&
-             (data.get('description', '') is string && data.get('description', '').size() <= 2000) &&
-             (data.get('location', '') is string && data.get('location', '').size() <= 256) &&
-             (data.get('brand', '') is string && data.get('brand', '').size() <= 128) &&
-             (data.get('outlet', '') is string && data.get('outlet', '').size() <= 128) &&
-             (data.get('inventoryType', 'Warehouse Stock') in ['Warehouse Stock', 'Client Stock']);
+             data.lastUpdated is timestamp &&
+             (data.get('stockInDate', 0) is number) &&
+             (data.get('description', '') is string && data.get('description', '').size() <= 5000) &&
+             (data.get('location', '') is string && data.get('location', '').size() <= 512) &&
+             (data.get('brand', '') is string && data.get('brand', '').size() <= 256) &&
+             (data.get('modelNumber', '') is string && data.get('modelNumber', '').size() <= 256) &&
+             (data.get('client', '') is string && data.get('client', '').size() <= 256) &&
+             (data.get('jobNumber', '') is string && data.get('jobNumber', '').size() <= 128) &&
+             (data.get('outlet', '') is string && data.get('outlet', '').size() <= 256) &&
+             (data.get('inventoryType', 'Warehouse Stock') is string);
     }
 
     function isValidProject(data) {
@@ -75,6 +80,14 @@ service cloud.firestore {
              data.type in ['IN', 'OUT'] &&
              data.quantity is number && data.quantity > 0 &&
              data.userId == request.auth.uid;
+    }
+
+    function isValidChatMessage(data) {
+      let required = ['senderId', 'content', 'createdAt'];
+      return data.keys().hasAll(required) &&
+             (data.senderId == request.auth.uid || (data.senderId == 'ai' && data.get('isAi', false) == true)) &&
+             data.content is string && data.content.size() <= 10000 &&
+             (data.get('audioUrl', '') is string && data.get('audioUrl', '').size() <= 2048);
     }
 
     // --- Rules ---
@@ -152,7 +165,7 @@ service cloud.firestore {
 
     match /chats/{chatId}/messages/{messageId} {
       allow read: if isApprovedUser() && (chatId.contains(request.auth.uid) || isAdmin());
-      allow create: if isApprovedUser() && incoming().senderId == request.auth.uid;
+      allow create: if isApprovedUser() && isValidChatMessage(incoming());
     }
     
     match /activity_logs/{logId} {

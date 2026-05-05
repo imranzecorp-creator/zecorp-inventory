@@ -6,9 +6,9 @@ import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 
-// Using initializeFirestore with experimentalAutoDetectLongPolling to handle connectivity in restricted environments
+// Using initializeFirestore with experimentalForceLongPolling to handle connectivity in restricted environments
 export const db = initializeFirestore(app, {
-  experimentalAutoDetectLongPolling: true,
+  experimentalForceLongPolling: true,
 }, firebaseConfig.firestoreDatabaseId);
 
 export const auth = getAuth(app);

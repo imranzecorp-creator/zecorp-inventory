@@ -86,6 +86,7 @@ export interface ChatMessage {
   senderId: string;
   senderName: string;
   content: string;
+  audioUrl?: string;
   isAi: boolean;
   createdAt: any;
 }
@@ -115,6 +116,12 @@ export interface ProjectItem {
   posNo?: string;
   eta?: string;
   delivery?: string;
+  matched?: boolean;
+  dimensions?: string;
+  logistics?: string;
+  origin?: string;
+  unitLocation?: string;
+  alternateBrand?: string;
 }
 
 export interface Project {

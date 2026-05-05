@@ -25,10 +25,14 @@ import {
   ChevronDown,
   Hash,
   FileUp,
-  FileText
+  FileText,
+  Mic,
+  MicOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as XLSX from 'xlsx';
+import { useVoiceSearch } from '../hooks/useVoiceSearch';
+import { VoiceLanguageSelector } from './VoiceLanguageSelector';
 import { 
   collection, 
   addDoc, 
@@ -46,7 +50,7 @@ import { db, OperationType, handleFirestoreError, auth } from '../lib/firebase';
 import { InventoryItem, UserProfile, Project } from '../types';
 import { cn, formatDate, formatDateForInput } from '../lib/utils';
 import { generateInventoryReport } from '../services/pdfService';
-import { suggestItemDetails, processAiSearch, mapExcelItems } from '../services/geminiService';
+import { suggestItemDetails, processAiSearch, mapExcelItems, getExcelMapping } from '../services/geminiService';
 
 import { FilterDropdown } from './ui/FilterDropdown';
 
@@ -55,6 +59,8 @@ interface InventoryListProps {
   clients: any[];
   user: UserProfile;
   projects: Project[];
+  initialSearch?: string;
+  onSearchClear?: () => void;
 }
 
 import { VariableSizeList as List } from 'react-window';
@@ -255,14 +261,16 @@ const InventoryRow = memo(({ index, style, data }: { index: number, style: React
   );
 });
 
-export default function InventoryList({ items, clients, user, projects }: InventoryListProps) {
-  const [searchTerm, setSearchTerm] = useState('');
+export default function InventoryList({ items, clients, user, projects, initialSearch = '', onSearchClear }: InventoryListProps) {
+  const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [isAiSearching, setIsAiSearching] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [aiFilteredIds, setAiFilteredIds] = useState<string[] | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const inventoryFileInputRef = React.useRef<HTMLInputElement>(null);
   const listRef = React.useRef<List>(null);
+
+  const [importPreview, setImportPreview] = useState<any[] | null>(null);
 
   const handleInventoryExcelUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -272,55 +280,66 @@ export default function InventoryList({ items, clients, user, projects }: Invent
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
-        const bstr = evt.target?.result;
+        const bstr = evt.target?.result as string;
         const wb = XLSX.read(bstr, { type: 'binary' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
+        const headers = XLSX.utils.sheet_to_json(ws, { header: 1 })[0] as string[];
 
         if (data.length === 0) {
           alert('Excel file is empty');
           return;
         }
 
-        const aiMappedItems = await mapExcelItems(data);
+        // Use AI to find mapping
+        const mapping = await getExcelMapping(headers, data.slice(0, 5));
         
-        if (aiMappedItems.length === 0) {
-          alert('AI could not map any items from this file. Please check the Excel format.');
-          return;
+        let mappedData: any[] = [];
+        
+        // If Gemini provided a mapping, use it. Otherwise, use the old mapping function as fallback
+        if (Object.values(mapping).some(v => !!v)) {
+          console.log("Using Gemini suggested mapping:", mapping);
+          mappedData = data.map((row: any) => {
+            const getVal = (internalField: string) => {
+              const excelHeader = mapping[internalField];
+              return excelHeader ? row[excelHeader] : '';
+            };
+            
+            return {
+              name: getVal('name') || 'Unnamed Item',
+              brand: getVal('brand') || '',
+              modelNumber: getVal('modelNumber') || '',
+              currentQuantity: Number(getVal('quantity')) || 0,
+              category: getVal('category') || '',
+              location: getVal('location') || 'Warehouse',
+              warehouseLocation: getVal('warehouseLocation') || '',
+              clientAssignment: getVal('clientAssignment') || '',
+              supplier: getVal('supplier') || '',
+              client: getVal('client') || '',
+              outlet: getVal('outlet') || '',
+              jobNumber: getVal('jobNumber') || '',
+              inventoryType: 'Warehouse Stock'
+            };
+          });
+        } else {
+          console.log("Falling back to direct Gemini mapping for small sample");
+          const aiMappedItems = await mapExcelItems(data.slice(0, 50));
+          mappedData = aiMappedItems.map((item: any) => ({
+            name: item.name || 'Unnamed Item',
+            brand: item.brand || '',
+            modelNumber: item.model || '',
+            currentQuantity: item.quantity || 0,
+            category: item.category || '',
+            location: item.location || 'Warehouse',
+            warehouseLocation: item.warehouseLocation || '',
+            clientAssignment: item.clientAssignment || '',
+            supplier: item.supplier || '',
+            inventoryType: 'Warehouse Stock'
+          }));
         }
-
-        // Firestore batches are limited to 500 docs. 
-        // We'll use multiple batches if needed.
-        const chunks = [];
-        for (let i = 0; i < aiMappedItems.length; i += 500) {
-          chunks.push(aiMappedItems.slice(i, i + 500));
-        }
-
-        for (const chunk of chunks) {
-          const batch = writeBatch(db);
-          for (const itemData of chunk) {
-            const newDocRef = doc(collection(db, 'inventory'));
-            batch.set(newDocRef, {
-              name: itemData.name || 'Unnamed Item',
-              brand: itemData.brand || '',
-              modelNumber: itemData.model || '',
-              currentQuantity: itemData.quantity || 0,
-              minStock: 5,
-              description: `Imported via AI: ${itemData.category || ''} ${itemData.brand || ''}`,
-              location: itemData.location || 'Warehouse',
-              warehouseLocation: itemData.warehouseLocation || '',
-              clientAssignment: itemData.clientAssignment || '',
-              supplier: itemData.supplier || '',
-              lastUpdated: serverTimestamp(),
-              inventoryType: 'Warehouse Stock',
-              createdAt: serverTimestamp()
-            });
-          }
-          await batch.commit();
-        }
-
-        alert(`Successfully AI-imported ${aiMappedItems.length} inventory items!`);
+        
+        setImportPreview(mappedData);
       } catch (err: any) {
         console.error('Error importing inventory:', err);
         alert(err.message || 'Failed to import inventory items.');
@@ -331,6 +350,48 @@ export default function InventoryList({ items, clients, user, projects }: Invent
     };
     reader.readAsBinaryString(file);
   }, []);
+
+  const handleConfirmImport = async () => {
+    if (!importPreview) return;
+    setIsImporting(true);
+    try {
+      const chunks = [];
+      for (let i = 0; i < importPreview.length; i += 500) {
+        chunks.push(importPreview.slice(i, i + 500));
+      }
+
+      for (const chunk of chunks) {
+        const batch = writeBatch(db);
+        for (const itemData of chunk) {
+          const newDocRef = doc(collection(db, 'inventory'));
+          batch.set(newDocRef, {
+            ...itemData,
+            minStock: 5,
+            description: `AI Integrated Import: ${itemData.category || ''} ${itemData.brand || ''}`,
+            lastUpdated: serverTimestamp(),
+            createdAt: serverTimestamp()
+          });
+        }
+        await batch.commit();
+      }
+      
+      // Activity Log
+      addDoc(collection(db, 'activity_logs'), {
+        userId: user.uid,
+        action: 'AI_IMPORT_INVENTORY',
+        details: `Imported ${importPreview.length} items via AI Mapping`,
+        createdAt: serverTimestamp()
+      }).catch(e => console.warn('Logging failed:', e));
+
+      alert(`Successfully AI-integrated ${importPreview.length} inventory items!`);
+      setImportPreview(null);
+    } catch (err: any) {
+      console.error('Error committing import:', err);
+      alert(err.message || 'Failed to commit inventory import.');
+    } finally {
+      setIsImporting(false);
+    }
+  };
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -357,13 +418,18 @@ export default function InventoryList({ items, clients, user, projects }: Invent
 
   // Advanced Filters
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const [selectedOutlets, setSelectedOutlets] = useState<string[]>([]);
+  const [selectedWarehouseLocations, setSelectedWarehouseLocations] = useState<string[]>([]);
   const [clientFilter, setClientFilter] = useState('');
+  const [showClientSuggestions, setShowClientSuggestions] = useState(false);
   const [jobFilter, setJobFilter] = useState('');
+  const [showJobSuggestions, setShowJobSuggestions] = useState(false);
   const [locationFilter, setLocationFilter] = useState('');
+  const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
   const [inventoryTypeFilter, setInventoryTypeFilter] = useState<'Warehouse Stock' | 'Client Stock' | ''>('');
   const [stockInStart, setStockInStart] = useState('');
   const [stockInEnd, setStockInEnd] = useState('');
@@ -374,10 +440,71 @@ export default function InventoryList({ items, clients, user, projects }: Invent
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null);
   const [inventoryError, setInventoryError] = useState<string | null>(null);
+  
+  const { isListening, startListening, currentLang, setCurrentLang } = useVoiceSearch((transcript) => {
+    setSearchTerm(transcript);
+  });
+
+  useEffect(() => {
+    if (initialSearch) {
+      setSearchTerm(initialSearch);
+    }
+  }, [initialSearch]);
+
+  useEffect(() => {
+    listRef.current?.scrollTo(0);
+  }, [searchTerm]);
 
   const isAdmin = user.role === 'admin' || user.email.toLowerCase() === 'imranzecorp@gmail.com';
   const isApproved = user.isApproved || isAdmin;
   const canUpdateStock = isApproved;
+
+  const searchSuggestions = useMemo(() => {
+    if (!searchTerm || searchTerm.length < 1) return [];
+    
+    const searchLow = searchTerm.toLowerCase();
+    const matches = new Set<string>();
+    
+    items.forEach(item => {
+      if (item.name.toLowerCase().includes(searchLow)) matches.add(item.name);
+      if (item.brand && item.brand.toLowerCase().includes(searchLow)) matches.add(item.brand);
+      if (item.modelNumber && item.modelNumber.toLowerCase().includes(searchLow)) matches.add(item.modelNumber);
+    });
+    
+    return Array.from(matches).slice(0, 8); // Limit to 8 suggestions
+  }, [searchTerm, items]);
+
+  const clientSuggestions = useMemo(() => {
+    if (!clientFilter || clientFilter.length < 1) return [];
+    const searchLow = clientFilter.toLowerCase();
+    const matches = new Set<string>();
+    items.forEach(item => {
+      if (item.client && item.client.toLowerCase().includes(searchLow)) matches.add(item.client);
+    });
+    return Array.from(matches).slice(0, 8);
+  }, [clientFilter, items]);
+
+  const jobSuggestions = useMemo(() => {
+    if (!jobFilter || jobFilter.length < 1) return [];
+    const searchLow = jobFilter.toLowerCase();
+    const matches = new Set<string>();
+    items.forEach(item => {
+      if (item.jobNumber && item.jobNumber.toLowerCase().includes(searchLow)) matches.add(item.jobNumber);
+    });
+    return Array.from(matches).slice(0, 8);
+  }, [jobFilter, items]);
+
+  const locationSuggestions = useMemo(() => {
+    if (!locationFilter || locationFilter.length < 1) return [];
+    const searchLow = locationFilter.toLowerCase();
+    const matches = new Set<string>();
+    items.forEach(item => {
+      if (item.location && item.location.toLowerCase().includes(searchLow)) matches.add(item.location);
+      if (item.outlet && item.outlet.toLowerCase().includes(searchLow)) matches.add(item.outlet);
+      if (item.warehouseLocation && item.warehouseLocation.toLowerCase().includes(searchLow)) matches.add(item.warehouseLocation);
+    });
+    return Array.from(matches).slice(0, 8);
+  }, [locationFilter, items]);
 
   const handleAiSearch = useCallback(async () => {
     if (!searchTerm.trim()) return;
@@ -394,11 +521,13 @@ export default function InventoryList({ items, clients, user, projects }: Invent
 
   const clearSearch = useCallback(() => {
     setSearchTerm('');
+    if (onSearchClear) onSearchClear();
     setAiFilteredIds(null);
     setSelectedBrands([]);
     setSelectedModels([]);
     setSelectedSuppliers([]);
     setSelectedOutlets([]);
+    setSelectedWarehouseLocations([]);
     setClientFilter('');
     setJobFilter('');
     setLocationFilter('');
@@ -415,6 +544,7 @@ export default function InventoryList({ items, clients, user, projects }: Invent
       models: Array.from(new Set(items.map(i => i.modelNumber).filter(Boolean))) as string[],
       suppliers: Array.from(new Set(items.map(i => i.supplier).filter(Boolean))) as string[],
       projects: Array.from(new Set(items.map(i => i.outlet).filter(Boolean))) as string[],
+      warehouseLocations: Array.from(new Set(['Dip Room 35', 'AL Quoz', 'Home Box', 'Head Office', ...items.map(i => i.warehouseLocation).filter(Boolean)])) as string[],
     };
   }, [items]);
 
@@ -441,6 +571,7 @@ export default function InventoryList({ items, clients, user, projects }: Invent
       if (selectedModels.length > 0 && (!item.modelNumber || !selectedModels.includes(item.modelNumber))) return false;
       if (selectedSuppliers.length > 0 && (!item.supplier || !selectedSuppliers.includes(item.supplier))) return false;
       if (selectedOutlets.length > 0 && (!item.outlet || !selectedOutlets.includes(item.outlet))) return false;
+      if (selectedWarehouseLocations.length > 0 && (!item.warehouseLocation || !selectedWarehouseLocations.includes(item.warehouseLocation))) return false;
 
       // Legacy/Remaining Advanced Filters
       const clientLow = clientFilter.toLowerCase();
@@ -737,10 +868,58 @@ export default function InventoryList({ items, clients, user, projects }: Invent
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
+                setShowSearchSuggestions(true);
                 if (aiFilteredIds && !e.target.value) setAiFilteredIds(null);
               }}
+              onFocus={() => setShowSearchSuggestions(true)}
               onKeyDown={(e) => e.key === 'Enter' && handleAiSearch()}
             />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center space-x-1">
+              <VoiceLanguageSelector 
+                currentLang={currentLang} 
+                onLangChange={setCurrentLang} 
+                className="mr-1"
+              />
+              <button
+                type="button"
+                onClick={startListening}
+                className={cn(
+                  "p-1.5 rounded-lg transition-all",
+                  isListening ? "bg-red-500/20 text-red-500 animate-pulse" : "hover:bg-white/10 text-slate-500"
+                )}
+              >
+                {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </button>
+            </div>
+            <AnimatePresence>
+              {showSearchSuggestions && searchSuggestions.length > 0 && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowSearchSuggestions(false)} />
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                  >
+                    <div className="p-2 space-y-1">
+                      {searchSuggestions.map((suggestion, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            setSearchTerm(suggestion);
+                            setShowSearchSuggestions(false);
+                          }}
+                          className="w-full px-4 py-2.5 flex items-center space-x-3 hover:bg-white/5 transition-colors text-left rounded-xl group"
+                        >
+                          <Search className="w-4 h-4 text-slate-500 group-hover:text-primary transition-colors" />
+                          <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">{suggestion}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center space-x-1">
               {searchTerm && (
                 <button 
@@ -776,9 +955,9 @@ export default function InventoryList({ items, clients, user, projects }: Invent
                 : "bg-slate-800/50 border-white/10 text-slate-400 hover:text-white hover:bg-white/10"
             )}
           >
-            <Filter className={cn("w-4 h-4", (selectedBrands.length > 0 || selectedModels.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || clientFilter || jobFilter || locationFilter || stockInStart || stockInEnd || updatedStart || updatedEnd) && "animate-bounce")} />
+            <Filter className={cn("w-4 h-4", (selectedBrands.length > 0 || selectedModels.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || selectedWarehouseLocations.length > 0 || clientFilter || jobFilter || locationFilter || stockInStart || stockInEnd || updatedStart || updatedEnd) && "animate-bounce")} />
             <span className="text-sm font-black uppercase tracking-widest">Filters</span>
-            {(selectedBrands.length > 0 || selectedModels.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || clientFilter || jobFilter || locationFilter || stockInStart || stockInEnd || updatedStart || updatedEnd) && (
+            {(selectedBrands.length > 0 || selectedModels.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || selectedWarehouseLocations.length > 0 || clientFilter || jobFilter || locationFilter || stockInStart || stockInEnd || updatedStart || updatedEnd) && (
               <div className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-pulse" />
             )}
           </motion.button>
@@ -820,27 +999,104 @@ export default function InventoryList({ items, clients, user, projects }: Invent
                   selected={selectedOutlets} 
                   onChange={setSelectedOutlets} 
                 />
+                
+                <FilterDropdown 
+                  label="WH Location" 
+                  options={uniqueValues.warehouseLocations} 
+                  selected={selectedWarehouseLocations} 
+                  onChange={setSelectedWarehouseLocations} 
+                />
 
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 relative">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Client Search</label>
-                  <input 
-                    type="text"
-                    value={clientFilter}
-                    onChange={(e) => setClientFilter(e.target.value)}
-                    placeholder="Search clients..."
-                    className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
-                  />
+                  <div className="relative">
+                    <input 
+                      type="text"
+                      value={clientFilter}
+                      onChange={(e) => {
+                        setClientFilter(e.target.value);
+                        setShowClientSuggestions(true);
+                      }}
+                      onFocus={() => setShowClientSuggestions(true)}
+                      placeholder="Search clients..."
+                      className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
+                    />
+                    <AnimatePresence>
+                      {showClientSuggestions && clientSuggestions.length > 0 && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setShowClientSuggestions(false)} />
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 10 }}
+                            className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                          >
+                            <div className="p-2 space-y-1">
+                              {clientSuggestions.map((suggestion, index) => (
+                                <button
+                                  key={index}
+                                  onClick={() => {
+                                    setClientFilter(suggestion);
+                                    setShowClientSuggestions(false);
+                                  }}
+                                  className="w-full px-4 py-2.5 flex items-center space-x-3 hover:bg-white/5 transition-colors text-left rounded-xl group"
+                                >
+                                  <Search className="w-3.5 h-3.5 text-slate-600 group-hover:text-primary transition-colors" />
+                                  <span className="text-[11px] font-medium text-slate-400 group-hover:text-white transition-colors">{suggestion}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </motion.div>
+                        </>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 relative">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Job Number</label>
-                  <input 
-                    type="text"
-                    value={jobFilter}
-                    onChange={(e) => setJobFilter(e.target.value)}
-                    placeholder="Filter by Job#..."
-                    className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
-                  />
+                  <div className="relative">
+                    <input 
+                      type="text"
+                      value={jobFilter}
+                      onChange={(e) => {
+                        setJobFilter(e.target.value);
+                        setShowJobSuggestions(true);
+                      }}
+                      onFocus={() => setShowJobSuggestions(true)}
+                      placeholder="Filter by Job#..."
+                      className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
+                    />
+                    <AnimatePresence>
+                      {showJobSuggestions && jobSuggestions.length > 0 && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setShowJobSuggestions(false)} />
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 10 }}
+                            className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                          >
+                            <div className="p-2 space-y-1">
+                              {jobSuggestions.map((suggestion, index) => (
+                                <button
+                                  key={index}
+                                  onClick={() => {
+                                    setJobFilter(suggestion);
+                                    setShowJobSuggestions(false);
+                                  }}
+                                  className="w-full px-4 py-2.5 flex items-center space-x-3 hover:bg-white/5 transition-colors text-left rounded-xl group"
+                                >
+                                  <Search className="w-3.5 h-3.5 text-slate-600 group-hover:text-primary transition-colors" />
+                                  <span className="text-[11px] font-medium text-slate-400 group-hover:text-white transition-colors">{suggestion}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </motion.div>
+                        </>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
@@ -856,15 +1112,50 @@ export default function InventoryList({ items, clients, user, projects }: Invent
                   </select>
                 </div>
 
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 relative">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Project Outlet</label>
-                  <input 
-                    type="text"
-                    value={locationFilter}
-                    onChange={(e) => setLocationFilter(e.target.value)}
-                    placeholder="Search outlets..."
-                    className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
-                  />
+                  <div className="relative">
+                    <input 
+                      type="text"
+                      value={locationFilter}
+                      onChange={(e) => {
+                        setLocationFilter(e.target.value);
+                        setShowLocationSuggestions(true);
+                      }}
+                      onFocus={() => setShowLocationSuggestions(true)}
+                      placeholder="Search outlets..."
+                      className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
+                    />
+                    <AnimatePresence>
+                      {showLocationSuggestions && locationSuggestions.length > 0 && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setShowLocationSuggestions(false)} />
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 10 }}
+                            className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                          >
+                            <div className="p-2 space-y-1">
+                              {locationSuggestions.map((suggestion, index) => (
+                                <button
+                                  key={index}
+                                  onClick={() => {
+                                    setLocationFilter(suggestion);
+                                    setShowLocationSuggestions(false);
+                                  }}
+                                  className="w-full px-4 py-2.5 flex items-center space-x-3 hover:bg-white/5 transition-colors text-left rounded-xl group"
+                                >
+                                  <Search className="w-3.5 h-3.5 text-slate-600 group-hover:text-primary transition-colors" />
+                                  <span className="text-[11px] font-medium text-slate-400 group-hover:text-white transition-colors">{suggestion}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </motion.div>
+                        </>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
 
                 {/* Date Filters Row */}
@@ -1111,6 +1402,14 @@ export default function InventoryList({ items, clients, user, projects }: Invent
             projects={projects}
             onClose={() => { setShowAddModal(false); setEditingItem(null); }} 
             user={user}
+          />
+        )}
+        {importPreview && (
+          <ImportPreviewModal 
+            data={importPreview} 
+            onConfirm={handleConfirmImport} 
+            onCancel={() => setImportPreview(null)} 
+            isImporting={isImporting} 
           />
         )}
       </AnimatePresence>
@@ -2195,12 +2494,124 @@ function ItemDetailModal({ item, clients, onClose, onDelete, user, initialAction
   );
 }
 
+function ImportPreviewModal({ data, onConfirm, onCancel, isImporting }: { data: any[], onConfirm: () => void, onCancel: () => void, isImporting: boolean }) {
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[100]" onClick={onCancel} />
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9, y: 40 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: 40 }}
+        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-5xl h-[85vh] glass-morphism rounded-[40px] shadow-2xl z-[101] overflow-hidden border border-white/10 flex flex-col"
+      >
+        <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/[0.03]">
+          <div className="flex items-center space-x-4">
+            <div className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center border border-primary/30">
+              <Zap className="w-6 h-6 text-primary animate-pulse" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-black text-white tracking-tighter uppercase italic">AI Semantic Mapping Deep Dive</h2>
+              <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.3em]">Reviewing {data.length} processed entities</p>
+            </div>
+          </div>
+          <button 
+            onClick={onCancel} 
+            className="p-3 hover:bg-white/10 rounded-2xl transition-all text-slate-400 hover:text-white"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-black/20">
+          <table className="w-full text-left border-separate border-spacing-y-2">
+            <thead>
+              <tr className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                <th className="px-6 py-4 bg-white/5 first:rounded-l-2xl">Item Name</th>
+                <th className="px-6 py-4 bg-white/5">Brand / Model</th>
+                <th className="px-6 py-4 bg-white/5">Qty</th>
+                <th className="px-6 py-4 bg-white/5">Category</th>
+                <th className="px-6 py-4 bg-white/5">Location</th>
+                <th className="px-6 py-4 bg-white/5 last:rounded-r-2xl">Ref</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((item, idx) => (
+                <motion.tr 
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.01 }}
+                  key={idx} 
+                  className="group"
+                >
+                  <td className="px-6 py-4 bg-white/[0.02] border-y border-l border-white/5 rounded-l-2xl group-hover:bg-white/[0.05] transition-colors">
+                    <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{item.name}</p>
+                    <p className="text-[10px] text-slate-500 font-mono mt-0.5">{item.supplier || 'No Supplier'}</p>
+                  </td>
+                  <td className="px-6 py-4 bg-white/[0.02] border-y border-white/5 group-hover:bg-white/[0.05] transition-colors">
+                    <p className="text-xs font-bold text-slate-300">{item.brand || '---'}</p>
+                    <p className="text-[10px] text-slate-500 font-mono">{item.modelNumber || '---'}</p>
+                  </td>
+                  <td className="px-6 py-4 bg-white/[0.02] border-y border-white/5 group-hover:bg-white/[0.05] transition-colors">
+                    <span className="px-3 py-1 rounded-lg bg-primary/10 text-primary text-xs font-black">{item.currentQuantity}</span>
+                  </td>
+                  <td className="px-6 py-4 bg-white/[0.02] border-y border-white/5 group-hover:bg-white/[0.05] transition-colors">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{item.category || 'Uncategorized'}</span>
+                  </td>
+                  <td className="px-6 py-4 bg-white/[0.02] border-y border-white/5 group-hover:bg-white/[0.05] transition-colors">
+                    <div className="flex items-center space-x-1.5 text-[10px] font-bold text-slate-300">
+                      <MapPin className="w-3 h-3 text-primary" />
+                      <span>{item.warehouseLocation || item.location}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 bg-white/[0.02] border-y border-r border-white/5 rounded-r-2xl group-hover:bg-white/[0.05] transition-colors">
+                    <p className="text-[10px] text-slate-600 font-mono">{item.jobNumber || 'N/A'}</p>
+                  </td>
+                </motion.tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="p-8 border-t border-white/5 flex items-center justify-between bg-black/40">
+          <div className="flex items-center space-x-4">
+            <div className="flex -space-x-2">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="w-8 h-8 rounded-full border-2 border-slate-900 bg-slate-800 flex items-center justify-center">
+                  <Package className="w-4 h-4 text-slate-600" />
+                </div>
+              ))}
+            </div>
+            <p className="text-xs font-bold text-slate-400 italic">Total of {data.length} items mapped and ready for injection.</p>
+          </div>
+          <div className="flex items-center space-x-4">
+            <button 
+              onClick={onCancel}
+              className="px-8 py-4 text-slate-400 font-black uppercase tracking-widest text-xs hover:text-white transition-colors"
+            >
+              Abort Mission
+            </button>
+            <button 
+              onClick={onConfirm}
+              disabled={isImporting}
+              className="px-10 py-5 bg-primary text-slate-950 font-black uppercase tracking-[0.3em] text-sm rounded-[24px] shadow-[0_0_30px_rgba(var(--primary-rgb),0.3)] hover:shadow-[0_0_50px_rgba(var(--primary-rgb),0.5)] transition-all active:scale-95 disabled:opacity-50 flex items-center space-x-3"
+            >
+              {isImporting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Zap className="w-5 h-5" />}
+              <span>Commit AI Injection</span>
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </>
+  );
+}
+
 function ItemFormModal({ item, items, clients, projects, onClose, user }: any) {
   const [loading, setLoading] = useState(false);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const [showClientSuggestions, setShowClientSuggestions] = useState(false);
   const [showProjectSuggestions, setShowProjectSuggestions] = useState(false);
+  const [showWHLocationSuggestions, setShowWHLocationSuggestions] = useState(false);
   const [selectionStep, setSelectionStep] = useState(!item); // Only show selection for NEW items
   const isApproved = user.role === 'admin' || user.isApproved;
 
@@ -2718,7 +3129,7 @@ function ItemFormModal({ item, items, clients, projects, onClose, user }: any) {
                   <span>AI Suggest</span>
                 </button>
               </div>
-              <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
+              <input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
             </div>
           </div>
           
@@ -2739,12 +3150,61 @@ function ItemFormModal({ item, items, clients, projects, onClose, user }: any) {
           </div>
 
           <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Warehouse Location</label>
+            <div className="space-y-2 relative">
+              <label htmlFor="warehouseLocation" className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1 cursor-pointer">Warehouse Location</label>
               <div className="relative">
                 <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/40" />
-                <input value={formData.warehouseLocation} onChange={e => setFormData({...formData, warehouseLocation: e.target.value})} placeholder="e.g., Aisle 4, Shelf B" className="w-full pl-12 pr-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
+                <input 
+                  id="warehouseLocation"
+                  value={formData.warehouseLocation} 
+                  onChange={e => setFormData({...formData, warehouseLocation: e.target.value})} 
+                  onFocus={() => setShowWHLocationSuggestions(true)}
+                  placeholder="Select or type location..." 
+                  className="w-full pl-12 pr-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" 
+                />
               </div>
+              <AnimatePresence>
+                {showWHLocationSuggestions && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowWHLocationSuggestions(false)} />
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                    >
+                      <div className="p-2 space-y-1">
+                        {['Dip Room 35', 'AL Quoz', 'Home Box', 'Head Office'].map((loc) => (
+                          <button
+                            key={loc}
+                            type="button"
+                            onClick={() => {
+                              setFormData({ ...formData, warehouseLocation: loc });
+                              setShowWHLocationSuggestions(false);
+                            }}
+                            className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/5 transition-colors text-left rounded-xl"
+                          >
+                            <span className="text-sm font-bold text-slate-300">{loc}</span>
+                            <ChevronDown className="w-4 h-4 text-slate-600 -rotate-90" />
+                          </button>
+                        ))}
+                        <div className="h-px bg-white/5 mx-2 my-1" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData({ ...formData, warehouseLocation: '' });
+                            setShowWHLocationSuggestions(false);
+                          }}
+                          className="w-full px-4 py-3 flex items-center space-x-3 hover:bg-primary/10 transition-colors text-left rounded-xl group"
+                        >
+                          <Plus className="w-4 h-4 text-primary group-hover:rotate-90 transition-transform" />
+                          <span className="text-xs font-black text-primary uppercase tracking-widest">Add new Location</span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
             </div>
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Client Assignment</label>
@@ -2934,7 +3394,7 @@ function ItemFormModal({ item, items, clients, projects, onClose, user }: any) {
               </label>
               <div className="relative">
                 <Package className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                <input type="number" required value={formData.currentQuantity} onChange={e => setFormData({...formData, currentQuantity: parseInt(e.target.value) || 0})} className="w-full pl-12 pr-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-bold focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
+                <input type="number" value={formData.currentQuantity} onChange={e => setFormData({...formData, currentQuantity: parseInt(e.target.value) || 0})} className="w-full pl-12 pr-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-bold focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
               </div>
             </div>
 

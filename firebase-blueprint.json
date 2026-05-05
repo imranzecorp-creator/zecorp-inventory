@@ -105,6 +105,7 @@
         "senderId": { "type": "string" },
         "receiverId": { "type": "string" },
         "content": { "type": "string" },
+        "audioUrl": { "type": "string" },
         "isAi": { "type": "boolean" },
         "createdAt": { "type": "string", "format": "date-time" }
       },

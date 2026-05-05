@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Send, 
   Bot, 
@@ -8,7 +8,13 @@ import {
   ChevronRight,
   MoreVertical,
   Minus,
-  MessageSquare
+  MessageSquare,
+  Mic,
+  MicOff,
+  Square,
+  Trash2,
+  Volume2,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -25,6 +31,9 @@ import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { UserProfile, ChatMessage } from '../types';
 import { cn, formatDate } from '../lib/utils';
 import { getAiResponse } from '../services/geminiService';
+import { useVoiceSearch } from '../hooks/useVoiceSearch';
+import { VoiceLanguageSelector } from './VoiceLanguageSelector';
+import { useVoiceRecorder } from '../hooks/useVoiceRecorder';
 
 interface ChatViewProps {
   user: UserProfile;
@@ -39,8 +48,67 @@ export default function ChatView({ user }: ChatViewProps) {
   const [selectedRecipient, setSelectedRecipient] = useState<UserProfile | null>(null);
   const [showMobileList, setShowMobileList] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'all' | 'team' | 'ai'>('all');
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const { isListening, startListening, currentLang, setCurrentLang } = useVoiceSearch((transcript) => {
+    setNewMessage(prev => prev + (prev ? ' ' : '') + transcript);
+  });
+
+  const { isRecording, recordingDuration, startRecording, stopRecording, uploadAudio } = useVoiceRecorder();
+
+  const handleSendVoice = async () => {
+    const blob = await stopRecording();
+    if (!blob || loading) return;
+
+    setLoading(true);
+    try {
+      const chatId = isAiMode 
+        ? `${user.uid}_ai` 
+        : [user.uid, selectedRecipient!.uid].sort().join('_');
+      
+      const fileName = `voice/${chatId}/${Date.now()}.webm`;
+      const audioUrl = await uploadAudio(blob, fileName);
+
+      const userMsg = {
+        senderId: user.uid,
+        senderName: user.displayName,
+        content: '[Voice Message]',
+        audioUrl: audioUrl,
+        isAi: false,
+        createdAt: Date.now()
+      };
+
+      await addDoc(collection(db, `chats/${chatId}/messages`), userMsg);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cancelRecording = () => {
+    stopRecording(); // Just to clear state
+  };
+
+  const userSuggestions = useMemo(() => {
+    if (!searchTerm || searchTerm.length < 1) return [];
+    
+    const searchLow = searchTerm.toLowerCase();
+    const matches = new Set<string>();
+    
+    users.forEach(u => {
+      if (u.displayName.toLowerCase().includes(searchLow)) matches.add(u.displayName);
+      if (u.role && u.role.toLowerCase().includes(searchLow)) matches.add(u.role);
+    });
+    
+    if (activeFilter === 'all' || activeFilter === 'ai') {
+      if ('ai assistant'.includes(searchLow)) matches.add('AI Assistant');
+    }
+    
+    return Array.from(matches).slice(0, 8);
+  }, [searchTerm, users, activeFilter]);
 
   // Filter users based on search term and active filter
   const filteredUsers = users.filter(u => {
@@ -157,9 +225,42 @@ export default function ChatView({ user }: ChatViewProps) {
               type="text" 
               placeholder="Search team or AI..." 
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setShowSearchSuggestions(true);
+              }}
+              onFocus={() => setShowSearchSuggestions(true)}
               className="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/5 rounded-xl text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
             />
+            <AnimatePresence>
+              {showSearchSuggestions && userSuggestions.length > 0 && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowSearchSuggestions(false)} />
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                  >
+                    <div className="p-2 space-y-1">
+                      {userSuggestions.map((suggestion, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            setSearchTerm(suggestion);
+                            setShowSearchSuggestions(false);
+                          }}
+                          className="w-full px-4 py-2.5 flex items-center space-x-3 hover:bg-white/5 transition-colors text-left rounded-xl group"
+                        >
+                          <Search className="w-4 h-4 text-slate-500 group-hover:text-primary transition-colors" />
+                          <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">{suggestion}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
             {searchTerm && (
               <button 
                 onClick={() => setSearchTerm('')}
@@ -349,7 +450,19 @@ export default function ChatView({ user }: ChatViewProps) {
                     ? "bg-slate-800 text-slate-100 border border-slate-700 rounded-tl-none"
                     : "bg-white/5 text-slate-200 rounded-tl-none border border-white/5"
               )}>
-                {msg.content}
+                {msg.audioUrl ? (
+                  <div className="flex flex-col space-y-2 py-1 min-w-[200px]">
+                    <div className="flex items-center space-x-2">
+                      <Volume2 className="w-3 h-3 text-white/60" />
+                      <span className="text-[9px] font-black uppercase tracking-widest text-white/50">Voice Message</span>
+                    </div>
+                    <audio 
+                      src={msg.audioUrl} 
+                      controls 
+                      className="h-8 w-full max-w-[240px] [&::-webkit-media-controls-enclosure]:bg-white/10 [&::-webkit-media-controls-panel]:bg-transparent" 
+                    />
+                  </div>
+                ) : msg.content}
               </div>
               <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter px-2">{formatDate(msg.createdAt)}</span>
             </div>
@@ -372,23 +485,84 @@ export default function ChatView({ user }: ChatViewProps) {
         </div>
 
         <div className="p-6 border-t border-white/5 bg-white/[0.01]">
-          <form onSubmit={handleSendMessage} className="flex items-center space-x-3 bg-white/5 p-2 rounded-3xl border border-white/10 shadow-xl focus-within:ring-2 focus-within:ring-primary/30 transition-all">
-            <input 
-              type="text" 
-              placeholder={isAiMode ? "Ask Assistant anything... (e.g., Show me low stock items)" : `Type a message to ${selectedRecipient?.displayName?.split(' ')[0]}...`}
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              disabled={!isAiMode && !selectedRecipient}
-              className="flex-1 px-4 py-2 border-none bg-transparent text-sm text-white placeholder:text-slate-600 focus:outline-none disabled:opacity-50"
-            />
-            <button 
-              type="submit"
-              disabled={!newMessage.trim() || loading || (!isAiMode && !selectedRecipient)}
-              className="p-3 bg-primary text-white rounded-2xl shadow-xl shadow-primary/30 hover:bg-primary-hover hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
-            >
-              <Send className="w-5 h-5" />
-            </button>
-          </form>
+          <AnimatePresence mode="wait">
+            {isRecording ? (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                className="flex items-center space-x-4 bg-red-500/10 p-3 rounded-3xl border border-red-500/20 shadow-xl"
+              >
+                <div className="flex items-center space-x-3 flex-1 px-4">
+                  <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                  <span className="text-sm font-bold text-red-500 font-mono">
+                    {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')}
+                  </span>
+                  <span className="text-[10px] text-red-500/60 uppercase font-black tracking-widest">Recording Voice Message...</span>
+                </div>
+                <button 
+                  onClick={cancelRecording}
+                  className="p-3 hover:bg-red-500/20 text-red-500 rounded-2xl transition-all"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+                <button 
+                  onClick={handleSendVoice}
+                  className="p-3 bg-red-500 text-white rounded-2xl shadow-xl shadow-red-500/30 hover:bg-red-600 hover:scale-105 active:scale-95 transition-all"
+                >
+                  <Square className="w-5 h-5 fill-current" />
+                </button>
+              </motion.div>
+            ) : (
+              <motion.form 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                onSubmit={handleSendMessage} 
+                className="flex items-center space-x-3 bg-white/5 p-2 rounded-3xl border border-white/10 shadow-xl focus-within:ring-2 focus-within:ring-primary/30 transition-all"
+              >
+                <input 
+                  type="text" 
+                  placeholder={isAiMode ? "Ask Assistant anything... (e.g., Show me low stock items)" : `Type a message to ${selectedRecipient?.displayName?.split(' ')[0]}...`}
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  disabled={!isAiMode && !selectedRecipient}
+            className="flex-1 px-4 py-2 border-none bg-transparent text-sm text-white placeholder:text-slate-600 focus:outline-none disabled:opacity-50"
+                />
+                <VoiceLanguageSelector 
+                  currentLang={currentLang} 
+                  onLangChange={setCurrentLang} 
+                />
+                <button
+                  type="button"
+                  onClick={startListening}
+                  disabled={!isAiMode && !selectedRecipient}
+                  title="Speech to Text"
+                  className={cn(
+                    "p-2 rounded-xl transition-all",
+                    isListening ? "bg-red-500/20 text-red-500 animate-pulse" : "text-slate-500 hover:bg-white/10"
+                  )}
+                >
+                  {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={startRecording}
+                  disabled={loading || (!isAiMode && !selectedRecipient)}
+                  title="Voice Message"
+                  className="p-2 text-slate-500 hover:bg-white/10 rounded-xl transition-all"
+                >
+                  <Volume2 className="w-5 h-5" />
+                </button>
+                <button 
+                  type="submit"
+                  disabled={!newMessage.trim() || loading || (!isAiMode && !selectedRecipient)}
+                  className="p-3 bg-primary text-white rounded-2xl shadow-xl shadow-primary/30 hover:bg-primary-hover hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </motion.form>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </div>

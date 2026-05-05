@@ -31,12 +31,12 @@ export default memo(function Sidebar({ activeTab, setActiveTab, role }: SidebarP
   const menuItems = useMemo(() => {
     const items = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { id: 'projects', label: 'Projects', icon: Briefcase },
       { id: 'inventory', label: 'Inventory', icon: Package },
+      { id: 'projects', label: 'Projects', icon: Briefcase },
       { id: 'transactions', label: 'Transactions', icon: History },
+      { id: 'chat', label: 'Messages', icon: MessageSquare },
       { id: 'social', label: 'Social Feed', icon: ImageIcon },
       { id: 'intelligence', label: 'AI Intelligence', icon: Sparkles },
-      { id: 'chat', label: 'Messages', icon: MessageSquare },
     ];
     if (role === 'admin') {
       items.push({ id: 'admin', label: 'Admin Panel', icon: ShieldCheck });

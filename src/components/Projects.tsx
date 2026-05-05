@@ -26,7 +26,8 @@ import {
   ChevronDown,
   Building,
   FileUp,
-  Zap
+  Zap,
+  CheckSquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -35,14 +36,15 @@ import {
   updateDoc, 
   deleteDoc, 
   doc, 
-  serverTimestamp 
+  serverTimestamp,
+  writeBatch 
 } from 'firebase/firestore';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { Project, InventoryItem, UserProfile, ProjectItem, StockTransaction } from '../types';
 import { cn, formatDate, formatDateTime } from '../lib/utils';
 import { FilterDropdown } from './ui/FilterDropdown';
 import { Clock, History } from 'lucide-react';
-import { analyzeInventory, processAiSearch, mapExcelItems, mapExcelProjects } from '../services/geminiService';
+import { analyzeInventory, processAiSearch, mapExcelItems, mapExcelProjects, getExcelMapping, getProjectExcelMapping, findInventoryMatches } from '../services/geminiService';
 
 const ManifestRow = memo(({ index, style, data }: { index: number, style: React.CSSProperties, data: { items: ProjectItem[] } }) => {
   const item = data.items[index];
@@ -74,6 +76,24 @@ const ManifestRow = memo(({ index, style, data }: { index: number, style: React.
                   <span className="flex items-center space-x-1">
                      <span className="text-slate-600 font-black">POS:</span>
                      <span className="text-slate-300">{item.posNo}</span>
+                  </span>
+                </>
+              )}
+              {item.dimensions && (
+                <>
+                  <span className="w-1 h-1 rounded-full bg-slate-700" />
+                  <span className="flex items-center space-x-1">
+                     <span className="text-slate-600 font-black">DIM:</span>
+                     <span className="text-slate-300">{item.dimensions}</span>
+                  </span>
+                </>
+              )}
+              {item.unitLocation && (
+                <>
+                  <span className="w-1 h-1 rounded-full bg-slate-700" />
+                  <span className="flex items-center space-x-1">
+                     <span className="text-slate-600 font-black">LOCATION:</span>
+                     <span className="text-slate-300">{item.unitLocation}</span>
                   </span>
                 </>
               )}
@@ -112,6 +132,8 @@ interface ProjectsProps {
 
 export default function Projects({ projects, inventory, clients, user, transactions }: ProjectsProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
+  const [showJobSuggestions, setShowJobSuggestions] = useState(false);
   const isAdmin = user.role === 'admin' || user.email.toLowerCase() === 'imranzecorp@gmail.com';
   const isApproved = user.isApproved || isAdmin;
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
@@ -122,8 +144,12 @@ export default function Projects({ projects, inventory, clients, user, transacti
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [selectedForDeletion, setSelectedForDeletion] = useState<string[]>([]);
+  const [isDeleteMode, setIsDeleteMode] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [projectImportPreview, setProjectImportPreview] = useState<any[] | null>(null);
 
   const handleExcelUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -133,54 +159,75 @@ export default function Projects({ projects, inventory, clients, user, transacti
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
-        const bstr = evt.target?.result;
+        const bstr = evt.target?.result as string;
         const wb = XLSX.read(bstr, { type: 'binary' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
+        const headers = XLSX.utils.sheet_to_json(ws, { header: 1 })[0] as string[];
 
         if (data.length === 0) {
           alert('Excel file is empty');
           return;
         }
 
-        // Use AI to map projects and items
-        const aiMappedProjects = await mapExcelProjects(data);
+        // Identify Mapping
+        const mapping = await getProjectExcelMapping(headers, data.slice(0, 5));
+        
+        let processedProjects: any[] = [];
 
-        if (aiMappedProjects.length === 0) {
+        if (Object.values(mapping).some(v => !!v)) {
+          // Group rows by Job Number or Client
+          const groupedByJob = data.reduce((acc: any, row: any) => {
+            const jobNum = row[mapping.jobNumber || ''] || 'DEFAULT';
+            if (!acc[jobNum]) acc[jobNum] = [];
+            acc[jobNum].push(row);
+            return acc;
+          }, {});
+
+          processedProjects = Object.keys(groupedByJob).map(jobNum => {
+            const rows = groupedByJob[jobNum];
+            const firstRow = rows[0];
+            
+            return {
+              client: firstRow[mapping.client || ''] || 'Unnamed Client',
+              jobNumber: jobNum === 'DEFAULT' ? `JN-${Math.floor(Math.random() * 10000)}` : jobNum,
+              outlet: firstRow[mapping.outlet || ''] || 'Project Outlet',
+              location: firstRow[mapping.location || ''] || 'Site Location',
+              items: rows.map((r: any) => ({
+                name: r[mapping.name || ''] || 'Unnamed Item',
+                brand: r[mapping.brand || ''] || '',
+                model: r[mapping.model || ''] || '',
+                quantity: Number(r[mapping.quantity || '']) || 0,
+                category: r[mapping.category || ''] || '',
+                posNo: r[mapping.posNo || ''] || ''
+              }))
+            };
+          });
+        } else {
+          // Fallback to direct mapping
+          processedProjects = await mapExcelProjects(data.slice(0, 50));
+        }
+
+        if (processedProjects.length === 0) {
           alert('AI could not map any projects. Please check your Excel headers.');
           return;
         }
 
-        for (const projectPayload of aiMappedProjects) {
-          try {
-            const finalPayload = {
-              ...projectPayload,
-              items: projectPayload.items.map((item: any) => ({
-                ...item,
-                inventoryItemId: `EXT-${Math.random().toString(36).substr(2, 9)}`,
-                quantityIn: 0,
-                quantityOut: 0,
-                approvedQuote: item.approvedQuote || '',
-                category: item.category || '',
-                posNo: item.posNo || '',
-                eta: item.eta || '',
-                delivery: item.delivery || ''
-              })),
-              status: projectPayload.status || 'Active',
-              createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-              userId: user.uid,
-              totalQuantityIn: 0,
-              totalQuantityOut: 0
-            };
-            await addDoc(collection(db, 'projects'), finalPayload);
-          } catch (error) {
-            handleFirestoreError(error, OperationType.CREATE, 'projects');
-          }
-        }
+        // AI Matching across all items for all projects
+        const allItems = processedProjects.flatMap(p => p.items);
+        const matchedItems = await findInventoryMatches(allItems, inventory);
+        
+        // Re-assign matched items to projects
+        let itemIdx = 0;
+        const projectsWithMatches = processedProjects.map(p => {
+          const projectItemsCount = p.items.length;
+          const projectMatchedItems = matchedItems.slice(itemIdx, itemIdx + projectItemsCount);
+          itemIdx += projectItemsCount;
+          return { ...p, items: projectMatchedItems };
+        });
 
-        alert(`Successfully AI-imported ${aiMappedProjects.length} projects!`);
+        setProjectImportPreview(projectsWithMatches);
       } catch (err: any) {
         console.error('Error parsing Excel:', err);
         alert(err.message || 'Failed to parse Excel file. AI mapping failed or file is corrupt.');
@@ -191,6 +238,56 @@ export default function Projects({ projects, inventory, clients, user, transacti
     };
     reader.readAsBinaryString(file);
   }, [user.uid]);
+
+  const handleConfirmProjectImport = async () => {
+    if (!projectImportPreview) return;
+    setIsImporting(true);
+    try {
+      for (const projectPayload of projectImportPreview) {
+        const finalPayload = {
+          ...projectPayload,
+          items: projectPayload.items.map((item: any) => ({
+            ...item,
+            inventoryItemId: item.inventoryItemId || `EXT-${Math.random().toString(36).substr(2, 9)}`,
+            quantityIn: 0,
+            quantityOut: 0,
+            approvedQuote: item.approvedQuote || '',
+            category: item.category || '',
+            posNo: item.posNo || '',
+            eta: item.eta || '',
+            delivery: item.delivery || '',
+            dimensions: item.dimensions || '',
+            logistics: item.logistics || '',
+            origin: item.origin || '',
+            unitLocation: item.unitLocation || '',
+            alternateBrand: item.alternateBrand || ''
+          })),
+          status: 'Active',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          userId: user.uid,
+          totalQuantityIn: 0,
+          totalQuantityOut: 0
+        };
+        await addDoc(collection(db, 'projects'), finalPayload);
+      }
+      
+      // Activity Log
+      addDoc(collection(db, 'activity_logs'), {
+        userId: user.uid,
+        action: 'AI_IMPORT_PROJECTS',
+        details: `Bulk imported ${projectImportPreview.length} projects via AI Mapping`,
+        createdAt: serverTimestamp()
+      }).catch(e => console.warn('Logging failed:', e));
+
+      alert(`Successfully AI-imported ${projectImportPreview.length} projects!`);
+      setProjectImportPreview(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'projects');
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   const stats = useMemo(() => {
     return {
@@ -236,6 +333,35 @@ export default function Projects({ projects, inventory, clients, user, transacti
     });
   }, [projects, searchTerm, selectedStatuses, selectedClients, selectedProjects, selectedOutlets, jobSearch]);
 
+  const searchSuggestions = useMemo(() => {
+    if (!searchTerm || searchTerm.length < 1) return [];
+    
+    const searchLow = searchTerm.toLowerCase();
+    const matches = new Set<string>();
+    
+    projects.forEach(p => {
+      if (p.client.toLowerCase().includes(searchLow)) matches.add(p.client);
+      if (p.jobNumber.toLowerCase().includes(searchLow)) matches.add(p.jobNumber);
+      if (p.outlet?.toLowerCase().includes(searchLow)) matches.add(p.outlet);
+      if (p.location?.toLowerCase().includes(searchLow)) matches.add(p.location);
+    });
+    
+    return Array.from(matches).slice(0, 8);
+  }, [searchTerm, projects]);
+
+  const jobSuggestions = useMemo(() => {
+    if (!jobSearch || jobSearch.length < 1) return [];
+    
+    const searchLow = jobSearch.toLowerCase();
+    const matches = new Set<string>();
+    
+    projects.forEach(p => {
+      if (p.jobNumber.toLowerCase().includes(searchLow)) matches.add(p.jobNumber);
+    });
+    
+    return Array.from(matches).slice(0, 8);
+  }, [jobSearch, projects]);
+
   const clearFilters = useCallback(() => {
     setSelectedStatuses([]);
     setSelectedClients([]);
@@ -250,9 +376,39 @@ export default function Projects({ projects, inventory, clients, user, transacti
     try {
       await deleteDoc(doc(db, 'projects', projectId));
       setSelectedProject(null);
+      setSelectedForDeletion(prev => prev.filter(id => id !== projectId));
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, `projects/${projectId}`);
     }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedForDeletion.length === 0) return;
+    
+    setIsImporting(true);
+    try {
+      const batch = writeBatch(db);
+      selectedForDeletion.forEach(projectId => {
+        batch.delete(doc(db, 'projects', projectId));
+      });
+      await batch.commit();
+      
+      setSelectedForDeletion([]);
+      setIsDeleteMode(false);
+      // No alert, just feedback via state
+    } catch (err) {
+      console.error('Batch delete failed:', err);
+      alert('Some projects could not be deleted.');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const toggleSelectForDeletion = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedForDeletion(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
   };
 
   return (
@@ -267,42 +423,70 @@ export default function Projects({ projects, inventory, clients, user, transacti
           <p className="text-[10px] md:text-xs text-slate-500 uppercase font-black tracking-[0.2em] mt-1">Enterprise Asset Management & Logistics</p>
         </div>
         <div className="flex items-center space-x-2 md:space-x-3 overflow-x-auto pb-2 md:pb-0 custom-scrollbar-hide">
-          <button 
-            onClick={() => setShowFilters(!showFilters)}
-            className={cn(
-              "flex-shrink-0 flex items-center space-x-2 px-5 py-3 rounded-2xl border transition-all text-[10px] md:text-xs font-black uppercase tracking-widest active:scale-95 duration-500",
-              showFilters 
-                ? "bg-amber-500 text-slate-950 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.4)]" 
-                : "bg-slate-800/50 border-white/10 text-slate-400 hover:text-white hover:bg-white/10"
-            )}
-          >
-            <Filter className={cn("w-3.5 h-3.5 md:w-4 md:h-4", showFilters && "animate-bounce")} />
-            <span>{showFilters ? 'Hide Filters' : 'Show Filters'}</span>
-          </button>
-          {(isApproved) && (
+          {isDeleteMode ? (
+            <div className="flex items-center space-x-2">
+              <button 
+                onClick={handleBatchDelete}
+                disabled={selectedForDeletion.length === 0 || isImporting}
+                className="flex items-center space-x-2 px-5 py-3 rounded-2xl bg-red-500 text-white border border-red-400 shadow-lg shadow-red-500/20 text-xs font-black uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50"
+              >
+                <Trash className="w-4 h-4" />
+                <span>Delete {selectedForDeletion.length} selected</span>
+              </button>
+              <button 
+                onClick={() => { setIsDeleteMode(false); setSelectedForDeletion([]); }}
+                className="px-5 py-3 rounded-2xl bg-slate-800 text-slate-400 border border-white/10 text-xs font-black uppercase tracking-widest active:scale-95 transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
             <>
               <button 
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isImporting}
-                className="flex-shrink-0 flex items-center space-x-2 px-3 md:px-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl border border-blue-500/20 bg-blue-500/10 text-blue-400 hover:text-white hover:bg-blue-500/20 transition-all text-[10px] md:text-xs font-black uppercase tracking-widest active:scale-95 shadow-lg shadow-blue-500/10 group"
+                onClick={() => setIsDeleteMode(true)}
+                className="flex-shrink-0 flex items-center space-x-2 px-5 py-3 rounded-2xl bg-slate-800/50 border border-white/10 text-slate-400 hover:text-red-400 hover:border-red-500/30 transition-all text-[10px] md:text-xs font-black uppercase tracking-widest active:scale-95"
               >
-                {isImporting ? <Loader2 className="w-3.5 h-3.5 md:w-4 md:h-4 animate-spin" /> : <Zap className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary group-hover:animate-pulse" />}
-                <span>{isImporting ? 'AI MAPPING...' : 'AI PROJECT BULK IMPORT'}</span>
+                <Trash className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                <span>Quick Clean</span>
               </button>
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleExcelUpload} 
-                accept=".xlsx, .xls, .csv" 
-                className="hidden" 
-              />
               <button 
-                onClick={() => setShowAddModal(true)}
-                className="hidden md:flex flex-shrink-0 items-center space-x-2 px-6 py-3.5 text-xs font-black text-slate-950 bg-gradient-to-r from-primary via-emerald-400 to-primary rounded-2xl bg-[length:200%_auto] hover:bg-right shadow-[0_0_25px_rgba(var(--primary-rgb),0.4)] hover:shadow-[0_0_35px_rgba(var(--primary-rgb),0.6)] transition-all duration-500 active:scale-95 group uppercase tracking-[0.2em]"
+                onClick={() => setShowFilters(!showFilters)}
+                className={cn(
+                  "flex-shrink-0 flex items-center space-x-2 px-5 py-3 rounded-2xl border transition-all text-[10px] md:text-xs font-black uppercase tracking-widest active:scale-95 duration-500",
+                  showFilters 
+                    ? "bg-amber-500 text-slate-950 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.4)]" 
+                    : "bg-slate-800/50 border-white/10 text-slate-400 hover:text-white hover:bg-white/10"
+                )}
               >
-                <Plus className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
-                <span>Engage New Project</span>
+                <Filter className={cn("w-3.5 h-3.5 md:w-4 md:h-4", showFilters && "animate-bounce")} />
+                <span>{showFilters ? 'Hide Filters' : 'Show Filters'}</span>
               </button>
+              {(isApproved) && (
+                <>
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isImporting}
+                    className="flex-shrink-0 flex items-center space-x-2 px-3 md:px-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl border border-blue-500/20 bg-blue-500/10 text-blue-400 hover:text-white hover:bg-blue-500/20 transition-all text-[10px] md:text-xs font-black uppercase tracking-widest active:scale-95 shadow-lg shadow-blue-500/10 group"
+                  >
+                    {isImporting ? <Loader2 className="w-3.5 h-3.5 md:w-4 md:h-4 animate-spin" /> : <Zap className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary group-hover:animate-pulse" />}
+                    <span>{isImporting ? 'AI MAPPING...' : 'AI PROJECT BULK IMPORT'}</span>
+                  </button>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleExcelUpload} 
+                    accept=".xlsx, .xls, .csv" 
+                    className="hidden" 
+                  />
+                  <button 
+                    onClick={() => setShowAddModal(true)}
+                    className="hidden md:flex flex-shrink-0 items-center space-x-2 px-6 py-3.5 text-xs font-black text-slate-950 bg-gradient-to-r from-primary via-emerald-400 to-primary rounded-2xl bg-[length:200%_auto] hover:bg-right shadow-[0_0_25px_rgba(var(--primary-rgb),0.4)] hover:shadow-[0_0_35px_rgba(var(--primary-rgb),0.6)] transition-all duration-500 active:scale-95 group uppercase tracking-[0.2em]"
+                  >
+                    <Plus className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
+                    <span>Engage New Project</span>
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>
@@ -406,18 +590,52 @@ export default function Projects({ projects, inventory, clients, user, transacti
                   onChange={setSelectedOutlets} 
                 />
 
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 relative">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Job # Filter</label>
                   <div className="relative">
                     <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                     <input 
                       type="text"
                       value={jobSearch}
-                      onChange={(e) => setJobSearch(e.target.value)}
+                      onChange={(e) => {
+                        setJobSearch(e.target.value);
+                        setShowJobSuggestions(true);
+                      }}
+                      onFocus={() => setShowJobSuggestions(true)}
                       placeholder="e.g. JN-2024"
                       className="w-full pl-10 pr-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
                     />
                   </div>
+                  <AnimatePresence>
+                    {showJobSuggestions && jobSuggestions.length > 0 && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setShowJobSuggestions(false)} />
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 10 }}
+                          className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                        >
+                          <div className="p-2 space-y-1">
+                            {jobSuggestions.map((suggestion, index) => (
+                              <button
+                                key={index}
+                                type="button"
+                                onClick={() => {
+                                  setJobSearch(suggestion);
+                                  setShowJobSuggestions(false);
+                                }}
+                                className="w-full px-4 py-2 flex items-center space-x-3 hover:bg-white/5 transition-colors text-left rounded-xl group"
+                              >
+                                <Hash className="w-3.5 h-3.5 text-slate-500 group-hover:text-primary transition-colors" />
+                                <span className="text-[11px] font-medium text-slate-300 group-hover:text-white transition-colors">{suggestion}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </motion.div>
+                      </>
+                    )}
+                  </AnimatePresence>
                 </div>
               </div>
 
@@ -433,15 +651,49 @@ export default function Projects({ projects, inventory, clients, user, transacti
         )}
       </AnimatePresence>
 
-      <div className="relative group">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-primary transition-colors" />
+      <div className="relative">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 transition-colors" />
         <input 
           type="text" 
           placeholder="Global search by client, job number, or project..." 
           className="w-full pl-12 pr-4 py-3 rounded-2xl bg-white/5 border border-white/5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium"
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setShowSearchSuggestions(true);
+          }}
+          onFocus={() => setShowSearchSuggestions(true)}
         />
+        <AnimatePresence>
+          {showSearchSuggestions && searchSuggestions.length > 0 && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowSearchSuggestions(false)} />
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+              >
+                <div className="p-2 space-y-1">
+                  {searchSuggestions.map((suggestion, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => {
+                        setSearchTerm(suggestion);
+                        setShowSearchSuggestions(false);
+                      }}
+                      className="w-full px-4 py-2.5 flex items-center space-x-3 hover:bg-white/5 transition-colors text-left rounded-xl group"
+                    >
+                      <Search className="w-4 h-4 text-slate-500 group-hover:text-primary transition-colors" />
+                      <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">{suggestion}</span>
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -451,7 +703,13 @@ export default function Projects({ projects, inventory, clients, user, transacti
               key={project.id} 
               project={project} 
               user={user}
-              onClick={() => setSelectedProject(project)}
+              isDeleteMode={isDeleteMode}
+              isSelected={selectedForDeletion.includes(project.id)}
+              onToggleButton={(e) => toggleSelectForDeletion(project.id, e)}
+              onClick={(e) => {
+                if (isDeleteMode) toggleSelectForDeletion(project.id, e);
+                else setSelectedProject(project);
+              }}
               onEdit={(e) => { e.stopPropagation(); setEditingProject(project); }}
               onDelete={(e) => { e.stopPropagation(); handleDeleteProject(project.id); }}
             />
@@ -489,22 +747,68 @@ export default function Projects({ projects, inventory, clients, user, transacti
             isApproved={isApproved}
           />
         )}
+        {projectImportPreview && (
+          <ProjectImportPreviewModal 
+            data={projectImportPreview}
+            onConfirm={handleConfirmProjectImport}
+            onCancel={() => setProjectImportPreview(null)}
+            isImporting={isImporting}
+          />
+        )}
       </AnimatePresence>
     </motion.div>
   );
 }
 
-function ProjectCard({ project, user, onClick, onEdit, onDelete }: { project: Project, user: UserProfile, onClick: () => void, onEdit: (e: any) => void, onDelete: (e: any) => void }) {
+function ProjectCard({ 
+  project, 
+  user, 
+  onClick, 
+  onEdit, 
+  onDelete, 
+  isDeleteMode, 
+  isSelected, 
+  onToggleButton 
+}: { 
+  project: Project, 
+  user: UserProfile, 
+  onClick: (e: React.MouseEvent) => void, 
+  onEdit: (e: any) => void, 
+  onDelete: (e: any) => void,
+  isDeleteMode?: boolean,
+  isSelected?: boolean,
+  onToggleButton?: (e: any) => void
+}) {
   const itemCount = project.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
   
   return (
     <motion.div
       layout
-      whileHover={window.innerWidth > 768 ? { y: -5, scale: 1.02 } : {}}
-      className="glass-morphism p-5 md:p-6 rounded-3xl border border-white/5 shadow-sm group cursor-pointer relative overflow-hidden"
+      whileHover={window.innerWidth > 768 && !isDeleteMode ? { y: -5, scale: 1.02 } : {}}
+      className={cn(
+        "glass-morphism p-5 md:p-6 rounded-3xl border shadow-sm group cursor-pointer relative overflow-hidden transition-all duration-300",
+        isSelected ? "border-red-500/50 bg-red-500/5 ring-1 ring-red-500/20" : "border-white/5",
+        isDeleteMode && "hover:border-red-500/30"
+      )}
       onClick={onClick}
     >
-      <div className="absolute top-0 right-0 p-4 flex items-center space-x-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+      {isDeleteMode && (
+        <div className="absolute top-4 left-4 z-10">
+          <div className={cn(
+            "w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all",
+            isSelected 
+              ? "bg-red-500 border-red-400 shadow-[0_0_10px_rgba(239,68,68,0.4)]" 
+              : "bg-white/5 border-white/10"
+          )}>
+            {isSelected && <CheckSquare className="w-4 h-4 text-white" />}
+          </div>
+        </div>
+      )}
+
+      <div className={cn(
+        "absolute top-0 right-0 p-4 flex items-center space-x-2 transition-opacity",
+        isDeleteMode ? "opacity-0 pointer-events-none" : "md:opacity-0 md:group-hover:opacity-100"
+      )}>
         {(project.userId === user.uid || user.role === 'admin') && (
           <>
             <button 
@@ -642,6 +946,7 @@ function ProjectFormModal({
   const [items, setItems] = useState<ProjectItem[]>(project?.items || []);
   const [loading, setLoading] = useState(false);
   const [isMappingItems, setIsMappingItems] = useState(false);
+  const [itemImportPreview, setItemImportPreview] = useState<any[] | null>(null);
   const itemFileInputRef = useRef<HTMLInputElement>(null);
   const [showItemPicker, setShowItemPicker] = useState(false);
 
@@ -653,43 +958,51 @@ function ProjectFormModal({
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
-        const bstr = evt.target?.result;
+        const bstr = evt.target?.result as string;
         const wb = XLSX.read(bstr, { type: 'binary' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
         const data = XLSX.utils.sheet_to_json(ws);
+        const headers = XLSX.utils.sheet_to_json(ws, { header: 1 })[0] as string[];
 
         if (data.length === 0) {
           alert('No data found in Excel file.');
           return;
         }
 
-        const aiMappedItems = await mapExcelItems(data);
+        const mapping = await getExcelMapping(headers, data.slice(0, 5));
         
-        if (aiMappedItems.length === 0) {
-          alert('AI could not map any items for this project.');
-          return;
+        let mappedData: any[] = [];
+        if (Object.values(mapping).some(v => !!v)) {
+          mappedData = data.map((row: any) => {
+            const getVal = (f: string) => {
+              const h = mapping[f];
+              return h ? row[h] : '';
+            };
+            return {
+              name: getVal('name') || 'Unnamed Item',
+              brand: getVal('brand') || '',
+              model: getVal('modelNumber') || '',
+              quantity: Number(getVal('quantity')) || 0,
+              supplier: getVal('supplier') || '',
+              location: getVal('location') || '',
+              category: getVal('category') || '',
+              posNo: getVal('posNo') || '',
+              dimensions: getVal('dimensions') || '',
+              logistics: getVal('logistics') || '',
+              origin: getVal('origin') || '',
+              unitLocation: getVal('unitLocation') || '',
+              alternateBrand: getVal('alternateBrand') || '',
+              delivery: getVal('delivery') || ''
+            };
+          });
+        } else {
+          mappedData = await mapExcelItems(data.slice(0, 50));
         }
 
-        const newProjectItems: ProjectItem[] = aiMappedItems.map(item => ({
-          inventoryItemId: `EXT-${Math.random().toString(36).substr(2, 9)}`,
-          name: item.name || 'Unnamed Item',
-          brand: item.brand || '',
-          model: item.model || '',
-          quantity: item.quantity || 0,
-          supplier: item.supplier || '',
-          location: item.location || '',
-          quantityIn: 0,
-          quantityOut: 0,
-          approvedQuote: item.approvedQuote || '',
-          category: item.category || '',
-          posNo: item.posNo || '',
-          eta: item.eta || '',
-          delivery: item.delivery || ''
-        }));
-
-        setItems(prev => [...prev, ...newProjectItems]);
-        alert(`AI successfully mapped and added ${newProjectItems.length} items from Excel!`);
+        // Add AI Matching Pass
+        const matchedItems = await findInventoryMatches(mappedData, inventory);
+        setItemImportPreview(matchedItems);
       } catch (err: any) {
         console.error('Error mapping Excel items:', err);
         alert(err.message || 'Failed to process Excel with AI.');
@@ -700,6 +1013,35 @@ function ProjectFormModal({
     };
     reader.readAsBinaryString(file);
   }, []);
+
+  const handleConfirmItemImport = () => {
+    if (!itemImportPreview) return;
+    const newProjectItems: ProjectItem[] = itemImportPreview.map(item => ({
+      inventoryItemId: item.inventoryItemId,
+      name: item.name || 'Unnamed Item',
+      brand: item.brand || '',
+      model: item.model || '',
+      quantity: item.quantity || 0,
+      supplier: item.supplier || '',
+      location: item.unitLocation || item.location || '',
+      unitLocation: item.unitLocation || '',
+      dimensions: item.dimensions || '',
+      logistics: item.logistics || '',
+      origin: item.origin || '',
+      alternateBrand: item.alternateBrand || '',
+      quantityIn: 0,
+      quantityOut: 0,
+      approvedQuote: item.approvedQuote || '',
+      category: item.category || '',
+      posNo: item.posNo || '',
+      eta: item.eta || '',
+      delivery: item.delivery || '',
+      matched: item.matched
+    }));
+
+    setItems(prev => [...prev, ...newProjectItems]);
+    setItemImportPreview(null);
+  };
   const [itemSearch, setItemSearch] = useState('');
   const [showClientSuggestions, setShowClientSuggestions] = useState(false);
 
@@ -1079,6 +1421,13 @@ function ProjectFormModal({
               </div>
             </div>
           )}
+          {itemImportPreview && (
+            <ItemImportPreviewModal 
+              data={itemImportPreview}
+              onConfirm={handleConfirmItemImport}
+              onCancel={() => setItemImportPreview(null)}
+            />
+          )}
         </AnimatePresence>
       </motion.div>
     </>
@@ -1201,7 +1550,7 @@ function ProjectItemRow({ item, inventory, onRemove, onUpdate }: { item: Project
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="lg:col-span-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="space-y-1.5">
             <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Brand</label>
             <input 
@@ -1239,21 +1588,30 @@ function ProjectItemRow({ item, inventory, onRemove, onUpdate }: { item: Project
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Approved Quote</label>
+            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Dimensions (Dim)</label>
             <input 
               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:border-primary/50 outline-none transition-all"
-              value={item.approvedQuote || ''}
-              onChange={e => onUpdate({ approvedQuote: e.target.value })}
-              placeholder="Quote info..."
+              value={item.dimensions || ''}
+              onChange={e => onUpdate({ dimensions: e.target.value })}
+              placeholder="e.g. 120x60x10 cm"
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">ETA</label>
+            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Logistics</label>
             <input 
               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:border-primary/50 outline-none transition-all"
-              value={item.eta || ''}
-              onChange={e => onUpdate({ eta: e.target.value })}
-              placeholder="e.g. Next Week"
+              value={item.logistics || ''}
+              onChange={e => onUpdate({ logistics: e.target.value })}
+              placeholder="e.g. Air Freight"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Origin</label>
+            <input 
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:border-primary/50 outline-none transition-all"
+              value={item.origin || ''}
+              onChange={e => onUpdate({ origin: e.target.value })}
+              placeholder="e.g. China"
             />
           </div>
           <div className="space-y-1.5">
@@ -1269,12 +1627,21 @@ function ProjectItemRow({ item, inventory, onRemove, onUpdate }: { item: Project
             <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Unit Location</label>
             <input 
               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:border-primary/50 outline-none transition-all"
-              value={item.location || ''}
-              onChange={e => onUpdate({ location: e.target.value })}
+              value={item.unitLocation || item.location || ''}
+              onChange={e => onUpdate({ unitLocation: e.target.value })}
               placeholder="e.g. Shelf A1"
             />
           </div>
-          <div className="md:col-span-2 space-y-1.5">
+          <div className="space-y-1.5">
+            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Alternate Brand</label>
+            <input 
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:border-primary/50 outline-none transition-all"
+              value={item.alternateBrand || ''}
+              onChange={e => onUpdate({ alternateBrand: e.target.value })}
+              placeholder="e.g. LG (Alternative)"
+            />
+          </div>
+          <div className="space-y-1.5">
             <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Delivery Status</label>
             <input 
               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:border-primary/50 outline-none transition-all"
@@ -1283,43 +1650,61 @@ function ProjectItemRow({ item, inventory, onRemove, onUpdate }: { item: Project
               placeholder="e.g. In Transit"
             />
           </div>
+          <div className="space-y-1.5">
+            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">ETA</label>
+            <input 
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:border-primary/50 outline-none transition-all"
+              value={item.eta || ''}
+              onChange={e => onUpdate({ eta: e.target.value })}
+              placeholder="e.g. Next Week"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Approved Quote</label>
+            <input 
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:border-primary/50 outline-none transition-all"
+              value={item.approvedQuote || ''}
+              onChange={e => onUpdate({ approvedQuote: e.target.value })}
+              placeholder="Quote info..."
+            />
+          </div>
         </div>
 
-        <div className="lg:col-span-7 grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3">
-          <div className="p-2 md:p-3 bg-white/5 rounded-xl md:rounded-2xl border border-white/10 flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-1 md:mb-2">
-              <label className="text-[8px] md:text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none">Required</label>
-              <Hash className="w-2.5 h-2.5 md:w-3 md:h-3 text-slate-600" />
+        <div className="lg:col-span-12 grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="p-3 bg-white/5 rounded-2xl border border-white/10 flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none">Required</label>
+              <Hash className="w-3 h-3 text-slate-600" />
             </div>
             <input 
               type="number"
-              className="w-full bg-transparent text-lg md:text-xl font-black text-white outline-none"
+              className="w-full bg-transparent text-xl font-black text-white outline-none"
               value={item.quantity}
               onChange={e => onUpdate({ quantity: parseInt(e.target.value) || 0 })}
             />
           </div>
 
-          <div className="p-2 md:p-3 bg-green-500/5 rounded-xl md:rounded-2xl border border-green-500/10 flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-1 md:mb-2">
-              <label className="text-[8px] md:text-[9px] font-black text-green-500/70 uppercase tracking-widest leading-none">Qty In</label>
-              <ArrowDownLeft className="w-2.5 h-2.5 md:w-3 md:h-3 text-green-500" />
+          <div className="p-3 bg-green-500/5 rounded-2xl border border-green-500/10 flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[9px] font-black text-green-500/70 uppercase tracking-widest leading-none">Qty In</label>
+              <ArrowDownLeft className="w-3 h-3 text-green-500" />
             </div>
             <input 
               type="number"
-              className="w-full bg-transparent text-lg md:text-xl font-black text-green-400 outline-none"
+              className="w-full bg-transparent text-xl font-black text-green-400 outline-none"
               value={item.quantityIn || 0}
               onChange={e => onUpdate({ quantityIn: parseInt(e.target.value) || 0 })}
             />
           </div>
 
-          <div className="p-2 md:p-3 bg-red-500/5 rounded-xl md:rounded-2xl border border-red-500/10 flex flex-col justify-between col-span-2 md:col-span-1">
-            <div className="flex items-center justify-between mb-1 md:mb-2">
-              <label className="text-[8px] md:text-[9px] font-black text-red-500/70 uppercase tracking-widest leading-none">Qty Out</label>
-              <ArrowUpRight className="w-2.5 h-2.5 md:w-3 md:h-3 text-red-500" />
+          <div className="p-3 bg-red-500/5 rounded-2xl border border-red-500/10 flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[9px] font-black text-red-500/70 uppercase tracking-widest leading-none">Qty Out</label>
+              <ArrowUpRight className="w-3 h-3 text-red-500" />
             </div>
             <input 
               type="number"
-              className="w-full bg-transparent text-lg md:text-xl font-black text-red-400 outline-none"
+              className="w-full bg-transparent text-xl font-black text-red-400 outline-none"
               value={item.quantityOut || 0}
               onChange={e => onUpdate({ quantityOut: parseInt(e.target.value) || 0 })}
             />
@@ -1562,6 +1947,242 @@ function ProjectDetailModal({ project, inventory, transactions, onClose, onDelet
           <div className="flex items-center justify-between text-[10px] font-black text-slate-500 uppercase tracking-wider">
             <p>Created: {formatDate(project.createdAt)}</p>
             <p>ID: {project.id}</p>
+          </div>
+        </div>
+      </motion.div>
+    </>
+  );
+}
+
+function ProjectImportPreviewModal({ data, onConfirm, onCancel, isImporting }: { data: any[], onConfirm: () => void, onCancel: () => void, isImporting: boolean }) {
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/95 backdrop-blur-2xl z-[120]" onClick={onCancel} />
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9, y: 40 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: 40 }}
+        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-6xl h-[85vh] glass-morphism rounded-[40px] shadow-2xl z-[121] overflow-hidden border border-white/10 flex flex-col"
+      >
+        <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/[0.03]">
+          <div className="flex items-center space-x-4">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
+              <Zap className="w-6 h-6 text-indigo-400 animate-pulse" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-black text-white tracking-tighter uppercase italic">AI Project Manifest Reconstruction</h2>
+              <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.3em]">Parsed {data.length} project groups with relative manifests</p>
+            </div>
+          </div>
+          <button 
+            onClick={onCancel} 
+            className="p-3 hover:bg-white/10 rounded-2xl transition-all text-slate-400 hover:text-white"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-black/20">
+          <div className="space-y-6">
+            {data.map((project, idx) => (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.1 }}
+                key={idx}
+                className="bg-white/[0.02] border border-white/5 rounded-[32px] overflow-hidden"
+              >
+                <div className="p-6 bg-white/[0.03] border-b border-white/5 flex justify-between items-center">
+                  <div>
+                    <h3 className="text-lg font-black text-white uppercase tracking-tight">{project.client}</h3>
+                    <div className="flex items-center space-x-3 mt-1">
+                      <span className="text-[10px] font-mono text-indigo-400">JOB# {project.jobNumber}</span>
+                      <span className="w-1 h-1 rounded-full bg-slate-700" />
+                      <span className="text-[10px] font-black text-slate-500 uppercase">{project.outlet}</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Manifest Count</p>
+                    <p className="text-xl font-bold text-white">{project.items.length} SKUs</p>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="text-[8px] font-black text-slate-600 uppercase tracking-[0.2em] border-b border-white/5">
+                        <th className="pb-3 px-2">Description</th>
+                        <th className="pb-3 px-2">Brand/Model</th>
+                        <th className="pb-3 px-2 text-center">Status</th>
+                        <th className="pb-3 px-2 text-right">Quantity</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {project.items.slice(0, 3).map((item: any, i: number) => (
+                        <tr key={i} className="border-b border-white/[0.02] last:border-0">
+                           <td className="py-3 px-2">
+                             <p className="text-xs font-bold text-slate-300">{item.name}</p>
+                             <p className="text-[8px] text-slate-500 font-mono mt-0.5">{item.category}</p>
+                           </td>
+                          <td className="py-3 px-2 text-[10px] text-slate-500 font-mono">{item.brand} / {item.model}</td>
+                          <td className="py-3 px-2">
+                            <span className={cn(
+                              "inline-flex items-center px-1.5 py-0.5 rounded text-[7px] font-black uppercase tracking-widest",
+                              item.matched ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-500"
+                            )}>
+                              {item.matched ? 'LINKED' : 'EXTERNAL'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-2 text-right text-xs font-black text-primary">{item.quantity}</td>
+                        </tr>
+                      ))}
+                      {project.items.length > 3 && (
+                        <tr>
+                          <td colSpan={3} className="py-2 text-[8px] text-slate-600 font-black uppercase text-center italic">
+                            + {project.items.length - 3} more items in manifest
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+
+        <div className="p-8 border-t border-white/5 flex items-center justify-between bg-black/40">
+          <div className="flex items-center space-x-4">
+             <AlertCircle className="w-5 h-5 text-amber-500" />
+             <p className="text-xs font-bold text-slate-400 italic">Review mapped project structures carefully before final injection.</p>
+          </div>
+          <div className="flex items-center space-x-4">
+            <button 
+              onClick={onCancel}
+              className="px-8 py-4 text-slate-400 font-black uppercase tracking-widest text-xs hover:text-white transition-colors"
+            >
+              Abort Mission
+            </button>
+            <button 
+              onClick={onConfirm}
+              disabled={isImporting}
+              className="px-10 py-5 bg-indigo-500 text-white font-black uppercase tracking-[0.3em] text-sm rounded-[24px] shadow-[0_0_30px_rgba(99,102,241,0.3)] hover:shadow-[0_0_50px_rgba(99,102,241,0.5)] transition-all active:scale-95 disabled:opacity-50 flex items-center space-x-3"
+            >
+              {isImporting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+              <span>Commit Projects</span>
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </>
+  );
+}
+
+function ItemImportPreviewModal({ data, onConfirm, onCancel }: { data: any[], onConfirm: () => void, onCancel: () => void }) {
+  return (
+    <>
+      <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-3xl z-[150]" onClick={onCancel} />
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9, y: 40 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: 40 }}
+        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-5xl h-[80vh] glass-morphism rounded-[40px] shadow-2xl z-[151] overflow-hidden border border-white/10 flex flex-col"
+      >
+        <div className="p-8 border-b border-white/5 flex justify-between items-center bg-white/[0.03]">
+          <div className="flex items-center space-x-4">
+            <div className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center border border-primary/30">
+              <Package className="w-6 h-6 text-primary animate-pulse" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-black text-white tracking-tighter uppercase italic">Project SKU Ingestion</h2>
+              <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.3em]">AI identified {data.length} items from source file</p>
+            </div>
+          </div>
+          <button 
+            onClick={onCancel} 
+            className="p-3 hover:bg-white/10 rounded-2xl transition-all text-slate-400 hover:text-white"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-black/20">
+          <table className="w-full text-left border-separate border-spacing-y-2">
+            <thead>
+              <tr className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                <th className="px-6 py-4 bg-white/5 first:rounded-l-2xl">POS ID</th>
+                <th className="px-6 py-4 bg-white/5">Description</th>
+                <th className="px-6 py-4 bg-white/5">Brand / Model</th>
+                <th className="px-6 py-4 bg-white/5">Details</th>
+                <th className="px-6 py-4 bg-white/5 text-center">Status</th>
+                <th className="px-6 py-4 bg-white/5 last:rounded-r-2xl text-right">Qty</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((item, idx) => (
+                <tr key={idx} className="group">
+                  <td className="px-6 py-4 bg-white/[0.02] border-y border-l border-white/5 rounded-l-2xl group-hover:bg-white/[0.05] transition-colors">
+                    <p className="text-[10px] text-slate-400 font-black font-mono">#{item.posNo || 'N/A'}</p>
+                  </td>
+                  <td className="px-6 py-4 bg-white/[0.02] border-y border-white/5 group-hover:bg-white/[0.05] transition-colors">
+                    <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{item.name}</p>
+                    <p className="text-[10px] text-slate-500 font-mono mt-0.5 uppercase tracking-tighter">{item.category || 'NO CAT'}</p>
+                  </td>
+                  <td className="px-6 py-4 bg-white/[0.02] border-y border-white/5 group-hover:bg-white/[0.05] transition-colors">
+                    <p className="text-xs font-bold text-slate-300">{item.brand || '---'}</p>
+                    <p className="text-[10px] text-slate-500 font-mono">{item.model || '---'}</p>
+                  </td>
+                  <td className="px-6 py-4 bg-white/[0.02] border-y border-white/5 group-hover:bg-white/[0.05] transition-colors">
+                    <div className="space-y-1">
+                      {item.dimensions && <p className="text-[9px] text-slate-500 font-mono tracking-tighter"><span className="text-slate-700">DIM:</span> {item.dimensions}</p>}
+                      {item.origin && <p className="text-[9px] text-slate-500 font-mono tracking-tighter"><span className="text-slate-700">ORIGIN:</span> {item.origin}</p>}
+                      {item.unitLocation && <p className="text-[9px] text-slate-500 font-mono tracking-tighter"><span className="text-slate-700">UNIT LOC:</span> {item.unitLocation}</p>}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 bg-white/[0.02] border-y border-white/5 group-hover:bg-white/[0.05] transition-colors text-center">
+                    <div className={cn(
+                      "inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border mx-auto",
+                      item.matched 
+                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                        : "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                    )}>
+                      {item.matched ? (
+                        <>
+                          <CheckSquare className="w-3 h-3" />
+                          <span>Matched</span>
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-3 h-3" />
+                          <span>New SKU</span>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 bg-white/[0.02] border-y border-r border-white/5 rounded-r-2xl group-hover:bg-white/[0.05] transition-colors text-right">
+                    <span className="px-4 py-1.5 rounded-xl bg-primary/10 text-primary text-sm font-black border border-primary/20 shadow-inner group-hover:bg-primary group-hover:text-slate-950 transition-all">{item.quantity}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="p-8 border-t border-white/5 flex items-center justify-between bg-black/40">
+          <p className="text-xs font-bold text-slate-400 italic">Verify SKU descriptions and quantities before linking to project manifest.</p>
+          <div className="flex items-center space-x-4">
+            <button 
+              onClick={onCancel}
+              className="px-8 py-4 text-slate-400 font-black uppercase tracking-widest text-xs hover:text-white transition-colors"
+            >
+              Cancel Ingestion
+            </button>
+            <button 
+              onClick={onConfirm}
+              className="px-10 py-5 bg-primary text-slate-950 font-black uppercase tracking-[0.3em] text-sm rounded-[24px] shadow-[0_0_30px_rgba(var(--primary-rgb),0.3)] hover:shadow-[0_0_50px_rgba(var(--primary-rgb),0.5)] transition-all active:scale-95 flex items-center space-x-3"
+            >
+              <Plus className="w-5 h-5" />
+              <span>Ingest Manifest</span>
+            </button>
           </div>
         </div>
       </motion.div>

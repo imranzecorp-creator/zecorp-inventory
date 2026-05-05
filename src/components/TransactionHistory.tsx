@@ -26,8 +26,12 @@ import {
   Layout,
   CornerDownRight,
   RotateCcw,
-  Cloud
+  Cloud,
+  Mic,
+  MicOff
 } from 'lucide-react';
+import { useVoiceSearch } from '../hooks/useVoiceSearch';
+import { VoiceLanguageSelector } from './VoiceLanguageSelector';
 import { motion, AnimatePresence } from 'framer-motion';
 import { StockTransaction } from '../types';
 import { formatDate, formatTime, cn } from '../lib/utils';
@@ -187,13 +191,28 @@ const TransactionRow = memo(({ index, style, data }: { index: number, style: Rea
 
 const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [userFilter, setUserFilter] = useState('');
   const [inventoryTypeFilter, setInventoryTypeFilter] = useState<'Warehouse Stock' | 'Client Stock' | ''>('');
+  const [typeFilter, setTypeFilter] = useState<'IN' | 'OUT' | ''>('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [jobNumberFilter, setJobNumberFilter] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
   const listRef = useRef<List>(null);
+
+  const { isListening, startListening, currentLang, setCurrentLang } = useVoiceSearch((transcript) => {
+    setSearchTerm(transcript);
+    setShowSearchSuggestions(true);
+  });
+
+  useEffect(() => {
+    listRef.current?.scrollTo(0);
+  }, [searchTerm, userFilter, inventoryTypeFilter, typeFilter, startDate, endDate, categoryFilter, jobNumberFilter]);
 
   const toggleExpand = useCallback((id: string) => {
     setExpandedId(prev => prev === id ? null : id);
@@ -203,6 +222,24 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
     listRef.current?.resetAfterIndex(0);
   }, [expandedId]);
 
+  const searchSuggestions = useMemo(() => {
+    if (!searchTerm || searchTerm.length < 1) return [];
+    
+    const searchLow = searchTerm.toLowerCase();
+    const matches = new Set<string>();
+    
+    transactions.forEach(tx => {
+      if (tx.itemName.toLowerCase().includes(searchLow)) matches.add(tx.itemName);
+      if (tx.brand && tx.brand.toLowerCase().includes(searchLow)) matches.add(tx.brand);
+      if (tx.modelNumber && tx.modelNumber.toLowerCase().includes(searchLow)) matches.add(tx.modelNumber);
+      if (tx.jobNumber && tx.jobNumber.toLowerCase().includes(searchLow)) matches.add(tx.jobNumber);
+      if (tx.userName?.toLowerCase().includes(searchLow)) matches.add(tx.userName);
+      if (tx.category && tx.category.toLowerCase().includes(searchLow)) matches.add(tx.category);
+    });
+    
+    return Array.from(matches).slice(0, 8);
+  }, [searchTerm, transactions]);
+
   const filtered = useMemo(() => {
     return transactions.filter(tx => {
       const searchLow = searchTerm.toLowerCase();
@@ -210,7 +247,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
         tx.itemName.toLowerCase().includes(searchLow) ||
         (tx.brand?.toLowerCase() || '').includes(searchLow) ||
         (tx.modelNumber?.toLowerCase() || '').includes(searchLow) ||
-        (tx.jobNumber?.toLowerCase() || '').includes(searchLow);
+        (tx.jobNumber?.toLowerCase() || '').includes(searchLow) ||
+        (tx.category?.toLowerCase() || '').includes(searchLow);
       
       const matchesUser = !userFilter || 
         tx.userName?.toLowerCase().includes(userFilter.toLowerCase());
@@ -218,9 +256,21 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
       const matchesType = !inventoryTypeFilter || 
         tx.inventoryType === inventoryTypeFilter;
 
-      return matchesSearch && matchesUser && matchesType;
+      const matchesTxType = !typeFilter || tx.type === typeFilter;
+
+      const matchesCategory = !categoryFilter || 
+        (tx.category?.toLowerCase() || '').includes(categoryFilter.toLowerCase());
+
+      const matchesJob = !jobNumberFilter || 
+        (tx.jobNumber?.toLowerCase() || '').includes(jobNumberFilter.toLowerCase());
+
+      const txDate = tx.date?.toMillis ? tx.date.toMillis() : tx.date;
+      const matchesDate = (!startDate || txDate >= new Date(startDate).getTime()) &&
+                          (!endDate || txDate <= new Date(endDate).getTime() + 86400000);
+
+      return matchesSearch && matchesUser && matchesType && matchesTxType && matchesCategory && matchesJob && matchesDate;
     });
-  }, [transactions, searchTerm, userFilter, inventoryTypeFilter]);
+  }, [transactions, searchTerm, userFilter, inventoryTypeFilter, typeFilter, startDate, endDate, categoryFilter, jobNumberFilter]);
 
   const getItemSize = useCallback((index: number) => {
     return expandedId === filtered[index]?.id ? 380 : 96;
@@ -230,6 +280,11 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
     setSearchTerm('');
     setUserFilter('');
     setInventoryTypeFilter('');
+    setTypeFilter('');
+    setStartDate('');
+    setEndDate('');
+    setCategoryFilter('');
+    setJobNumberFilter('');
   };
 
   const handleSummarize = async () => {
@@ -274,8 +329,57 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
               placeholder="Search history mapping..." 
               className="pl-12 pr-6 py-3.5 bg-slate-800/40 border border-white/5 rounded-2xl text-xs md:text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium min-w-[300px]"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setShowSearchSuggestions(true);
+              }}
+              onFocus={() => setShowSearchSuggestions(true)}
             />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center space-x-2">
+              <VoiceLanguageSelector 
+                currentLang={currentLang} 
+                onLangChange={setCurrentLang} 
+              />
+              <button
+                type="button"
+                onClick={startListening}
+                className={cn(
+                  "p-2 rounded-xl transition-all",
+                  isListening ? "bg-red-500/20 text-red-500 animate-pulse" : "hover:bg-white/10 text-slate-500"
+                )}
+              >
+                {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </button>
+            </div>
+            <AnimatePresence>
+              {showSearchSuggestions && searchSuggestions.length > 0 && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowSearchSuggestions(false)} />
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                  >
+                    <div className="p-2 space-y-1">
+                      {searchSuggestions.map((suggestion, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            setSearchTerm(suggestion);
+                            setShowSearchSuggestions(false);
+                          }}
+                          className="w-full px-4 py-2.5 flex items-center space-x-3 hover:bg-white/5 transition-colors text-left rounded-xl group"
+                        >
+                          <Search className="w-4 h-4 text-slate-500 group-hover:text-primary transition-colors" />
+                          <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">{suggestion}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
           </div>
           
           <button 
@@ -315,55 +419,122 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <div className="glass-morphism p-8 rounded-[32px] border border-white/5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-4 shadow-2xl">
+            <div className="glass-morphism p-6 md:p-8 rounded-[32px] border border-white/5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6 md:gap-8 mb-4 shadow-2xl">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Search Matrix</label>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Universal Search</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600" />
                   <input 
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Reference query..."
+                    placeholder="Search anything..."
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Representative</label>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Movement Type</label>
+                <select 
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value as any)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:ring-2 focus:ring-primary/20 outline-none appearance-none"
+                >
+                  <option value="" className="bg-slate-900">All Movements</option>
+                  <option value="IN" className="bg-slate-900 font-bold text-green-400">Stock In (+)</option>
+                  <option value="OUT" className="bg-slate-900 font-bold text-red-400">Stock Out (-)</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Asset Category</label>
+                <div className="relative">
+                  <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600" />
+                  <input 
+                    type="text"
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    placeholder="e.g. AV Equipment"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Start Date</label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600" />
+                  <input 
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">End Date</label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600" />
+                  <input 
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Job Matrix (ID)</label>
+                <div className="relative">
+                  <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600" />
+                  <input 
+                    type="text"
+                    value={jobNumberFilter}
+                    onChange={(e) => setJobNumberFilter(e.target.value)}
+                    placeholder="Filter by Project ID..."
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Personnel</label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600" />
                   <input 
                     type="text"
                     value={userFilter}
                     onChange={(e) => setUserFilter(e.target.value)}
-                    placeholder="Filter by lead..."
+                    placeholder="Lead Name..."
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Stock Category</label>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Protocol Tier</label>
                 <select 
                   value={inventoryTypeFilter}
                   onChange={(e) => setInventoryTypeFilter(e.target.value as any)}
                   className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:ring-2 focus:ring-primary/20 outline-none appearance-none"
                 >
-                  <option value="" className="bg-slate-900">All Categories</option>
+                  <option value="" className="bg-slate-900">All Protocol Tiers</option>
                   <option value="Warehouse Stock" className="bg-slate-900">Warehouse Stock</option>
                   <option value="Client Stock" className="bg-slate-900">Client Stock</option>
                 </select>
               </div>
 
-              <div className="flex items-end">
+              <div className="flex items-end md:col-span-2 lg:col-span-1 xl:col-span-2">
                 <button 
                   onClick={clearFilters}
                   className="w-full py-2.5 px-4 rounded-xl bg-white/5 border border-white/10 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all flex items-center justify-center space-x-2"
                 >
                   <RotateCcw className="w-3 h-3" />
-                  <span>Reset Params</span>
+                  <span>Reset All Matrices</span>
                 </button>
               </div>
             </div>

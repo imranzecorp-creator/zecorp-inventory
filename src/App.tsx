@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   onAuthStateChanged, 
   signOut, 
@@ -64,6 +64,7 @@ import AmbientStorageBox from './components/AmbientStorageBox';
 import ToastContainer, { Toast } from './components/ToastContainer';
 import Logo from './components/Logo';
 import BackgroundAnimation from './components/BackgroundAnimation';
+import { ZecorpMascot } from './components/ZecorpMascot';
 
 // Lazy load heavy components
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
@@ -81,6 +82,7 @@ export default function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [globalSearch, setGlobalSearch] = useState('');
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
@@ -91,8 +93,7 @@ export default function App() {
   const [lastNotificationId, setLastNotificationId] = useState<string | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
       // Focus search: CMD+K or CTRL+K
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
@@ -104,14 +105,33 @@ export default function App() {
       if (e.altKey) {
         if (e.key === '1') setActiveTab('dashboard');
         if (e.key === '2') setActiveTab('inventory');
-        if (e.key === '3') setActiveTab('transactions');
-        if (e.key === '4') setActiveTab('social');
+        if (e.key === '3') setActiveTab('projects');
+        if (e.key === '4') setActiveTab('transactions');
         if (e.key === '5') setActiveTab('chat');
+        if (e.key === '6') setActiveTab('social');
+        if (e.key === '7') setActiveTab('intelligence');
       }
-    };
+    }, [setActiveTab]);
 
+  useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
+  const handleGlobalSearch = useCallback((term: string) => {
+    setGlobalSearch(term);
+    setActiveTab('inventory');
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  const handleMobileTabChange = useCallback((tab: string) => {
+    if ('vibrate' in navigator) {
+      navigator.vibrate(10);
+    }
+    setActiveTab(tab);
   }, []);
 
   useEffect(() => {
@@ -310,10 +330,6 @@ export default function App() {
     };
   }, [user]);
 
-  const removeToast = (id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  };
-
   const isApproved = user?.isApproved || user?.role === 'admin';
   const dashboardProps = useMemo(() => user ? ({ items, transactions, projects, user }) : null, [items, transactions, projects, user]);
   const inventoryProps = useMemo(() => user ? ({ items, clients, user, projects }) : null, [items, clients, user, projects]);
@@ -375,6 +391,8 @@ export default function App() {
           unreadCount={unreadCount} 
           notifications={notifications} 
           setActiveTab={setActiveTab}
+          items={items}
+          onGlobalSearch={handleGlobalSearch}
         />
         
         {!isApproved && (
@@ -411,7 +429,11 @@ export default function App() {
                 <Dashboard {...dashboardProps} />
               )}
               {activeTab === 'inventory' && inventoryProps && (
-                <InventoryList {...inventoryProps} />
+                <InventoryList 
+                  {...inventoryProps} 
+                  initialSearch={globalSearch} 
+                  onSearchClear={() => setGlobalSearch('')} 
+                />
               )}
               {activeTab === 'projects' && projectsProps && (
                 <Projects {...projectsProps} />
@@ -447,30 +469,30 @@ export default function App() {
                     </div>
                     
                     <div className="grid grid-cols-2 gap-4">
-                      <button 
-                          onClick={() => setActiveTab('social')}
+                        <button 
+                          onClick={() => handleMobileTabChange('chat')}
+                          className="p-6 glass-morphism rounded-3xl border border-white/5 flex flex-col items-center space-y-3 active:scale-95 transition-all bg-white/[0.02] col-span-2"
+                        >
+                          <MessageSquare className="w-8 h-8 text-primary" />
+                          <span className="text-xs font-black uppercase text-slate-300">Messages</span>
+                        </button>
+                        <button 
+                          onClick={() => handleMobileTabChange('social')}
                           className="p-6 glass-morphism rounded-3xl border border-white/5 flex flex-col items-center space-y-3 active:scale-95 transition-all bg-white/[0.02]"
                         >
                           <ImageIcon className="w-8 h-8 text-indigo-400" />
                           <span className="text-xs font-black uppercase text-slate-300">Social Feed</span>
                         </button>
                         <button 
-                          onClick={() => setActiveTab('intelligence')}
+                          onClick={() => handleMobileTabChange('intelligence')}
                           className="p-6 glass-morphism rounded-3xl border border-white/5 flex flex-col items-center space-y-3 active:scale-95 transition-all bg-white/[0.02]"
                         >
                           <Sparkles className="w-8 h-8 text-primary" />
                           <span className="text-xs font-black uppercase text-slate-300">Intelligence</span>
                         </button>
-                        <button 
-                          onClick={() => setActiveTab('transactions')}
-                          className="p-6 glass-morphism rounded-3xl border border-white/5 flex flex-col items-center space-y-3 active:scale-95 transition-all bg-white/[0.02]"
-                        >
-                          <History className="w-8 h-8 text-emerald-400" />
-                          <span className="text-xs font-black uppercase text-slate-300">Logs</span>
-                        </button>
                         {user.role === 'admin' && (
                           <button 
-                            onClick={() => setActiveTab('admin')}
+                            onClick={() => handleMobileTabChange('admin')}
                             className="p-6 glass-morphism rounded-3xl border border-white/5 flex flex-col items-center space-y-3 active:scale-95 transition-all bg-white/[0.02] col-span-2"
                           >
                             <ShieldCheck className="w-8 h-8 text-primary" />
@@ -478,14 +500,14 @@ export default function App() {
                           </button>
                         )}
                         <button 
-                          onClick={() => setActiveTab('profile')}
+                          onClick={() => handleMobileTabChange('profile')}
                           className="p-6 glass-morphism rounded-3xl border border-white/5 flex flex-col items-center space-y-3 active:scale-95 transition-all bg-white/[0.02]"
                         >
                           <User className="w-8 h-8 text-blue-400" />
                           <span className="text-xs font-black uppercase text-slate-300">Profile</span>
                         </button>
                         <button 
-                          onClick={() => setActiveTab('permissions')}
+                          onClick={() => handleMobileTabChange('permissions')}
                           className="p-6 glass-morphism rounded-3xl border border-white/5 flex flex-col items-center space-y-3 active:scale-95 transition-all bg-white/[0.02]"
                         >
                           <AlertCircle className="w-8 h-8 text-amber-500" />
@@ -506,36 +528,37 @@ export default function App() {
         <nav className="md:hidden fixed bottom-0 left-0 right-0 glass-morphism border-t border-white/10 px-2 py-3 pb-safe flex items-center justify-around z-[60] backdrop-blur-2xl bg-slate-900/90 shadow-[0_-8px_30px_rgb(0,0,0,0.5)]">
           <MobileNavButton 
             active={activeTab === 'dashboard'} 
-            onClick={() => setActiveTab('dashboard')} 
+            onClick={() => handleMobileTabChange('dashboard')} 
             icon={LayoutDashboard} 
             label="Dash" 
           />
           <MobileNavButton 
             active={activeTab === 'inventory'} 
-            onClick={() => setActiveTab('inventory')} 
+            onClick={() => handleMobileTabChange('inventory')} 
             icon={Package} 
             label="Inventory" 
           />
           <MobileNavButton 
             active={activeTab === 'projects'} 
-            onClick={() => setActiveTab('projects')} 
+            onClick={() => handleMobileTabChange('projects')} 
             icon={Zap} 
             label="Projects" 
           />
           <MobileNavButton 
-            active={activeTab === 'chat'} 
-            onClick={() => setActiveTab('chat')} 
-            icon={MessageSquare} 
-            label="Chat" 
+            active={activeTab === 'transactions'} 
+            onClick={() => handleMobileTabChange('transactions')} 
+            icon={History} 
+            label="Logs" 
           />
           <MobileNavButton 
-            active={activeTab === 'more'} 
-            onClick={() => setActiveTab('more')} 
+            active={activeTab === 'more' || activeTab === 'chat' || activeTab === 'social' || activeTab === 'intelligence' || activeTab === 'profile' || activeTab === 'permissions' || activeTab === 'admin'} 
+            onClick={() => handleMobileTabChange('more')} 
             icon={MoreVertical} 
             label="More" 
           />
         </nav>
       </div>
+      <ZecorpMascot />
     </div>
   );
 }

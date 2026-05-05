@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { InventoryItem, StockTransaction, ProjectItem } from "../types";
+import { InventoryItem, StockTransaction, ProjectItem, Project } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
 
@@ -8,6 +8,7 @@ export interface InventoryInsight {
   message: string;
   type: 'WARNING' | 'SUGGESTION' | 'POSITIVE';
   itemId?: string;
+  isUrgent?: boolean;
 }
 
 export async function analyzeInventory(items: InventoryItem[], transactions: StockTransaction[]): Promise<InventoryInsight[]> {
@@ -40,9 +41,10 @@ export async function analyzeInventory(items: InventoryItem[], transactions: Sto
                 type: Type.STRING,
                 enum: ['WARNING', 'SUGGESTION', 'POSITIVE']
               },
+              isUrgent: { type: Type.BOOLEAN },
               itemId: { type: Type.STRING, nullable: true }
             },
-            required: ['title', 'message', 'type']
+            required: ['title', 'message', 'type', 'isUrgent']
           }
         }
       }
@@ -149,6 +151,48 @@ export async function processAiSearch(query: string, items: InventoryItem[]): Pr
   }
 }
 
+export async function findInventoryMatches(importedItems: Partial<ProjectItem>[], inventory: InventoryItem[]): Promise<any[]> {
+  try {
+    const inventorySummary = inventory.map(i => ({ id: i.id, name: i.name, brand: i.brand, model: i.modelNumber }));
+    const response = await ai.models.generateContent({
+      model: "gemini-1.5-flash", // Use a cheaper model for this high-volume task if possible, or stick to provided aliases
+      contents: `
+        Match these imported items to the existing inventory. 
+        If a match is found, return the inventory 'id'. If no match is found, leave 'id' null.
+        
+        Imported Items:
+        ${JSON.stringify(importedItems.map(i => ({ name: i.name, brand: i.brand, model: i.model })))}
+        
+        Existing Inventory:
+        ${JSON.stringify(inventorySummary.slice(0, 300))} 
+        
+        Return a JSON array of matched IDs corresponding to the imported items (one-to-one mapping).
+      `,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING, nullable: true }
+        }
+      }
+    });
+
+    const matches = JSON.parse(response.text || "[]");
+    return importedItems.map((item, idx) => ({
+      ...item,
+      inventoryItemId: matches[idx] || `EXT-${Math.random().toString(36).substr(2, 9)}`,
+      matched: !!matches[idx]
+    }));
+  } catch (error) {
+    console.error("Gemini Matching Error:", error);
+    return importedItems.map(item => ({
+      ...item,
+      inventoryItemId: `EXT-${Math.random().toString(36).substr(2, 9)}`,
+      matched: false
+    }));
+  }
+}
+
 export async function getAiResponse(message: string): Promise<string> {
   try {
     const response = await ai.models.generateContent({
@@ -177,6 +221,66 @@ export async function getAiResponse(message: string): Promise<string> {
   }
 }
 
+export async function getExcelMapping(headers: string[], sampleData: any[]): Promise<Record<string, string>> {
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `
+        Analyze these Excel headers and sample data to map them to our internal Inventory Schema.
+        
+        Internal Fields:
+        - name: The item's primary name or description.
+        - brand: Manufacturer or brand name.
+        - modelNumber: Specific model identifier or part number.
+        - quantity: Current stock level (number).
+        - category: Type of item (e.g. Lighting, Audio, Cable).
+        - location: Where it's usually stored or used.
+        - supplier: Who provides the item.
+        - warehouseLocation: Specific bin, shelf, or aisle in the warehouse.
+        - unitPrice: The cost of a single unit.
+        - client: If it belongs to a specific client.
+        - outlet: The project or outlet name.
+        - jobNumber: The associated job or project number.
+
+        Excel Headers Found:
+        ${headers.join(', ')}
+        
+        Sample Data (first few rows):
+        ${JSON.stringify(sampleData)}
+        
+        Identify which Excel header matches each Internal Field. 
+        Return a JSON object where keys are Internal Fields and values are the corresponding Excel Header names.
+        If no match is found for a field, omit it from the object or use null.
+      `,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            name: { type: Type.STRING, nullable: true },
+            brand: { type: Type.STRING, nullable: true },
+            modelNumber: { type: Type.STRING, nullable: true },
+            quantity: { type: Type.STRING, nullable: true },
+            category: { type: Type.STRING, nullable: true },
+            location: { type: Type.STRING, nullable: true },
+            supplier: { type: Type.STRING, nullable: true },
+            warehouseLocation: { type: Type.STRING, nullable: true },
+            unitPrice: { type: Type.STRING, nullable: true },
+            client: { type: Type.STRING, nullable: true },
+            outlet: { type: Type.STRING, nullable: true },
+            jobNumber: { type: Type.STRING, nullable: true }
+          }
+        }
+      }
+    });
+
+    return JSON.parse(response.text || "{}");
+  } catch (error) {
+    console.error("Gemini Mapping identification error:", error);
+    return {};
+  }
+}
+
 export async function mapExcelItems(rawData: any[]): Promise<Partial<ProjectItem>[]> {
   try {
     const response = await ai.models.generateContent({
@@ -185,22 +289,27 @@ export async function mapExcelItems(rawData: any[]): Promise<Partial<ProjectItem
         Map this raw data from an Excel file to the application's ProjectItem schema.
         
         ProjectItem Schema & Guidance:
-        - name: string (Mapping to "Item description" or similar)
-        - brand: string (The manufacturer or brand)
+        - posNo: string (Mapping to "Pos No" or "Position")
+        - name: string (Mapping to "Item description" or "Item name")
+        - quantity: number (The quantity of items, "qty")
+        - brand: string (The manufacturer or primary brand)
         - model: string (The model number or specific identifier)
-        - quantity: number (The quantity of items)
-        - supplier: string (Who supplied the item)
-        - location: string (Mapping to "unit location" or where the item is stored)
-        - warehouseLocation: string (Mapping to warehouse storage details like Aisle, Shelf, or Bin)
-        - clientAssignment: string (Mapping to specific team, department, or user assignment)
-        - approvedQuote: string (Mapping to "Approved quote column" or pricing/quote info)
+        - dimensions: string (Mapping to "Dim" or "Dimensions")
+        - logistics: string (Mapping to "Logistics")
+        - origin: string (Mapping to "origin" or "orgin")
+        - supplier: string (Who supplied the item, "supplier")
+        - unitLocation: string (Mapping to "unit Location")
+        - alternateBrand: string (Mapping to "alternate brand if any")
+        - delivery: string (Delivery status or details, "delivery")
         - category: string (Mapping to "category description")
-        - posNo: string (Mapping to "pos no")
+        - location: string (General storage location)
+        - warehouseLocation: string (Aisle, Shelf, or Bin)
+        - clientAssignment: string (Team or department assignment)
+        - approvedQuote: string (Pricing or quote info)
         - eta: string (Estimated Time of Arrival)
-        - delivery: string (Delivery status or details)
         
         Raw Data (sample or all):
-        ${JSON.stringify(rawData.slice(0, 50))}
+        ${JSON.stringify(rawData.slice(0, 80))}
         
         Identify which columns correspond to the fields above. If a field is missing, leave it as an empty string (or 0 for quantity).
         Return a JSON array of objects that strictly follow the schema. Ensure quantity is a number.
@@ -224,7 +333,12 @@ export async function mapExcelItems(rawData: any[]): Promise<Partial<ProjectItem
               category: { type: Type.STRING },
               posNo: { type: Type.STRING },
               eta: { type: Type.STRING },
-              delivery: { type: Type.STRING }
+              delivery: { type: Type.STRING },
+              dimensions: { type: Type.STRING },
+              logistics: { type: Type.STRING },
+              origin: { type: Type.STRING },
+              unitLocation: { type: Type.STRING },
+              alternateBrand: { type: Type.STRING }
             },
             required: ['name', 'quantity']
           }
@@ -243,6 +357,78 @@ export async function mapExcelItems(rawData: any[]): Promise<Partial<ProjectItem
   }
 }
 
+export async function getProjectExcelMapping(headers: string[], sampleData: any[]): Promise<Record<string, string>> {
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `
+        Analyze these Excel headers and sample data to map them to our internal Project Schema.
+        Projects usually contain multiple items.
+        
+        Internal Project Fields:
+        - client: The name of the client/company.
+        - jobNumber: Unique job or project number.
+        - outlet: Project name or site name.
+        - location: General location of the project.
+
+        Internal Item Fields (per project):
+        - posNo: Position number in the project.
+        - name: Item description.
+        - brand: Manufacturer.
+        - model: Model number.
+        - quantity: Required quantity.
+        - dimensions: Item dimensions.
+        - logistics: Logistics info.
+        - origin: Item origin.
+        - supplier: Who provides the item.
+        - unitLocation: Unit location.
+        - alternateBrand: Alternative brand suggestion.
+        - delivery: Delivery details.
+        - category: Item category.
+
+        Excel Headers Found:
+        ${headers.join(', ')}
+        
+        Sample Data (first few rows):
+        ${JSON.stringify(sampleData)}
+        
+        Identify which Excel header matches each Internal Field. 
+        Return a JSON object where keys are Internal Fields (both Project and Item fields) and values are the corresponding Excel Header names.
+      `,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            client: { type: Type.STRING, nullable: true },
+            jobNumber: { type: Type.STRING, nullable: true },
+            outlet: { type: Type.STRING, nullable: true },
+            location: { type: Type.STRING, nullable: true },
+            name: { type: Type.STRING, nullable: true },
+            brand: { type: Type.STRING, nullable: true },
+            model: { type: Type.STRING, nullable: true },
+            quantity: { type: Type.STRING, nullable: true },
+            supplier: { type: Type.STRING, nullable: true },
+            category: { type: Type.STRING, nullable: true },
+            posNo: { type: Type.STRING, nullable: true },
+            dimensions: { type: Type.STRING, nullable: true },
+            logistics: { type: Type.STRING, nullable: true },
+            origin: { type: Type.STRING, nullable: true },
+            unitLocation: { type: Type.STRING, nullable: true },
+            alternateBrand: { type: Type.STRING, nullable: true },
+            delivery: { type: Type.STRING, nullable: true }
+          }
+        }
+      }
+    });
+
+    return JSON.parse(response.text || "{}");
+  } catch (error) {
+    console.error("Gemini Project Mapping error:", error);
+    return {};
+  }
+}
+
 export async function mapExcelProjects(rawData: any[]): Promise<any[]> {
   try {
     const response = await ai.models.generateContent({
@@ -257,20 +443,25 @@ export async function mapExcelProjects(rawData: any[]): Promise<any[]> {
         - outlet: string
         - location: string
         
-        ProjectItem Schema (belonging to a project):
+        ProjectItem Schema:
+        - posNo: string (Mapping to "Pos No")
         - name: string (Mapping to "Item description")
-        - brand: string
+        - brand: string (Primary brand)
         - model: string
-        - quantity: number
+        - quantity: number (qty)
         - supplier: string
-        - location: string (Mapping to "unit location")
-        - warehouseLocation: string (Mapping to warehouse storage details)
-        - clientAssignment: string (Mapping to team or user assignment)
-        - approvedQuote: string (Mapping to "Approved quote column")
-        - category: string (Mapping to "category description")
-        - posNo: string (Mapping to "pos no")
-        - eta: string
+        - dimensions: string (Dim)
+        - logistics: string
+        - origin: string (orgin)
+        - unitLocation: string (Unit location)
+        - alternateBrand: string (alternate brand if any)
         - delivery: string
+        - category: string
+        - location: string (Mapping to "unit location" or specific storage)
+        - warehouseLocation: string
+        - clientAssignment: string
+        - approvedQuote: string
+        - eta: string
         
         Raw Data (sample):
         ${JSON.stringify(rawData.slice(0, 50))}
@@ -306,7 +497,12 @@ export async function mapExcelProjects(rawData: any[]): Promise<any[]> {
                     category: { type: Type.STRING },
                     posNo: { type: Type.STRING },
                     eta: { type: Type.STRING },
-                    delivery: { type: Type.STRING }
+                    delivery: { type: Type.STRING },
+                    dimensions: { type: Type.STRING },
+                    logistics: { type: Type.STRING },
+                    origin: { type: Type.STRING },
+                    unitLocation: { type: Type.STRING },
+                    alternateBrand: { type: Type.STRING }
                   },
                   required: ['name', 'quantity']
                 }
@@ -325,6 +521,105 @@ export async function mapExcelProjects(rawData: any[]): Promise<any[]> {
       throw new Error("Gemini API quota exceeded. Please try again in 1-2 minutes.");
     }
     console.error("Gemini Project Mapping Error:", error);
+    return [];
+  }
+}
+
+// Simple cache to prevent excessive API calls
+const insightsCache = new Map<string, { timestamp: number, data: InventoryInsight[] }>();
+
+export async function analyzeSupplyChain(
+  inventory: InventoryItem[], 
+  transactions: StockTransaction[],
+  projects: Project[]
+): Promise<InventoryInsight[]> {
+  try {
+    const dataHash = JSON.stringify({
+      invCount: inventory.length,
+      txCount: transactions.length,
+      projCount: projects.length,
+      totalStock: inventory.reduce((s, i) => s + i.currentQuantity, 0)
+    });
+
+    const cached = insightsCache.get(dataHash);
+    if (cached && Date.now() - cached.timestamp < 600000) { // 10 minute cache
+      return cached.data;
+    }
+
+    const activeProjects = projects.filter(p => p.status === 'Active');
+    const projectSummary = activeProjects.map(p => ({
+      name: p.outlet,
+      items: p.items.map(i => ({ name: i.name, qty: i.quantity }))
+    }));
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `
+        Analyze the supply chain status and predict potential stockouts or overstock situations.
+        
+        Inventory:
+        ${JSON.stringify(inventory.slice(0, 100).map(i => ({ id: i.id, name: i.name, stock: i.currentQuantity, min: i.minStock })))}
+        
+        Recent Transactions (last 15):
+        ${JSON.stringify(transactions.slice(0, 15).map(t => ({ name: t.itemName, type: t.type, qty: t.quantity })))}
+        
+        Active Projects Requirements:
+        ${JSON.stringify(projectSummary)}
+        
+        Task:
+        1. Predict if any item will fall below min stock based on active project requirements.
+        2. Identify overstock if items have high stock but low transaction frequency and no project demand.
+        3. Suggest proactive restocks with estimated urgency.
+        
+        Return a JSON array of actionable insights.
+      `,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING },
+              message: { type: Type.STRING },
+              type: { 
+                type: Type.STRING,
+                enum: ['WARNING', 'SUGGESTION', 'POSITIVE']
+              },
+              isUrgent: { type: Type.BOOLEAN },
+              itemId: { type: Type.STRING, nullable: true }
+            },
+            required: ['title', 'message', 'type', 'isUrgent']
+          }
+        }
+      }
+    });
+
+    const results = JSON.parse(response.text || "[]");
+    insightsCache.set(dataHash, { timestamp: Date.now(), data: results });
+    return results;
+  } catch (error: any) {
+    const errorStr = JSON.stringify(error);
+    const isQuotaError = errorStr.includes('429') || 
+                        errorStr.includes('RESOURCE_EXHAUSTED') ||
+                        error?.status === 'RESOURCE_EXHAUSTED' ||
+                        error?.error?.code === 429;
+
+    if (isQuotaError) {
+      console.warn("Gemini Supply Chain Analysis: Quota limit reached (429). Using cache if available.");
+      // Return a friendly message if no cache exists
+      const lastCache = Array.from(insightsCache.values()).pop();
+      if (lastCache) return lastCache.data;
+      
+      return [{
+        title: "Analysis Delayed",
+        message: "Predictive analysis is currently throttled due to high usage. Please refresh in a moment.",
+        type: 'SUGGESTION',
+        isUrgent: false
+      }];
+    }
+    
+    console.error("Gemini Supply Chain Analysis Error:", error);
     return [];
   }
 }
