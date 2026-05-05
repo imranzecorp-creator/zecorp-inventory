@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, memo, useEffect } from 'react';
 import { 
   Plus, 
   Search, 
@@ -24,7 +24,8 @@ import {
   Warehouse,
   ChevronDown,
   Hash,
-  FileUp
+  FileUp,
+  FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as XLSX from 'xlsx';
@@ -56,6 +57,196 @@ interface InventoryListProps {
   projects: Project[];
 }
 
+import { VariableSizeList as List } from 'react-window';
+import AutoSizer from 'react-virtualized-auto-sizer';
+
+const InventoryRow = memo(({ index, style, data }: { index: number, style: React.CSSProperties, data: any }) => {
+  const { items, expandedId, selectedIds, toggleSelectItem, toggleExpand, isApproved, isAdmin, canUpdateStock, adjustmentItem, setAdjustmentType, setAdjustmentItem, setEditingItem, setItemToDelete } = data;
+  const item = items[index];
+  if (!item) return null;
+  const isExpanded = expandedId === item.id;
+  const isSelected = selectedIds.includes(item.id);
+
+  return (
+    <div style={style} className="px-2">
+      <motion.div 
+        layout
+        initial={false}
+        animate={{ 
+          backgroundColor: isSelected ? "rgba(59, 130, 246, 0.08)" : "rgba(255, 255, 255, 0)",
+          scale: isSelected ? 1.002 : 1,
+        }}
+        className={cn(
+          "group cursor-pointer border border-white/[0.03] rounded-2xl overflow-hidden transition-all duration-200",
+          isSelected && "ring-1 ring-inset ring-primary/20",
+          isExpanded ? "bg-white/[0.04] mb-4" : "hover:bg-white/[0.02] mb-1"
+        )}
+        onClick={() => toggleExpand(item.id)}
+      >
+        <div className="flex items-center p-3">
+          {isApproved && (
+            <div className="w-10 flex items-center justify-center shrink-0" onClick={(e) => { e.stopPropagation(); toggleSelectItem(item.id); }}>
+              <div className="text-slate-500 group-hover:text-primary transition-colors">
+                <AnimatePresence mode="wait">
+                  {isSelected ? (
+                    <motion.div key="c" initial={{ scale: 0, rotate: -90 }} animate={{ scale: 1, rotate: 0 }} exit={{ scale: 0, rotate: 90 }}>
+                      <CheckSquare className="w-4 h-4 text-primary" />
+                    </motion.div>
+                  ) : (
+                    <motion.div key="u" initial={{ scale: 0.8, opacity: 0.5 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0.5 }}>
+                      <Square className="w-4 h-4" />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+          )}
+          
+          <div className="flex-1 flex items-center space-x-3 truncate">
+            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden border border-white/10 shrink-0">
+              {item.imageUrl ? (
+                <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <Package className="w-5 h-5 text-slate-500" />
+              )}
+            </div>
+            <div className="flex flex-col truncate">
+              <div className="flex items-center space-x-2">
+                <p className="text-sm font-bold text-slate-200 group-hover:text-primary transition-colors truncate">{item.name}</p>
+                {item.inventoryType === 'Client Stock' && <Warehouse className="w-3 h-3 text-amber-500/60" />}
+              </div>
+              <p className="text-[10px] text-slate-500 font-medium truncate">
+                {item.brand && `${item.brand} • `}{item.modelNumber || 'No Model'}
+              </p>
+            </div>
+          </div>
+
+          <div className="w-24 px-4 text-center shrink-0">
+            <div className={cn(
+              "px-2 py-1 rounded-lg border flex flex-col justify-center",
+              item.currentQuantity <= item.minStock 
+                ? "bg-amber-500/10 border-amber-500/30 text-amber-400" 
+                : "bg-primary/10 border-primary/30 text-primary"
+            )}>
+              <span className="text-sm font-black leading-none">{item.currentQuantity}</span>
+              <span className="text-[8px] font-black uppercase opacity-60 mt-0.5">Units</span>
+            </div>
+          </div>
+
+          <div className="w-32 px-4 hidden lg:block shrink-0">
+             <div className="flex items-center space-x-2 text-slate-400">
+                <MapPin className="w-3 h-3 text-slate-600" />
+                <span className="text-xs font-medium truncate">{item.location}</span>
+             </div>
+          </div>
+
+          <div className="w-32 px-4 hidden xl:block shrink-0">
+            <span className={cn(
+              "px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border block text-center",
+              item.currentQuantity <= item.minStock 
+                ? "bg-red-500/10 text-red-500 border-red-500/20" 
+                : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+            )}>
+              {item.currentQuantity <= item.minStock ? 'Low Stock' : 'Healthy'}
+            </span>
+          </div>
+
+          {isApproved && (
+            <div className="w-32 flex items-center justify-end pr-4 space-x-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center space-x-1">
+                <button 
+                  onClick={() => { setAdjustmentType('IN'); setAdjustmentItem(item); }}
+                  className="p-1.5 bg-green-500/10 text-green-400 rounded-lg hover:bg-green-500/20 transition-all border border-green-500/10"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+                <button 
+                  onClick={() => { setAdjustmentType('OUT'); setAdjustmentItem(item); }}
+                  className="p-1.5 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-all border border-red-500/10"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              <div className="h-6 w-px bg-white/10 mx-1" />
+              <button 
+                onClick={() => setEditingItem(item)}
+                className="p-1.5 hover:bg-white/10 rounded-lg transition-all text-slate-400 hover:text-white"
+              >
+                <Edit className="w-3.5 h-3.5" />
+              </button>
+              <button 
+                onClick={() => setItemToDelete(item)}
+                className="p-1.5 hover:bg-red-500/10 rounded-lg transition-all text-slate-400 hover:text-red-500"
+              >
+                <Trash className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        <AnimatePresence>
+          {isExpanded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="bg-white/[0.04] border-t border-white/5 p-6"
+            >
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                  <div className="space-y-4">
+                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Info className="w-3 h-3" />Item Info</p>
+                     <div className="space-y-2">
+                        <div className="flex flex-col">
+                           <span className="text-[10px] text-slate-500 uppercase font-bold">Category</span>
+                           <span className="text-sm text-slate-200 font-medium">{item.category || 'Standard Asset'}</span>
+                        </div>
+                        <div className="flex flex-col">
+                           <span className="text-[10px] text-slate-500 uppercase font-bold">Supplier</span>
+                           <span className="text-sm text-slate-200 font-medium">{item.supplier || 'Not Specified'}</span>
+                        </div>
+                     </div>
+                  </div>
+                  <div className="space-y-4">
+                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Building className="w-3 h-3" />Project Details</p>
+                     <div className="space-y-2">
+                        <div className="flex flex-col">
+                           <span className="text-[10px] text-slate-500 uppercase font-bold">Client</span>
+                           <span className="text-sm text-slate-200 font-medium">{item.client || 'Internal'}</span>
+                        </div>
+                        <div className="flex flex-col">
+                           <span className="text-[10px] text-slate-500 uppercase font-bold">Project Outlet</span>
+                           <span className="text-sm text-slate-200 font-medium">{item.outlet || 'Unknown'}</span>
+                        </div>
+                     </div>
+                  </div>
+                  <div className="space-y-4">
+                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Hash className="w-3 h-3" />System Meta</p>
+                     <div className="space-y-2">
+                        <div className="flex flex-col">
+                           <span className="text-[10px] text-slate-500 uppercase font-bold">Job Number</span>
+                           <span className="text-sm font-mono text-primary font-bold">{item.jobNumber || 'PENDING'}</span>
+                        </div>
+                        <div className="flex flex-col">
+                           <span className="text-[10px] text-slate-500 uppercase font-bold">Entry ID</span>
+                           <span className="text-[10px] font-mono text-slate-500 truncate">{item.id}</span>
+                        </div>
+                     </div>
+                  </div>
+                  <div className="space-y-4">
+                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><FileText className="w-3 h-3" />Technical Notes</p>
+                     <p className="text-xs text-slate-400 italic leading-relaxed border-l-2 border-white/5 pl-3">
+                        {item.description || 'No additional technical data available for this asset signature.'}
+                     </p>
+                  </div>
+               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </div>
+  );
+});
+
 export default function InventoryList({ items, clients, user, projects }: InventoryListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAiSearching, setIsAiSearching] = useState(false);
@@ -63,6 +254,7 @@ export default function InventoryList({ items, clients, user, projects }: Invent
   const [aiFilteredIds, setAiFilteredIds] = useState<string[] | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const inventoryFileInputRef = React.useRef<HTMLInputElement>(null);
+  const listRef = React.useRef<List>(null);
 
   const handleInventoryExcelUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -85,29 +277,43 @@ export default function InventoryList({ items, clients, user, projects }: Invent
 
         const aiMappedItems = await mapExcelItems(data);
         
-        const batch = writeBatch(db);
-        for (const itemData of aiMappedItems) {
-          const newDocRef = doc(collection(db, 'inventory'));
-          batch.set(newDocRef, {
-            name: itemData.name || 'Unnamed Item',
-            brand: itemData.brand || '',
-            modelNumber: itemData.model || '',
-            currentQuantity: itemData.quantity || 0,
-            minStock: 5,
-            description: `Imported via AI: ${itemData.category || ''} ${itemData.brand || ''}`,
-            location: itemData.location || 'Warehouse',
-            supplier: itemData.supplier || '',
-            lastUpdated: serverTimestamp(),
-            inventoryType: 'Warehouse Stock',
-            createdAt: serverTimestamp()
-          });
+        if (aiMappedItems.length === 0) {
+          alert('AI could not map any items from this file. Please check the Excel format.');
+          return;
         }
-        await batch.commit();
+
+        // Firestore batches are limited to 500 docs. 
+        // We'll use multiple batches if needed.
+        const chunks = [];
+        for (let i = 0; i < aiMappedItems.length; i += 500) {
+          chunks.push(aiMappedItems.slice(i, i + 500));
+        }
+
+        for (const chunk of chunks) {
+          const batch = writeBatch(db);
+          for (const itemData of chunk) {
+            const newDocRef = doc(collection(db, 'inventory'));
+            batch.set(newDocRef, {
+              name: itemData.name || 'Unnamed Item',
+              brand: itemData.brand || '',
+              modelNumber: itemData.model || '',
+              currentQuantity: itemData.quantity || 0,
+              minStock: 5,
+              description: `Imported via AI: ${itemData.category || ''} ${itemData.brand || ''}`,
+              location: itemData.location || 'Warehouse',
+              supplier: itemData.supplier || '',
+              lastUpdated: serverTimestamp(),
+              inventoryType: 'Warehouse Stock',
+              createdAt: serverTimestamp()
+            });
+          }
+          await batch.commit();
+        }
 
         alert(`Successfully AI-imported ${aiMappedItems.length} inventory items!`);
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error importing inventory:', err);
-        alert('Failed to import inventory items.');
+        alert(err.message || 'Failed to import inventory items.');
       } finally {
         setIsImporting(false);
         if (inventoryFileInputRef.current) inventoryFileInputRef.current.value = '';
@@ -238,6 +444,14 @@ export default function InventoryList({ items, clients, user, projects }: Invent
       return true;
     });
   }, [items, searchTerm, aiFilteredIds, selectedBrands, selectedModels, selectedSuppliers, selectedOutlets, clientFilter, jobFilter, locationFilter, inventoryTypeFilter, stockInStart, stockInEnd, updatedStart, updatedEnd]);
+
+  const getItemSize = useCallback((index: number) => {
+    return expandedId === filteredItems[index]?.id ? 440 : 72;
+  }, [expandedId, filteredItems]);
+
+  useEffect(() => {
+    listRef.current?.resetAfterIndex(0);
+  }, [expandedId]);
 
   const toggleSelectAll = () => {
     if (selectedIds.length === filteredItems.length) {
@@ -382,6 +596,38 @@ export default function InventoryList({ items, clients, user, projects }: Invent
     }
   };
 
+  const itemData = useMemo(() => ({
+    items: filteredItems,
+    expandedId,
+    selectedIds,
+    toggleSelectItem,
+    toggleExpand,
+    isApproved,
+    isAdmin,
+    canUpdateStock,
+    adjustmentItem,
+    setAdjustmentType,
+    setAdjustmentItem,
+    setEditingItem,
+    setItemToDelete,
+    deletingId
+  }), [
+    filteredItems,
+    expandedId,
+    selectedIds,
+    toggleSelectItem,
+    toggleExpand,
+    isApproved,
+    isAdmin,
+    canUpdateStock,
+    adjustmentItem,
+    setAdjustmentType,
+    setAdjustmentItem,
+    setEditingItem,
+    setItemToDelete,
+    deletingId
+  ]);
+
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -426,14 +672,14 @@ export default function InventoryList({ items, clients, user, projects }: Invent
             <span>Export</span>
           </button>
           {isApproved && (
-            <>
+            <div className="flex items-center space-x-2 md:space-x-3">
               <button 
                 onClick={() => inventoryFileInputRef.current?.click()}
                 disabled={isImporting}
-                className="flex-shrink-0 flex items-center space-x-2 px-3 md:px-4 py-2 md:py-2.5 text-xs md:text-sm font-black md:font-medium text-slate-300 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all active:scale-95 group uppercase md:normal-case tracking-widest md:tracking-normal"
+                className="flex-shrink-0 flex items-center space-x-2 px-3 md:px-4 py-2 md:py-2.5 text-xs md:text-sm font-black md:font-medium text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-xl hover:bg-blue-500/20 transition-all active:scale-95 group uppercase md:normal-case tracking-widest md:tracking-normal shadow-lg shadow-blue-500/10"
               >
-                {isImporting ? <Loader2 className="w-3.5 h-3.5 md:w-4 md:h-4 animate-spin" /> : <FileUp className="w-3.5 h-3.5 md:w-4 md:h-4" />}
-                <span>{isImporting ? 'AI MAPPING...' : 'AI EXCEL IMPORT'}</span>
+                {isImporting ? <Loader2 className="w-3.5 h-3.5 md:w-4 md:h-4 animate-spin" /> : <Zap className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary group-hover:animate-pulse" />}
+                <span>{isImporting ? 'AI MAPPING...' : 'AI INVENTORY IMPORT'}</span>
               </button>
               <input 
                 type="file" 
@@ -449,7 +695,7 @@ export default function InventoryList({ items, clients, user, projects }: Invent
                 <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />
                 <span>Add Item</span>
               </button>
-            </>
+            </div>
           )}
         </div>
       </div>
@@ -675,514 +921,35 @@ export default function InventoryList({ items, clients, user, projects }: Invent
         </AnimatePresence>
       </div>
 
-      {/* Inventory Grid/Table */}
-      <div className="glass-morphism rounded-3xl border border-white/5 shadow-sm overflow-hidden">
-        {/* Desktop Table View */}
-        <div className="hidden md:block overflow-x-auto custom-scrollbar">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-white/5 border-b border-white/5 text-left">
-                {isApproved && (
-                  <th className="px-6 py-4 w-12">
-                    <button 
-                      onClick={toggleSelectAll}
-                      className="text-slate-500 hover:text-primary transition-colors"
-                    >
-                      <AnimatePresence mode="wait">
-                        {selectedIds.length === filteredItems.length && filteredItems.length > 0 ? (
-                          <motion.div
-                            key="checked"
-                            initial={{ scale: 0.5, opacity: 0, rotate: -45 }}
-                            animate={{ scale: 1, opacity: 1, rotate: 0 }}
-                            exit={{ scale: 0.5, opacity: 0, rotate: 45 }}
-                            transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                          >
-                            <CheckSquare className="w-4 h-4 text-primary" />
-                          </motion.div>
-                        ) : (
-                          <motion.div
-                            key="unchecked"
-                            initial={{ scale: 0.5, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.5, opacity: 0 }}
-                            transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                          >
-                            <Square className="w-4 h-4" />
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </button>
-                  </th>
-                )}
-                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Item Details</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Quantity</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Location</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                {isApproved && (
-                  <th className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
-                )}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {filteredItems.map((item) => (
-                <React.Fragment key={item.id}>
-                  <motion.tr 
-                    layout
-                    initial={false}
-                    animate={{ 
-                      backgroundColor: selectedIds.includes(item.id) ? "rgba(59, 130, 246, 0.08)" : "rgba(255, 255, 255, 0)",
-                      scale: selectedIds.includes(item.id) ? 1.005 : 1,
-                      x: selectedIds.includes(item.id) ? 4 : 0
-                    }}
-                    whileHover={{ backgroundColor: selectedIds.includes(item.id) ? "rgba(59, 130, 246, 0.12)" : "rgba(255, 255, 255, 0.02)" }}
-                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                    onClick={() => toggleExpand(item.id)}
-                    className={cn(
-                      "group cursor-pointer border-b border-white/[0.02] last:border-0",
-                      selectedIds.includes(item.id) && "ring-1 ring-inset ring-primary/20",
-                      expandedId === item.id && "bg-white/[0.03]"
-                    )}
-                  >
-                    {isApproved && (
-                      <td className="px-6 py-3" onClick={(e) => { e.stopPropagation(); toggleSelectItem(item.id); }}>
-                        <div className="text-slate-500 group-hover:text-primary transition-colors">
-                          <AnimatePresence mode="wait">
-                            {selectedIds.includes(item.id) ? (
-                              <motion.div
-                                key="item-checked"
-                                initial={{ scale: 0, rotate: -90 }}
-                                animate={{ scale: 1, rotate: 0 }}
-                                exit={{ scale: 0, rotate: 90 }}
-                                transition={{ type: "spring", stiffness: 500, damping: 20 }}
-                              >
-                                <CheckSquare className="w-4 h-4 text-primary" />
-                              </motion.div>
-                            ) : (
-                              <motion.div
-                                key="item-unchecked"
-                                initial={{ scale: 0.8, opacity: 0.5 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                exit={{ scale: 0.8, opacity: 0.5 }}
-                              >
-                                <Square className="w-4 h-4" />
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
-                      </td>
-                    )}
-                    <td className="px-6 py-3">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden border border-white/10">
-                          {item.imageUrl ? (
-                            <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                          ) : (
-                            <Package className="w-5 h-5 text-slate-500" />
-                          )}
-                        </div>
-                        <div>
-                          <div className="flex items-center space-x-2">
-                             <p className="text-sm font-semibold text-slate-200 group-hover:text-primary transition-colors">{item.name}</p>
-                             <motion.div
-                                animate={{ rotate: expandedId === item.id ? 180 : 0 }}
-                                className="text-slate-600"
-                             >
-                               <ChevronDown className="w-3 h-3" />
-                             </motion.div>
-                          </div>
-                          <div className="flex items-center space-x-2 mt-0.5">
-                            <span className={cn(
-                              "text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md",
-                              item.inventoryType === 'Client Stock' 
-                                ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" 
-                                : "bg-primary/10 text-primary border border-primary/20"
-                            )}>
-                              {item.inventoryType === 'Client Stock' ? 'Client' : 'Warehouse'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-3">
-                      <div className="flex flex-col space-y-1.5 min-w-[120px]">
-                        <div className="flex items-center justify-between">
-                          <span className={cn(
-                            "text-sm font-bold",
-                            item.currentQuantity <= (item.minStock || 5) ? "text-amber-400" : "text-white"
-                          )}>{item.currentQuantity}</span>
-                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">/ {(item.minStock || 5) * 5} Max</span>
-                        </div>
-                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
-                           <motion.div 
-                              initial={{ width: 0 }}
-                              animate={{ width: `${Math.min((item.currentQuantity / ((item.minStock || 5) * 5 || 1)) * 100, 100)}%` }}
-                              className={cn(
-                                "h-full rounded-full transition-all duration-1000",
-                                item.currentQuantity <= (item.minStock || 5) ? "bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]" : "bg-primary"
-                              )}
-                           />
-                        </div>
-                        {/* Cross-Stock Info */}
-                        {(() => {
-                           const otherTypeItems = items.filter(i => 
-                             i.id !== item.id && 
-                             i.name.toLowerCase() === item.name.toLowerCase() &&
-                             i.inventoryType !== item.inventoryType &&
-                             (item.brand ? i.brand?.toLowerCase() === item.brand.toLowerCase() : true)
-                           );
-                           const otherTotal = otherTypeItems.reduce((acc, curr) => acc + curr.currentQuantity, 0);
-                           if (otherTotal === 0) return null;
-                           return (
-                             <div className="flex items-center space-x-1.5 mt-2">
-                               <div className="w-1 h-1 rounded-full bg-blue-400 animate-pulse" />
-                               <span className="text-[9px] font-black text-blue-400/80 uppercase tracking-widest">
-                                 {item.inventoryType === 'Warehouse Stock' ? 'CL' : 'WH'}: {otherTotal} Units
-                               </span>
-                             </div>
-                           );
-                        })()}
-                      </div>
-                    </td>
-                    <td className="px-6 py-3">
-                      <div className="flex items-center space-x-1 text-slate-400 text-sm">
-                        <MapPin className="w-3.5 h-3.5" />
-                        <span>{item.location}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-3">
-                      <span className={cn(
-                        "px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider",
-                        item.currentQuantity > item.minStock 
-                          ? "bg-green-500/10 text-green-400" 
-                          : item.currentQuantity === 0 
-                            ? "bg-red-500/10 text-red-400" 
-                            : "bg-amber-500/10 text-amber-400"
-                      )}>
-                        {item.currentQuantity > item.minStock ? 'Healthy' : item.currentQuantity === 0 ? 'Out of Stock' : 'Low Stock'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-3">
-                      <div className="flex items-center justify-end space-x-2">
-                        {canUpdateStock && (
-                          <div className="flex items-center space-x-1 mr-4 border-r border-white/5 pr-4">
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={(e) => { e.stopPropagation(); setAdjustmentItem(item); setAdjustmentType('IN'); }}
-                              className="p-2 bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white rounded-lg transition-all border border-green-500/20"
-                              title="Stock Receiving"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                            </motion.button>
-                            <motion.button
-                              whileHover={{ scale: 1.1 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={(e) => { e.stopPropagation(); setAdjustmentItem(item); setAdjustmentType('OUT'); }}
-                              className="p-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all border border-red-500/20"
-                              title="Stock Distribution"
-                            >
-                              <Minus className="w-3.5 h-3.5" />
-                            </motion.button>
-                          </div>
-                        )}
-                        {isApproved && (
-                          <div className="flex items-center space-x-2">
-                            <motion.button 
-                              whileHover={{ scale: 1.1, rotate: -5 }}
-                              whileTap={{ scale: 0.9 }}
-                              onClick={(e) => { e.stopPropagation(); setEditingItem(item); }}
-                              className="p-2 text-slate-500 hover:text-primary hover:bg-white/10 rounded-lg transition-all"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </motion.button>
-                            <motion.button 
-                              whileHover={{ scale: 1.1, rotate: 5 }}
-                              whileTap={{ scale: 0.9 }}
-                              disabled={deletingId === item.id}
-                              onClick={(e) => { e.stopPropagation(); setItemToDelete(item); }}
-                              className="p-2 text-red-500/40 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all disabled:opacity-50"
-                              title="Delete Item"
-                            >
-                              {deletingId === item.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin text-red-500" />
-                              ) : (
-                                <Trash className="w-4 h-4" />
-                              )}
-                            </motion.button>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                  </motion.tr>
-
-                  <AnimatePresence>
-                    {expandedId === item.id && (
-                      <motion.tr
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="bg-white/[0.01]"
-                      >
-                        <td colSpan={isApproved ? 6 : 5} className="px-6 py-0 overflow-hidden">
-                          <motion.div 
-                            initial={{ y: -10, opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            className="py-6 px-12 grid grid-cols-2 lg:grid-cols-4 gap-6 border-x border-white/5"
-                          >
-                            <div className="space-y-1">
-                              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                                {item.inventoryType === 'Client Stock' ? 'Allocated Client' : 'Project'}
-                              </p>
-                              <p className="text-sm font-bold text-primary">
-                                {item.inventoryType === 'Client Stock' 
-                                  ? (item.client || 'General Client') 
-                                  : (item.outlet || 'Central Hub')}
-                              </p>
-                            </div>
-                            {item.inventoryType === 'Client Stock' && item.jobNumber && (
-                              <div className="space-y-1">
-                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Job Number</p>
-                                <p className="text-sm font-bold text-amber-500">{item.jobNumber}</p>
-                              </div>
-                            )}
-                            <div className="space-y-1">
-                              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Brand & Model</p>
-                              <p className="text-sm font-bold text-white">{item.brand || 'N/A'} {item.modelNumber || ''}</p>
-                            </div>
-                            <div className="space-y-1">
-                              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Warehouse Location</p>
-                              <div className="flex items-center space-x-2 text-primary group/loc">
-                                <motion.div
-                                  whileHover={{ y: -2 }}
-                                  transition={{ type: "spring", stiffness: 400 }}
-                                >
-                                  <MapPin className="w-3 h-3" />
-                                </motion.div>
-                                <p className="text-sm font-bold">{item.location}</p>
-                              </div>
-                            </div>
-                            <div className="space-y-1">
-                              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Supplier</p>
-                              <p className="text-sm font-bold text-slate-300">{item.supplier || 'Not Specified'}</p>
-                            </div>
-                            <div className="space-y-1 flex flex-col justify-end">
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); setSelectedItem(item); }}
-                                className="flex items-center space-x-2 text-[10px] font-black text-primary uppercase tracking-widest hover:underline group"
-                              >
-                                <span>Full Stock Analysis</span>
-                                <Info className="w-3 h-3 group-hover:scale-110 transition-transform" />
-                              </button>
-                            </div>
-                            <div className="col-span-full pt-4 border-t border-white/5">
-                              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Description</p>
-                              <p className="text-sm text-slate-400 line-clamp-2 italic">{item.description || 'No description available.'}</p>
-                            </div>
-                          </motion.div>
-                        </td>
-                      </motion.tr>
-                    )}
-                  </AnimatePresence>
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile View */}
-        <div className="md:hidden divide-y divide-white/5">
-          {filteredItems.map((item) => (
-            <motion.div 
-              key={item.id}
-              layout
-              onClick={() => toggleExpand(item.id)}
-              className={cn(
-                "p-4 transition-all active:bg-white/[0.05] relative overflow-hidden",
-                selectedIds.includes(item.id) && "bg-primary/5",
-                expandedId === item.id && "bg-white/[0.03]"
-              )}
+      {/* Inventory Grid/Table - Unified Virtualized View */}
+      <div className="glass-morphism rounded-3xl border border-white/5 shadow-sm overflow-hidden h-[600px] relative">
+        <AutoSizer>
+          {({ height, width }) => (
+            <List
+              ref={listRef}
+              height={height}
+              width={width}
+              itemCount={filteredItems.length}
+              itemSize={getItemSize}
+              itemData={itemData}
             >
-              <div className="flex items-center justify-between relative z-10">
-                <div className="flex items-center space-x-4">
-                  <div className="relative group">
-                    <div className="w-14 h-14 rounded-[20px] bg-white/5 flex items-center justify-center border border-white/10 overflow-hidden shadow-inner">
-                      {item.imageUrl ? (
-                        <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      ) : (
-                        <Package className="w-6 h-6 text-slate-600" />
-                      )}
-                    </div>
-                    {isApproved && (
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); toggleSelectItem(item.id); }}
-                        className={cn(
-                          "absolute -top-1 -left-1 w-6 h-6 rounded-full flex items-center justify-center border transition-all shadow-lg",
-                          selectedIds.includes(item.id) 
-                            ? "bg-primary border-primary text-white scale-110" 
-                            : "bg-slate-900 border-white/20 text-slate-500 scale-90"
-                        )}
-                      >
-                        {selectedIds.includes(item.id) ? (
-                          <CheckSquare className="w-3 h-3 text-white" />
-                        ) : (
-                          <Square className="w-3 h-3 text-white" />
-                        )}
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2">
-                       <h3 className="text-[15px] font-bold text-white leading-tight truncate">{item.name}</h3>
-                       {item.inventoryType === 'Client Stock' && (
-                         <div className="w-1.5 h-1.5 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]" />
-                       )}
-                    </div>
-                    <div className="flex items-center space-x-2 mt-2">
-                       <span className={cn(
-                         "text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border",
-                         item.inventoryType === 'Client Stock' 
-                           ? "bg-amber-500/10 text-amber-500 border-amber-500/20" 
-                           : "bg-primary/10 text-primary border-primary/20"
-                       )}>
-                         {item.inventoryType === 'Client Stock' ? 'CL' : 'WH'} {item.brand ? `• ${item.brand}` : ''}
-                       </span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="text-right flex flex-col items-end">
-                   <div className="flex items-center space-x-2 mb-1">
-                      {isApproved && (
-                        <button 
-                          disabled={deletingId === item.id}
-                          onClick={(e) => { e.stopPropagation(); setItemToDelete(item); }}
-                          className="p-1.5 text-red-500/40 hover:text-red-500 bg-red-500/5 hover:bg-red-500/10 rounded-lg transition-all mr-1 disabled:opacity-50"
-                        >
-                          {deletingId === item.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Trash className="w-3.5 h-3.5" />
-                          )}
-                        </button>
-                      )}
-                      <span className={cn(
-                        "text-xl font-black tracking-tight",
-                        item.currentQuantity <= item.minStock ? "text-amber-500" : "text-white"
-                      )}>{item.currentQuantity}</span>
-                      <ChevronDown className={cn("w-4 h-4 text-slate-600 transition-transform duration-300", expandedId === item.id && "rotate-180 text-primary")} />
-                   </div>
-                   <div className="h-1 w-12 bg-white/5 rounded-full overflow-hidden">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.min((item.currentQuantity / (item.minStock * 5 || 25)) * 100, 100)}%` }}
-                        className={cn(
-                          "h-full rounded-full transition-all duration-1000",
-                          item.currentQuantity <= item.minStock ? "bg-amber-500" : "bg-primary"
-                        )}
-                      />
-                   </div>
-                </div>
-              </div>
-
-              <AnimatePresence>
-                {expandedId === item.id && (
-                  <motion.div 
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="pt-6 mt-4 border-t border-white/5 grid grid-cols-2 gap-6 relative z-10">
-                      <div className="space-y-1.5">
-                        <p className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em]">
-                          {item.inventoryType === 'Client Stock' ? 'Client Assignment' : 'Warehouse Origin'}
-                        </p>
-                        <div className="flex items-center space-x-2 text-slate-200">
-                          {item.inventoryType === 'Client Stock' ? (
-                            <User className="w-3.5 h-3.5 text-amber-500" />
-                          ) : (
-                            <MapPin className="w-3.5 h-3.5 text-primary" />
-                          )}
-                          <p className="text-xs font-bold truncate leading-none">
-                            {item.inventoryType === 'Client Stock' 
-                              ? (item.client || 'General Client') 
-                              : (item.location || 'Not Assigned')}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="space-y-1.5">
-                        <p className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em]">Batch Status</p>
-                        <span className={cn(
-                          "text-[10px] font-black uppercase tracking-wider",
-                          item.currentQuantity > item.minStock ? "text-green-400" : "text-amber-400"
-                        )}>
-                          {item.currentQuantity > item.minStock ? 'Healthy Node' : 'Low Reserves'}
-                        </span>
-                      </div>
-                      
-                      <div className="col-span-2 flex items-center justify-between pt-4 mt-2 border-t border-white/5">
-                        <div className="flex items-center space-x-3">
-                          {canUpdateStock && (
-                            <div className="flex items-center space-x-2 mr-2">
-                              <motion.button 
-                                whileTap={{ scale: 0.85 }}
-                                onClick={(e) => { e.stopPropagation(); setAdjustmentItem(item); setAdjustmentType('IN'); }}
-                                className="w-12 h-12 flex items-center justify-center bg-green-500 text-white rounded-2xl shadow-lg shadow-green-500/20 active:bg-green-600 transition-colors"
-                              >
-                                <Plus className="w-6 h-6 stroke-[3]" />
-                              </motion.button>
-                              <motion.button 
-                                whileTap={{ scale: 0.85 }}
-                                onClick={(e) => { e.stopPropagation(); setAdjustmentItem(item); setAdjustmentType('OUT'); }}
-                                className="w-12 h-12 flex items-center justify-center bg-red-500 text-white rounded-2xl shadow-lg shadow-red-500/20 active:bg-red-600 transition-colors"
-                              >
-                                <Minus className="w-6 h-6 stroke-[3]" />
-                              </motion.button>
-                            </div>
-                          )}
-                          <motion.button 
-                            whileTap={{ scale: 0.95 }}
-                            onClick={(e) => { e.stopPropagation(); setSelectedItem(item); setInitialAction(null); }}
-                            className="h-12 px-6 bg-primary/10 border border-primary/20 text-primary text-[10px] font-black uppercase tracking-widest rounded-2xl flex items-center space-x-2 active:bg-primary/20 mt-1"
-                          >
-                            <Info className="w-4 h-4" />
-                            <span>Details</span>
-                          </motion.button>
-                        </div>
-                        {isApproved && (
-                          <div className="flex items-center space-x-2">
-                            <motion.button 
-                              whileTap={{ scale: 0.8 }}
-                              onClick={(e) => { e.stopPropagation(); setEditingItem(item); }} 
-                              className="w-11 h-11 flex items-center justify-center bg-white/5 rounded-2xl text-slate-400 active:text-white border border-white/5"
-                            >
-                              <Edit className="w-4 h-4" />
-                            </motion.button>
-                            <motion.button 
-                              whileTap={{ scale: 0.8 }}
-                              onClick={(e) => { e.stopPropagation(); setItemToDelete(item); }} 
-                              className="w-11 h-11 flex items-center justify-center bg-red-500/10 rounded-2xl text-red-500/60 active:text-red-500 border border-red-500/10"
-                            >
-                              <Trash className="w-4 h-4" />
-                            </motion.button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {/* Background Glow */}
-                    <div className="absolute -right-10 top-1/2 -translate-y-1/2 w-40 h-40 bg-primary/5 blur-3xl rounded-full pointer-events-none" />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </motion.div>
-          ))}
-        </div>
-  {filteredItems.length === 0 && (
-            <div className="py-20 text-center text-slate-500">
-              <Search className="w-12 h-12 mx-auto mb-4 opacity-10" />
-              <p>No items found matching your search</p>
-            </div>
+              {InventoryRow}
+            </List>
           )}
+        </AutoSizer>
+
+        {filteredItems.length === 0 && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 bg-slate-950/20 backdrop-blur-sm">
+            <Search className="w-12 h-12 mb-4 opacity-10" />
+            <p className="text-sm font-medium">No units matching your current matrix</p>
+            <button 
+              onClick={clearSearch}
+              className="mt-4 text-xs font-black text-primary uppercase tracking-widest hover:underline"
+            >
+              Clear Search Matrix
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Bulk Action Bar */}

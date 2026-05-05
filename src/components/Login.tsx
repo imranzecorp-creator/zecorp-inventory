@@ -45,6 +45,7 @@ export default function Login() {
     setError('');
     try {
       const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
       await signInWithPopup(auth, provider);
     } catch (err: any) {
       console.error(err);
@@ -93,25 +94,34 @@ export default function Login() {
 
     try {
       if (isReset) {
+        if (!email.trim()) throw new Error('Please enter your email.');
         await sendPasswordResetEmail(auth, email);
         setMessage('Password reset email sent. Check your inbox.');
         setIsReset(false);
       } else if (isSignUp) {
+        if (password.length < 6) throw new Error('Password must be at least 6 characters.');
+        if (!name.trim()) throw new Error('Please enter your full name.');
+        
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(cred.user, { displayName: name });
         // Create user doc
         await setDoc(doc(db, 'users', cred.user.uid), {
           uid: cred.user.uid,
-          email: email,
+          email: email.toLowerCase(),
           displayName: name,
           role: 'user',
+          isApproved: false,
+          emailVerified: false,
           createdAt: Date.now()
         });
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }
     } catch (err: any) {
-      setError(err.message || 'Authentication failed.');
+      let msg = err.message || 'Authentication failed.';
+      if (msg.includes('auth/invalid-credential')) msg = 'Invalid email or password.';
+      if (msg.includes('auth/email-already-in-use')) msg = 'Email already registered.';
+      setError(msg);
     } finally {
       setLoading(false);
     }

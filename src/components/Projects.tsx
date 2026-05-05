@@ -23,7 +23,8 @@ import {
   ArrowDownLeft,
   ChevronDown,
   Building,
-  FileUp
+  FileUp,
+  Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -86,6 +87,11 @@ export default function Projects({ projects, inventory, clients, user, transacti
         // Use AI to map projects and items
         const aiMappedProjects = await mapExcelProjects(data);
 
+        if (aiMappedProjects.length === 0) {
+          alert('AI could not map any projects. Please check your Excel headers.');
+          return;
+        }
+
         for (const projectPayload of aiMappedProjects) {
           try {
             const finalPayload = {
@@ -115,9 +121,9 @@ export default function Projects({ projects, inventory, clients, user, transacti
         }
 
         alert(`Successfully AI-imported ${aiMappedProjects.length} projects!`);
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error parsing Excel:', err);
-        alert('Failed to parse Excel file. AI mapping failed or file is corrupt.');
+        alert(err.message || 'Failed to parse Excel file. AI mapping failed or file is corrupt.');
       } finally {
         setIsImporting(false);
         if (fileInputRef.current) fileInputRef.current.value = '';
@@ -218,10 +224,10 @@ export default function Projects({ projects, inventory, clients, user, transacti
               <button 
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isImporting}
-                className="flex-shrink-0 flex items-center space-x-2 px-3 md:px-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl border border-white/10 bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-all text-[10px] md:text-xs font-black uppercase tracking-widest active:scale-95"
+                className="flex-shrink-0 flex items-center space-x-2 px-3 md:px-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl border border-blue-500/20 bg-blue-500/10 text-blue-400 hover:text-white hover:bg-blue-500/20 transition-all text-[10px] md:text-xs font-black uppercase tracking-widest active:scale-95 shadow-lg shadow-blue-500/10 group"
               >
-                {isImporting ? <Loader2 className="w-3.5 h-3.5 md:w-4 md:h-4 animate-spin" /> : <FileUp className="w-3.5 h-3.5 md:w-4 md:h-4" />}
-                <span>{isImporting ? 'AI MAPPING...' : 'AI EXCEL IMPORT'}</span>
+                {isImporting ? <Loader2 className="w-3.5 h-3.5 md:w-4 md:h-4 animate-spin" /> : <Zap className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary group-hover:animate-pulse" />}
+                <span>{isImporting ? 'AI MAPPING...' : 'AI PROJECT BULK IMPORT'}</span>
               </button>
               <input 
                 type="file" 
@@ -402,13 +408,15 @@ export default function Projects({ projects, inventory, clients, user, transacti
       )}
 
       <AnimatePresence>
-        {(showAddModal || editingProject) && (
+        { (showAddModal || editingProject) && (
           <ProjectFormModal 
             project={editingProject} 
             inventory={inventory} 
             clients={clients}
             onClose={() => { setShowAddModal(false); setEditingProject(null); }}
             user={user}
+            isImporting={isImporting}
+            onImportClick={() => fileInputRef.current?.click()}
           />
         )}
         {selectedProject && (
@@ -536,7 +544,23 @@ function ProjectCard({ project, user, onClick, onEdit, onDelete }: { project: Pr
   );
 }
 
-function ProjectFormModal({ project, inventory, clients, onClose, user }: { project: Project | null, inventory: InventoryItem[], clients: any[], onClose: () => void, user: UserProfile }) {
+function ProjectFormModal({ 
+  project, 
+  inventory, 
+  clients, 
+  onClose, 
+  user,
+  isImporting,
+  onImportClick 
+}: { 
+  project: Project | null, 
+  inventory: InventoryItem[], 
+  clients: any[], 
+  onClose: () => void, 
+  user: UserProfile,
+  isImporting: boolean,
+  onImportClick: () => void
+}) {
   const isAdmin = user.role === 'admin' || user.email.toLowerCase() === 'imranzecorp@gmail.com';
   const isApproved = user.isApproved || isAdmin;
   const generateJobNumber = () => {
@@ -580,6 +604,11 @@ function ProjectFormModal({ project, inventory, clients, onClose, user }: { proj
 
         const aiMappedItems = await mapExcelItems(data);
         
+        if (aiMappedItems.length === 0) {
+          alert('AI could not map any items for this project.');
+          return;
+        }
+
         const newProjectItems: ProjectItem[] = aiMappedItems.map(item => ({
           inventoryItemId: `EXT-${Math.random().toString(36).substr(2, 9)}`,
           name: item.name || 'Unnamed Item',
@@ -599,9 +628,9 @@ function ProjectFormModal({ project, inventory, clients, onClose, user }: { proj
 
         setItems(prev => [...prev, ...newProjectItems]);
         alert(`AI successfully mapped and added ${newProjectItems.length} items from Excel!`);
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error mapping Excel items:', err);
-        alert('Failed to process Excel with AI.');
+        alert(err.message || 'Failed to process Excel with AI.');
       } finally {
         setIsMappingItems(false);
         if (itemFileInputRef.current) itemFileInputRef.current.value = '';
@@ -702,9 +731,22 @@ function ProjectFormModal({ project, inventory, clients, onClose, user }: { proj
         className="fixed inset-0 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-4xl h-full md:h-auto md:max-h-[85vh] glass-morphism md:rounded-[32px] shadow-2xl z-[61] overflow-hidden border border-white/10 flex flex-col"
       >
         <div className="p-4 md:p-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
-          <h2 className="text-lg md:text-xl font-bold text-white uppercase tracking-tight">
-            {project ? 'Update Project' : 'New Project'}
-          </h2>
+          <div className="flex items-center space-x-4">
+            <h2 className="text-lg md:text-xl font-bold text-white uppercase tracking-tight">
+              {project ? 'Update Project' : 'New Project'}
+            </h2>
+            {isApproved && (
+              <button 
+                type="button"
+                onClick={onImportClick}
+                disabled={isImporting}
+                className="flex items-center space-x-2 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-400 hover:text-white transition-all text-[10px] font-black uppercase tracking-widest active:scale-95 group shadow-lg shadow-blue-500/5"
+              >
+                {isImporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5 text-primary group-hover:animate-pulse" />}
+                <span>{isImporting ? 'AI MAPPING...' : 'AI BULK PROJECT IMPORT'}</span>
+              </button>
+            )}
+          </div>
           <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl transition-colors"><X className="w-5 h-5 text-slate-400" /></button>
         </div>
 
@@ -823,10 +865,10 @@ function ProjectFormModal({ project, inventory, clients, onClose, user }: { proj
                       type="button"
                       onClick={() => itemFileInputRef.current?.click()}
                       disabled={isMappingItems}
-                      className="text-xs font-black text-blue-400 hover:text-white transition-colors flex items-center space-x-2 bg-blue-500/5 px-3 py-1.5 rounded-xl border border-blue-500/10"
+                      className="text-[10px] font-black text-blue-400 hover:text-white transition-colors flex items-center space-x-2 bg-blue-500/10 px-4 py-2 rounded-xl border border-blue-500/20 shadow-lg shadow-blue-500/10 group"
                     >
-                      {isMappingItems ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileUp className="w-3 h-3" />}
-                      <span>{isMappingItems ? 'AI MAPPING...' : 'AI EXCEL IMPORT'}</span>
+                      {isMappingItems ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5 text-primary group-hover:animate-pulse" />}
+                      <span>{isMappingItems ? 'AI MAPPING...' : 'AI ITEM IMPORT'}</span>
                     </button>
                     <input 
                       type="file" 
@@ -838,9 +880,9 @@ function ProjectFormModal({ project, inventory, clients, onClose, user }: { proj
                     <button 
                       type="button"
                       onClick={() => setShowItemPicker(true)}
-                      className="text-xs font-black text-primary hover:text-white transition-colors flex items-center space-x-2 bg-primary/5 px-3 py-1.5 rounded-xl border border-primary/10"
+                      className="text-[10px] font-black text-primary hover:text-white transition-colors flex items-center space-x-2 bg-primary/5 px-4 py-2 rounded-xl border border-primary/10 shadow-sm"
                     >
-                      <Plus className="w-3 h-3" />
+                      <Plus className="w-3.5 h-3.5" />
                       <span>LINK INVENTORY ITEM</span>
                     </button>
                   </>

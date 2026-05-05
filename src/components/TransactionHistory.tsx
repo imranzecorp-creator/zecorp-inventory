@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, memo } from 'react';
 import { 
   ArrowUpRight, 
   ArrowDownRight, 
@@ -25,9 +25,118 @@ import { formatDate, cn } from '../lib/utils';
 import { generateTransactionsReport } from '../services/pdfService';
 import { summarizeTransactions } from '../services/geminiService';
 
+import { FixedSizeList as List } from 'react-window';
+import AutoSizer from 'react-virtualized-auto-sizer';
+
 interface TransactionHistoryProps {
   transactions: StockTransaction[];
 }
+
+const TransactionRow = memo(({ index, style, data }: { index: number, style: React.CSSProperties, data: { items: StockTransaction[], expandedId: string | null, toggleExpand: (id: string) => void } }) => {
+  const tx = data.items[index];
+  const isExpanded = data.expandedId === tx.id;
+
+  return (
+    <div style={style} className="border-b border-white/[0.02] last:border-0">
+      <div 
+        onClick={() => data.toggleExpand(tx.id)}
+        className={cn(
+          "flex items-center group cursor-pointer transition-all duration-200 h-[60px]",
+          isExpanded ? "bg-white/5" : "hover:bg-white/[0.03]"
+        )}
+      >
+        <div className="w-10 flex items-center justify-center">
+          <AnimatePresence mode="wait">
+            {isExpanded ? (
+              <motion.div key="up" initial={{ rotate: -180, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 180, opacity: 0 }}>
+                <ChevronUp className="w-4 h-4 text-primary" />
+              </motion.div>
+            ) : (
+              <motion.div key="down" initial={{ rotate: 180, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -180, opacity: 0 }}>
+                <ChevronDown className="w-4 h-4 text-slate-600 group-hover:text-primary transition-colors" />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+        
+        <div className="flex-1 px-4 truncate">
+          <p className="text-[11px] font-mono text-slate-400 truncate">{new Date(tx.date).toLocaleString()}</p>
+        </div>
+
+        <div className="w-20 px-4">
+          <span className={cn(
+            "px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border",
+            tx.type === 'IN' ? "bg-green-500/10 text-green-400 border-green-500/20" : "bg-red-500/10 text-red-500 border-red-500/20"
+          )}>
+            {tx.type}
+          </span>
+        </div>
+
+        <div className="flex-[2] px-4 truncate">
+          <div className="flex flex-col truncate">
+            <span className="text-sm font-bold text-slate-200 truncate">{tx.itemName}</span>
+            {(tx.brand || tx.modelNumber) && (
+              <span className="text-[9px] text-primary/60 font-black uppercase tracking-tighter truncate">
+                {tx.brand} {tx.modelNumber}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="w-20 px-4 text-center">
+          <span className={cn("text-sm font-black", tx.type === 'IN' ? "text-green-400" : "text-red-400")}>
+            {tx.type === 'IN' ? '+' : '-'}{tx.quantity}
+          </span>
+        </div>
+
+        <div className="w-24 px-4 truncate hidden lg:block">
+           <span className="text-[10px] font-mono font-bold text-slate-400 truncate">{tx.jobNumber || 'N/A'}</span>
+        </div>
+
+        <div className="w-32 px-4 truncate hidden xl:block">
+          <div className="flex items-center space-x-2 truncate">
+            <User className="w-3 h-3 text-slate-500 shrink-0" />
+            <span className="text-xs font-bold text-slate-400 truncate">{tx.userName}</span>
+          </div>
+        </div>
+
+        <div className="w-32 px-4 truncate hidden 2xl:block">
+          <span className="text-xs text-slate-500 italic truncate">{tx.client || 'System'}</span>
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="bg-white/[0.04] border-l-2 border-primary overflow-hidden"
+          >
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+               <div className="space-y-1">
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Tag className="w-3 h-3" />Details</p>
+                  <p className="text-sm font-bold text-white">{tx.brand || 'N/A'} {tx.modelNumber || ''}</p>
+               </div>
+               <div className="space-y-1">
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Briefcase className="w-3 h-3" />Project</p>
+                  <p className="text-sm font-bold text-white">{tx.jobNumber || 'N/A'} - {tx.outlet || 'N/A'}</p>
+               </div>
+               <div className="space-y-1">
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><MapPin className="w-3 h-3" />Location</p>
+                  <p className="text-sm font-bold text-white">{tx.location || 'Warehouse'}</p>
+               </div>
+               <div className="space-y-1">
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><FileText className="w-3 h-3" />Notes</p>
+                  <p className="text-xs text-slate-400 italic leading-relaxed">{tx.notes || 'No notes'}</p>
+               </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+});
 
 export default function TransactionHistory({ transactions }: TransactionHistoryProps) {
   const [searchTerm, setSearchTerm] = useState('');

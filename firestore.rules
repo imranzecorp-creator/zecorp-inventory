@@ -16,7 +16,7 @@ service cloud.firestore {
     
     // Admin roles looked up or bootstrapped. imranzecorp@gmail.com is primary admin.
     function isAdmin() { 
-      return isSignedIn() && (
+      return isVerified() && (
         request.auth.token.email.lower() == 'imranzecorp@gmail.com' ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
@@ -24,7 +24,7 @@ service cloud.firestore {
 
     function isApprovedUser() {
       return isAdmin() || (
-        isSignedIn() && 
+        isVerified() && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isApproved == true
       );
@@ -35,7 +35,8 @@ service cloud.firestore {
     function isValidUser(data) {
       return data.keys().hasAll(['uid', 'email']) &&
              data.email is string && data.email.size() <= 256 &&
-             data.uid is string;
+             data.uid is string &&
+             (data.get('emailVerified', false) is bool);
     }
 
     function isValidInventoryItem(data) {
@@ -75,8 +76,8 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().uid == userId;
       allow update: if (isOwner(userId) || isAdmin()) && isValidUser(incoming()) && (
-        (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'updatedAt'])) ||
-        (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'isApproved', 'displayName', 'photoURL', 'updatedAt']))
+        (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'updatedAt', 'emailVerified'])) ||
+        (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'isApproved', 'displayName', 'photoURL', 'updatedAt', 'emailVerified']))
       );
     }
 

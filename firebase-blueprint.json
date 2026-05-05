@@ -10,6 +10,8 @@
         "displayName": { "type": "string" },
         "photoURL": { "type": "string" },
         "role": { "type": "string", "enum": ["admin", "user"] },
+        "isApproved": { "type": "boolean" },
+        "emailVerified": { "type": "boolean" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "email"]

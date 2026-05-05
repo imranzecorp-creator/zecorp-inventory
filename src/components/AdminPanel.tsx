@@ -359,7 +359,12 @@ function UserManagement() {
                   {u.isApproved ? (
                     <span className="text-[7px] md:text-[8px] bg-emerald-500/10 text-emerald-500 px-1 md:px-1.5 py-0.5 rounded-full border border-emerald-500/20 uppercase tracking-widest leading-none">Approved</span>
                   ) : (
-                    <span className="text-[7px] md:text-[8px] bg-amber-500/10 text-amber-500 px-1 md:px-1.5 py-0.5 rounded-full border border-amber-500/20 uppercase tracking-widest leading-none">Pending</span>
+                    <span className="text-[7px] md:text-[8px] bg-amber-500/10 text-amber-500 px-1 md:px-1.5 py-0.5 rounded-full border border-amber-500/20 uppercase tracking-widest leading-none">Pending Approval</span>
+                  )}
+                  {u.emailVerified ? (
+                    <span className="text-[7px] md:text-[8px] bg-blue-500/10 text-blue-400 px-1 md:px-1.5 py-0.5 rounded-full border border-blue-500/20 uppercase tracking-widest leading-none">Verified</span>
+                  ) : (
+                    <span className="text-[7px] md:text-[8px] bg-red-500/10 text-red-400 px-1 md:px-1.5 py-0.5 rounded-full border border-red-500/20 uppercase tracking-widest leading-none">Unverified</span>
                   )}
                 </p>
                 <p className="text-[10px] md:text-xs text-slate-500 font-medium font-mono truncate max-w-[120px] md:max-w-none">{u.email}</p>

@@ -45,6 +45,62 @@ interface DashboardProps {
   projects: Project[];
 }
 
+
+
+const StockTableRow = memo(({ index, style, data }: { index: number, style: React.CSSProperties, data: { items: InventoryItem[] } }) => {
+  const item = data.items[index];
+  if (!item) return null;
+
+  return (
+    <div style={style} className="flex items-center group hover:bg-white/[0.02] transition-colors border-b border-white/[0.02]">
+      <div className="px-4 py-4 flex-1 flex items-center space-x-3 truncate">
+        <motion.div 
+          whileHover={{ scale: 1.2, rotate: 15 }}
+          className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/5 overflow-hidden shrink-0"
+        >
+          {item.imageUrl ? (
+            <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+          ) : (
+            <Package className="w-5 h-5 text-slate-600" />
+          )}
+        </motion.div>
+        <div className="flex flex-col truncate">
+          <span className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors truncate">{item.name}</span>
+          {(item.brand || item.modelNumber) && (
+            <span className="text-[9px] text-primary/50 font-black uppercase tracking-tighter truncate">
+              {item.brand} {item.modelNumber}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="px-4 py-4 w-32 text-center shrink-0">
+        <span className={cn(
+          "text-sm font-black px-3 py-1 rounded-lg border",
+          item.currentQuantity <= item.minStock 
+            ? "bg-amber-500/10 text-amber-500 border-amber-500/20" 
+            : "bg-primary/10 text-primary border-primary/20"
+        )}>
+          {item.currentQuantity}
+        </span>
+      </div>
+      <div className="px-4 py-4 flex-1 hidden lg:block truncate text-xs text-slate-400 font-medium">
+        {item.client || 'Internal'}
+      </div>
+      <div className="px-4 py-4 flex-1 hidden lg:block truncate text-[10px] text-slate-500 uppercase font-black tracking-tighter opacity-60">
+        {item.location}
+      </div>
+      <div className="px-4 py-4 w-32 hidden xl:block text-right shrink-0">
+        <span className="text-[10px] font-mono text-slate-500 bg-white/5 px-2 py-1 rounded-md border border-white/5">
+          {item.jobNumber || 'PENDING'}
+        </span>
+      </div>
+    </div>
+  );
+});
+
+import { FixedSizeList as List } from 'react-window';
+import AutoSizer from 'react-virtualized-auto-sizer';
+
 export default function Dashboard({ user, items, transactions, projects }: DashboardProps) {
   const [stockSearch, setStockSearch] = useState('');
   const [stockJobFilter, setStockJobFilter] = useState('');
@@ -71,7 +127,11 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
       }
     };
 
-    fetchInsights();
+    const timer = setTimeout(() => {
+      fetchInsights();
+    }, 5000); // 5 second debounce for insights
+
+    return () => clearTimeout(timer);
   }, [items, transactions]);
 
   const handleAiSearch = useCallback(async (e: React.FormEvent) => {
@@ -542,106 +602,40 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
           </div>
         </div>
 
-        <div className="overflow-x-auto custom-scrollbar">
-        {/* Desktop Table View */}
-        <div className="hidden md:block overflow-x-auto custom-scrollbar">
-          <table className="w-full">
-            <thead>
-              <tr className="text-left border-b border-white/5 pb-4">
-                <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Item Name</th>
-                <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">Available Stock</th>
-                <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Last Client</th>
-                <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Project Outlet</th>
-                <th className="px-4 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Job Number</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {filteredItems.slice(0, 50).map((item) => (
-                <tr key={item.id} className="group hover:bg-white/[0.02] transition-colors">
-                  <td className="px-4 py-4">
-                    <div className="flex items-center space-x-3">
-                        <motion.div 
-                          whileHover={{ scale: 1.2, rotate: 15 }}
-                          className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center border border-white/5 overflow-hidden"
-                        >
-                          {item.imageUrl ? (
-                            <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                          ) : (
-                            <Package className="w-4 h-4 text-slate-600" />
-                          )}
-                        </motion.div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors">{item.name}</span>
-                        {(item.brand || item.modelNumber) && (
-                          <span className="text-[9px] text-primary/50 font-black uppercase tracking-tighter">
-                            {item.brand} {item.modelNumber}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 text-center">
-                    <span className={`text-sm font-black ${item.currentQuantity <= item.minStock ? 'text-amber-500' : 'text-primary'}`}>
-                      {item.currentQuantity}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4">
-                    <span className="text-xs text-slate-400 font-medium">{item.client || 'Internal'}</span>
-                  </td>
-                  <td className="px-4 py-4">
-                    <span className="text-xs text-slate-400 uppercase font-black tracking-tighter opacity-60">{item.location}</span>
-                  </td>
-                  <td className="px-4 py-4 text-right">
-                    <span className="text-[10px] font-mono text-slate-500 bg-white/5 px-2 py-1 rounded-md border border-white/5">
-                      {item.jobNumber || 'PENDING'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile View */}
-        <div className="md:hidden space-y-4">
-          {filteredItems.slice(0, 20).map((item) => (
-            <div key={item.id} className="p-4 bg-white/5 rounded-2xl border border-white/5 transition-all active:scale-[0.98]">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/5 overflow-hidden">
-                    {item.imageUrl ? (
-                      <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    ) : (
-                      <Package className="w-5 h-5 text-slate-600" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-bold text-white truncate">{item.name}</h4>
-                  </div>
-                </div>
-                <div className="text-right ml-4">
-                  <p className={cn(
-                    "text-lg font-black",
-                    item.currentQuantity <= item.minStock ? "text-amber-500" : "text-primary"
-                  )}>{item.currentQuantity}</p>
-                </div>
+        <div className="overflow-hidden bg-white/[0.02] rounded-3xl border border-white/5">
+          {/* Header */}
+          <div className="flex items-center border-b border-white/10 bg-white/[0.03] px-4 py-3">
+            <div className="px-4 text-[10px] font-black text-slate-500 uppercase tracking-widest flex-1">Item Name</div>
+            <div className="px-4 text-[10px] font-black text-slate-500 uppercase tracking-widest w-32 text-center">Available Stock</div>
+            <div className="px-4 text-[10px] font-black text-slate-500 uppercase tracking-widest flex-1 hidden lg:block">Last Client</div>
+            <div className="px-4 text-[10px] font-black text-slate-500 uppercase tracking-widest flex-1 hidden lg:block">Project Outlet</div>
+            <div className="px-4 text-[10px] font-black text-slate-500 uppercase tracking-widest w-32 text-right hidden xl:block">Job Number</div>
+          </div>
+          
+          <div className="h-[500px] w-full">
+            <AutoSizer>
+              {({ height, width }) => (
+                <List
+                  height={height}
+                  itemCount={filteredItems.length}
+                  itemSize={72}
+                  width={width}
+                  itemData={{ items: filteredItems }}
+                  className="custom-scrollbar"
+                >
+                  {StockTableRow}
+                </List>
+              )}
+            </AutoSizer>
+          </div>
+          
+          {filteredItems.length === 0 && (
+            <div className="py-20 text-center flex flex-col items-center justify-center space-y-4">
+              <Package className="w-12 h-12 text-slate-800" />
+              <div>
+                <p className="text-sm font-bold text-slate-600">No matching assets found</p>
+                <p className="text-xs text-slate-700 uppercase tracking-widest font-black mt-1">Refine your search parameters</p>
               </div>
-              <div className="grid grid-cols-2 gap-2 pt-3 border-t border-white/5 text-[10px] font-black uppercase tracking-[0.1em]">
-                <div className="flex flex-col">
-                  <span className="text-slate-600">Project Outlet</span>
-                  <span className="text-slate-300 truncate">{item.location}</span>
-                </div>
-                <div className="flex flex-col text-right">
-                  <span className="text-slate-600">Job#</span>
-                  <span className="text-slate-300 truncate">{item.jobNumber || 'PENDING'}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-          {items.length === 0 && (
-            <div className="py-12 text-center text-slate-600 italic text-sm">
-              No inventory records found.
             </div>
           )}
         </div>

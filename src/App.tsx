@@ -37,65 +37,42 @@ import {
   TrendingUp, 
   AlertCircle,
   Zap,
-  FileText,
+  Image as ImageIcon,
   User,
   Settings,
-  Image as ImageIcon,
-  Send,
   MoreVertical,
-  MoreHorizontal,
+  Loader2,
   X,
-  Edit,
-  Download,
-  Trash,
   ShieldCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  Cell,
-  PieChart,
-  Pie
-} from 'recharts';
-import { formatDistanceToNow } from 'date-fns';
-import { cn, formatDate } from './lib/utils';
-import { getAiResponse } from './services/geminiService';
-import { exportToPdf, generateInventoryReport } from './services/pdfService';
+import { cn } from './lib/utils';
 import type { 
   UserProfile, 
   InventoryItem, 
   StockTransaction, 
-  Post, 
-  ChatMessage, 
   AppNotification,
-  Comment,
   Project
 } from './types';
 
 // Components
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
-import Dashboard from './components/Dashboard';
-import InventoryList from './components/InventoryList';
-import TransactionHistory from './components/TransactionHistory';
-import SocialFeed from './components/SocialFeed';
-import ChatView from './components/ChatView';
-import AdminPanel from './components/AdminPanel';
 import Login from './components/Login';
-import ProfileSettings from './components/ProfileSettings';
-import PermissionList from './components/PermissionList';
-import Projects from './components/Projects';
 import AmbientStorageBox from './components/AmbientStorageBox';
 import ToastContainer, { Toast } from './components/ToastContainer';
 import Logo from './components/Logo';
+
+// Lazy load heavy components
+const Dashboard = React.lazy(() => import('./components/Dashboard'));
+const InventoryList = React.lazy(() => import('./components/InventoryList'));
+const TransactionHistory = React.lazy(() => import('./components/TransactionHistory'));
+const SocialFeed = React.lazy(() => import('./components/SocialFeed'));
+const ChatView = React.lazy(() => import('./components/ChatView'));
+const AdminPanel = React.lazy(() => import('./components/AdminPanel'));
+const ProfileSettings = React.lazy(() => import('./components/ProfileSettings'));
+const PermissionList = React.lazy(() => import('./components/PermissionList'));
+const Projects = React.lazy(() => import('./components/Projects'));
 
 export default function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -149,13 +126,18 @@ export default function App() {
             const isAdmin = email === 'imranzecorp@gmail.com';
             let userData = {
                ...data,
+               emailVerified: idUser.emailVerified,
                isApproved: !!data.isApproved || data.role === 'admin' || isAdmin
             } as UserProfile;
             
             // Auto-promote hardcoded admin
             if (isAdmin && (userData.role !== 'admin' || !userData.isApproved)) {
               await updateDoc(userRef, { role: 'admin', isApproved: true });
-              // onSnapshot will trigger again after this update
+            }
+
+            // Update emailVerified in DB if it changed
+            if (data.emailVerified !== idUser.emailVerified) {
+              await updateDoc(userRef, { emailVerified: idUser.emailVerified });
             }
 
             // Cross-check with approved_emails whitelist if not admin or approved
@@ -164,7 +146,6 @@ export default function App() {
               const approvedSnap = await getDocs(approvedQuery);
               if (!approvedSnap.empty) {
                 await updateDoc(userRef, { isApproved: true });
-                // onSnapshot will trigger again
               }
             }
             
@@ -188,6 +169,7 @@ export default function App() {
               photoURL: idUser.photoURL || '',
               role: isAdmin ? 'admin' : 'user',
               isApproved: isApproved,
+              emailVerified: idUser.emailVerified,
               createdAt: Date.now(),
             };
             
@@ -354,92 +336,105 @@ export default function App() {
             </button>
           </div>
         )}
-
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8 custom-scrollbar">
+        
+        {user.isApproved && !user.emailVerified && (
+          <div className="bg-rose-500/10 border-y border-rose-500/20 px-4 py-2 flex items-center justify-center space-x-3 backdrop-blur-md">
+            <ShieldCheck className="w-4 h-4 text-rose-500 animate-pulse" />
+            <p className="text-[10px] md:text-xs font-black text-rose-500 uppercase tracking-[0.2em]">
+              Email Verification Required • System writes are currently blocked by security protocol
+            </p>
+          </div>
+        )}        <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8 custom-scrollbar">
           <div className="max-w-7xl mx-auto">
-            <AnimatePresence mode="wait">
-            {activeTab === 'dashboard' && (
-              <Dashboard items={items} transactions={transactions} projects={projects} user={user} />
-            )}
-            {activeTab === 'inventory' && (
-              <InventoryList items={items} clients={clients} user={user} projects={projects} />
-            )}
-            {activeTab === 'projects' && (
-              <Projects projects={projects} inventory={items} clients={clients} user={user} transactions={transactions} />
-            )}
-            {activeTab === 'transactions' && (
-              <TransactionHistory transactions={transactions} />
-            )}
-            {activeTab === 'social' && (
-              <SocialFeed user={user} />
-            )}
-            {activeTab === 'chat' && (
-              <ChatView user={user} />
-            )}
-            {activeTab === 'admin' && user.role === 'admin' && (
-              <AdminPanel user={user} clients={clients} />
-            )}
-            {activeTab === 'profile' && (
-              <ProfileSettings user={user} setUser={setUser} />
-            )}
-            {activeTab === 'permissions' && (
-              <PermissionList />
-            )}
-            {activeTab === 'more' && (
-               <div className="md:hidden space-y-6 pt-4 animate-in fade-in slide-in-from-bottom-4">
-                  <div className="flex items-center space-x-3 mb-6">
-                     <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
-                        <MoreVertical className="w-5 h-5 text-primary" />
-                     </div>
-                     <h2 className="text-xl font-black text-white uppercase tracking-tight">Access Hub</h2>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                     <button 
-                        onClick={() => setActiveTab('social')}
-                        className="p-6 glass-morphism rounded-3xl border border-white/5 flex flex-col items-center space-y-3 active:scale-95 transition-all bg-white/[0.02]"
-                      >
-                        <ImageIcon className="w-8 h-8 text-indigo-400" />
-                        <span className="text-xs font-black uppercase text-slate-300">Social Feed</span>
-                      </button>
+            <React.Suspense fallback={
+              <div className="flex h-full w-full items-center justify-center py-20">
+                <Loader2 className="w-8 h-8 text-primary animate-spin" />
+              </div>
+            }>
+              <AnimatePresence mode="wait">
+              {activeTab === 'dashboard' && (
+                <Dashboard items={items} transactions={transactions} projects={projects} user={user} />
+              )}
+              {activeTab === 'inventory' && (
+                <InventoryList items={items} clients={clients} user={user} projects={projects} />
+              )}
+              {activeTab === 'projects' && (
+                <Projects projects={projects} inventory={items} clients={clients} user={user} transactions={transactions} />
+              )}
+              {activeTab === 'transactions' && (
+                <TransactionHistory transactions={transactions} />
+              )}
+              {activeTab === 'social' && (
+                <SocialFeed user={user} />
+              )}
+              {activeTab === 'chat' && (
+                <ChatView user={user} />
+              )}
+              {activeTab === 'admin' && user.role === 'admin' && (
+                <AdminPanel user={user} clients={clients} />
+              )}
+              {activeTab === 'profile' && (
+                <ProfileSettings user={user} setUser={setUser} />
+              )}
+              {activeTab === 'permissions' && (
+                <PermissionList />
+              )}
+              {activeTab === 'more' && (
+                <div className="md:hidden space-y-6 pt-4 animate-in fade-in slide-in-from-bottom-4">
+                    <div className="flex items-center space-x-3 mb-6">
+                      <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                          <MoreVertical className="w-5 h-5 text-primary" />
+                      </div>
+                      <h2 className="text-xl font-black text-white uppercase tracking-tight">Access Hub</h2>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4">
                       <button 
-                        onClick={() => setActiveTab('transactions')}
-                        className="p-6 glass-morphism rounded-3xl border border-white/5 flex flex-col items-center space-y-3 active:scale-95 transition-all bg-white/[0.02]"
-                      >
-                        <History className="w-8 h-8 text-emerald-400" />
-                        <span className="text-xs font-black uppercase text-slate-300">Logs</span>
-                      </button>
-                      {user.role === 'admin' && (
-                        <button 
-                           onClick={() => setActiveTab('admin')}
-                           className="p-6 glass-morphism rounded-3xl border border-white/5 flex flex-col items-center space-y-3 active:scale-95 transition-all bg-white/[0.02] col-span-2"
+                          onClick={() => setActiveTab('social')}
+                          className="p-6 glass-morphism rounded-3xl border border-white/5 flex flex-col items-center space-y-3 active:scale-95 transition-all bg-white/[0.02]"
                         >
-                           <ShieldCheck className="w-8 h-8 text-primary" />
-                           <span className="text-xs font-black uppercase text-slate-300">Admin Control</span>
+                          <ImageIcon className="w-8 h-8 text-indigo-400" />
+                          <span className="text-xs font-black uppercase text-slate-300">Social Feed</span>
                         </button>
-                      )}
-                      <button 
-                        onClick={() => setActiveTab('profile')}
-                        className="p-6 glass-morphism rounded-3xl border border-white/5 flex flex-col items-center space-y-3 active:scale-95 transition-all bg-white/[0.02]"
-                      >
-                        <User className="w-8 h-8 text-blue-400" />
-                        <span className="text-xs font-black uppercase text-slate-300">Profile</span>
-                      </button>
-                      <button 
-                        onClick={() => setActiveTab('permissions')}
-                        className="p-6 glass-morphism rounded-3xl border border-white/5 flex flex-col items-center space-y-3 active:scale-95 transition-all bg-white/[0.02]"
-                      >
-                        <AlertCircle className="w-8 h-8 text-amber-500" />
-                        <span className="text-xs font-black uppercase text-slate-300">Access Keys</span>
-                      </button>
-                  </div>
-                  
-                  <div className="pt-10 pb-20 text-center">
-                     <p className="text-[10px] font-black text-slate-700 uppercase tracking-[0.4em]">ZECORP OS v4.2.0 • PREVIEW</p>
-                  </div>
-               </div>
-            )}
-          </AnimatePresence>
+                        <button 
+                          onClick={() => setActiveTab('transactions')}
+                          className="p-6 glass-morphism rounded-3xl border border-white/5 flex flex-col items-center space-y-3 active:scale-95 transition-all bg-white/[0.02]"
+                        >
+                          <History className="w-8 h-8 text-emerald-400" />
+                          <span className="text-xs font-black uppercase text-slate-300">Logs</span>
+                        </button>
+                        {user.role === 'admin' && (
+                          <button 
+                            onClick={() => setActiveTab('admin')}
+                            className="p-6 glass-morphism rounded-3xl border border-white/5 flex flex-col items-center space-y-3 active:scale-95 transition-all bg-white/[0.02] col-span-2"
+                          >
+                            <ShieldCheck className="w-8 h-8 text-primary" />
+                            <span className="text-xs font-black uppercase text-slate-300">Admin Control</span>
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => setActiveTab('profile')}
+                          className="p-6 glass-morphism rounded-3xl border border-white/5 flex flex-col items-center space-y-3 active:scale-95 transition-all bg-white/[0.02]"
+                        >
+                          <User className="w-8 h-8 text-blue-400" />
+                          <span className="text-xs font-black uppercase text-slate-300">Profile</span>
+                        </button>
+                        <button 
+                          onClick={() => setActiveTab('permissions')}
+                          className="p-6 glass-morphism rounded-3xl border border-white/5 flex flex-col items-center space-y-3 active:scale-95 transition-all bg-white/[0.02]"
+                        >
+                          <AlertCircle className="w-8 h-8 text-amber-500" />
+                          <span className="text-xs font-black uppercase text-slate-300">Access Keys</span>
+                        </button>
+                    </div>
+                    
+                    <div className="pt-10 pb-20 text-center">
+                      <p className="text-[10px] font-black text-slate-700 uppercase tracking-[0.4em]">ZECORP OS v4.2.0 • PREVIEW</p>
+                    </div>
+                </div>
+              )}
+              </AnimatePresence>
+            </React.Suspense>
           </div>
         </main>
 

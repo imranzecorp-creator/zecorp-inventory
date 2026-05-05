@@ -5,6 +5,7 @@ export interface UserProfile {
   photoURL?: string;
   role: 'admin' | 'user';
   isApproved: boolean;
+  emailVerified: boolean;
   createdAt: any;
 }
 

@@ -230,6 +230,10 @@ export async function mapExcelItems(rawData: any[]): Promise<Partial<ProjectItem
 
     return JSON.parse(response.text || "[]");
   } catch (error: any) {
+    const errorStr = JSON.stringify(error);
+    if (errorStr.includes('429') || errorStr.includes('RESOURCE_EXHAUSTED')) {
+      throw new Error("Gemini API quota exceeded. Please try again in 1-2 minutes.");
+    }
     console.error("Gemini Excel Mapping Error:", error);
     return [];
   }
@@ -308,6 +312,10 @@ export async function mapExcelProjects(rawData: any[]): Promise<any[]> {
 
     return JSON.parse(response.text || "[]");
   } catch (error: any) {
+    const errorStr = JSON.stringify(error);
+    if (errorStr.includes('429') || errorStr.includes('RESOURCE_EXHAUSTED')) {
+      throw new Error("Gemini API quota exceeded. Please try again in 1-2 minutes.");
+    }
     console.error("Gemini Project Mapping Error:", error);
     return [];
   }
