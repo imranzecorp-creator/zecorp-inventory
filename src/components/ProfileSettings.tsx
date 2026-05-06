@@ -1,4 +1,4 @@
-import React, { useState, memo } from 'react';
+import React, { useState } from 'react';
 import { 
   User, 
   Mail, 
@@ -15,7 +15,7 @@ import { updateProfile, updateEmail, updatePassword } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { UserProfile } from '../types';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { formatDate } from '../lib/utils';
 import { usePWA } from '../hooks/usePWA';
 
@@ -24,7 +24,7 @@ interface ProfileSettingsProps {
   setUser: (user: UserProfile) => void;
 }
 
-export default memo(function ProfileSettings({ user, setUser }: ProfileSettingsProps) {
+export default React.memo(function ProfileSettings({ user, setUser }: ProfileSettingsProps) {
   const [name, setName] = useState(user.displayName || '');
   const [photo, setPhoto] = useState(user.photoURL || '');
   const [email, setEmail] = useState(user.email || '');

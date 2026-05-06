@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useCallback, memo } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useDeferredValue } from 'react';
 import * as XLSX from 'xlsx';
 import { VariableSizeList as List } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
@@ -29,7 +29,7 @@ import {
   Zap,
   CheckSquare
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   collection, 
   addDoc, 
@@ -43,10 +43,10 @@ import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { Project, InventoryItem, UserProfile, ProjectItem, StockTransaction } from '../types';
 import { cn, formatDate, formatDateTime } from '../lib/utils';
 import { FilterDropdown } from './ui/FilterDropdown';
-import { Clock, History } from 'lucide-react';
+import { Clock, History as LucideHistory } from 'lucide-react';
 import { analyzeInventory, processAiSearch, mapExcelItems, mapExcelProjects, getExcelMapping, getProjectExcelMapping, findInventoryMatches } from '../services/geminiService';
 
-const ManifestRow = memo(({ index, style, data }: { index: number, style: React.CSSProperties, data: { items: ProjectItem[] } }) => {
+const ManifestRow = React.memo(({ index, style, data }: { index: number, style: React.CSSProperties, data: { items: ProjectItem[] } }) => {
   const item = data.items[index];
   if (!item) return null;
 
@@ -159,6 +159,7 @@ interface ProjectsProps {
 
 export default function Projects({ projects, inventory, clients, user, transactions }: ProjectsProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const deferredSearchTerm = useDeferredValue(searchTerm);
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [showJobSuggestions, setShowJobSuggestions] = useState(false);
   const isAdmin = user.role === 'admin' || user.email.toLowerCase() === 'imranzecorp@gmail.com';
@@ -167,6 +168,7 @@ export default function Projects({ projects, inventory, clients, user, transacti
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
   const [jobSearch, setJobSearch] = useState('');
+  const deferredJobSearch = useDeferredValue(jobSearch);
   const [showFilters, setShowFilters] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -356,8 +358,8 @@ export default function Projects({ projects, inventory, clients, user, transacti
   const filteredProjects = useMemo(() => {
     return projects.filter(p => {
       // Global Search
-      const searchLow = searchTerm.toLowerCase();
-      const matchesGlobal = !searchTerm || 
+      const searchLow = deferredSearchTerm.toLowerCase();
+      const matchesGlobal = !deferredSearchTerm || 
         p.client.toLowerCase().includes(searchLow) ||
         p.jobNumber.toLowerCase().includes(searchLow) ||
         (p.outlet?.toLowerCase() || '').includes(searchLow) ||
@@ -371,11 +373,11 @@ export default function Projects({ projects, inventory, clients, user, transacti
       if (selectedProjects.length > 0 && (!p.outlet || !selectedProjects.includes(p.outlet))) return false;
       if (selectedOutlets.length > 0 && (!p.location || !selectedOutlets.includes(p.location))) return false;
       
-      if (jobSearch && !p.jobNumber.toLowerCase().includes(jobSearch.toLowerCase())) return false;
+      if (deferredJobSearch && !p.jobNumber.toLowerCase().includes(deferredJobSearch.toLowerCase())) return false;
 
       return true;
     });
-  }, [projects, searchTerm, selectedStatuses, selectedClients, selectedProjects, selectedOutlets, jobSearch]);
+  }, [projects, deferredSearchTerm, selectedStatuses, selectedClients, selectedProjects, selectedOutlets, deferredJobSearch]);
 
   const searchSuggestions = useMemo(() => {
     if (!searchTerm || searchTerm.length < 1) return [];
@@ -1826,7 +1828,7 @@ function ProjectDetailModal({ project, inventory, transactions, onClose, onDelet
           <div className="flex items-center space-x-6 border-b border-white/5">
             {[
               { id: 'manifest', label: 'Inventory Manifest', icon: Package },
-              { id: 'activity', label: 'Recent Activity', icon: History },
+              { id: 'activity', label: 'Recent Activity', icon: LucideHistory },
               { id: 'client-stock', label: 'Client Stock', icon: User }
             ].map((tab) => (
               <button
@@ -1934,7 +1936,7 @@ function ProjectDetailModal({ project, inventory, transactions, onClose, onDelet
                   ))
                 ) : (
                   <div className="py-20 text-center opacity-40">
-                    <History className="w-12 h-12 mx-auto mb-4" />
+                    <LucideHistory className="w-12 h-12 mx-auto mb-4" />
                     <p className="text-sm font-bold">No Transaction Data</p>
                     <p className="text-[10px] uppercase tracking-widest mt-1">Ready for initialization</p>
                   </div>

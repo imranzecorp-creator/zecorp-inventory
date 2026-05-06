@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, memo, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useDeferredValue } from 'react';
 import { 
   Plus, 
   Search, 
@@ -29,7 +29,7 @@ import {
   Mic,
   MicOff
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
 import { useVoiceSearch } from '../hooks/useVoiceSearch';
 import { VoiceLanguageSelector } from './VoiceLanguageSelector';
@@ -66,7 +66,7 @@ interface InventoryListProps {
 import { VariableSizeList as List } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
 
-const InventoryRow = memo(({ index, style, data }: { index: number, style: React.CSSProperties, data: any }) => {
+const InventoryRow = React.memo(({ index, style, data }: { index: number, style: React.CSSProperties, data: any }) => {
   const { items, expandedId, selectedIds, toggleSelectItem, toggleExpand, isApproved, isAdmin, canUpdateStock, openAdjustment, setEditingItem, setItemToDelete } = data;
   const item = items[index];
   if (!item) return null;
@@ -122,9 +122,13 @@ const InventoryRow = memo(({ index, style, data }: { index: number, style: React
                 {item.inventoryType === 'Client Stock' && <Warehouse className="w-3 h-3 text-amber-500/60" />}
               </div>
               <p className="text-[10px] text-slate-500 font-medium truncate">
-                {item.brand && `${item.brand} • `}{item.modelNumber || 'No Model'}
+                {item.modelNumber || 'No Model'}
               </p>
             </div>
+          </div>
+
+          <div className="w-32 px-4 hidden md:block shrink-0">
+             <span className="text-[10px] text-slate-400 font-black uppercase tracking-tighter truncate block">{item.brand || 'No Brand'}</span>
           </div>
 
           <div className="w-24 px-4 text-center shrink-0">
@@ -141,20 +145,16 @@ const InventoryRow = memo(({ index, style, data }: { index: number, style: React
 
           <div className="w-32 px-4 hidden lg:block shrink-0">
              <div className="flex items-center space-x-2 text-slate-400">
-                <MapPin className="w-3 h-3 text-slate-600" />
-                <span className="text-xs font-medium truncate">{item.location}</span>
+                <Warehouse className="w-3 h-3 text-slate-600 shrink-0" />
+                <span className="text-[10px] font-black uppercase tracking-tighter truncate text-primary/80">{item.warehouseLocation || 'N/A'}</span>
              </div>
           </div>
 
-          <div className="w-32 px-4 hidden xl:block shrink-0">
-            <span className={cn(
-              "px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border block text-center",
-              item.currentQuantity <= item.minStock 
-                ? "bg-red-500/10 text-red-500 border-red-500/20" 
-                : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-            )}>
-              {item.currentQuantity <= item.minStock ? 'Low Stock' : 'Healthy'}
-            </span>
+          <div className="w-48 px-4 hidden xl:block shrink-0">
+            <div className="flex flex-col truncate">
+              <span className="text-[10px] text-slate-300 font-black uppercase tracking-tighter truncate">{item.client || 'Internal'}</span>
+              <span className="text-[9px] text-slate-500 font-bold truncate">{item.outlet || item.location || '-'}</span>
+            </div>
           </div>
 
           {isApproved && (
@@ -302,6 +302,7 @@ const InventoryRow = memo(({ index, style, data }: { index: number, style: React
 
 export default function InventoryList({ items, clients, user, projects, initialSearch = '', onSearchClear }: InventoryListProps) {
   const [searchTerm, setSearchTerm] = useState(initialSearch);
+  const deferredSearchTerm = useDeferredValue(searchTerm);
   const [isAiSearching, setIsAiSearching] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [aiFilteredIds, setAiFilteredIds] = useState<string[] | null>(null);
@@ -620,7 +621,7 @@ export default function InventoryList({ items, clients, user, projects, initialS
     const updatedEndTime = updatedEnd ? new Date(updatedEnd).setHours(23, 59, 59, 999) : null;
 
     return items.filter(item => {
-      const searchLow = searchTerm.toLowerCase();
+      const searchLow = deferredSearchTerm.toLowerCase();
       
       // Basic Search
       const matchesSearch = 
@@ -669,7 +670,7 @@ export default function InventoryList({ items, clients, user, projects, initialS
 
       return true;
     });
-  }, [items, searchTerm, aiFilteredIds, selectedBrands, selectedModels, selectedSuppliers, selectedOutlets, clientFilter, jobFilter, locationFilter, inventoryTypeFilter, stockInStart, stockInEnd, updatedStart, updatedEnd]);
+  }, [items, deferredSearchTerm, aiFilteredIds, selectedBrands, selectedModels, selectedSuppliers, selectedOutlets, clientFilter, jobFilter, locationFilter, inventoryTypeFilter, stockInStart, stockInEnd, updatedStart, updatedEnd]);
 
   const getItemSize = useCallback((index: number) => {
     return expandedId === filteredItems[index]?.id ? 440 : 72;
@@ -1297,21 +1298,32 @@ export default function InventoryList({ items, clients, user, projects, initialS
       </div>
 
       {/* Inventory Grid/Table - Unified Virtualized View */}
-      <div className="glass-morphism rounded-3xl border border-white/5 shadow-sm overflow-hidden h-[600px] relative">
-        <AutoSizer>
-          {({ height, width }) => (
-            <List
-              ref={listRef}
-              height={height}
-              width={width}
-              itemCount={filteredItems.length}
-              itemSize={getItemSize}
-              itemData={itemData}
-            >
-              {InventoryRow}
-            </List>
-          )}
-        </AutoSizer>
+      <div className="glass-morphism rounded-3xl border border-white/5 shadow-sm overflow-hidden h-[600px] relative flex flex-col">
+        <div className="flex items-center px-5 py-3 bg-white/[0.03] border-b border-white/5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 shrink-0">
+          {isApproved && <div className="w-10 shrink-0" />}
+          <div className="flex-1 px-3">Item Matrix</div>
+          <div className="w-32 px-4 hidden md:block shrink-0">Brand</div>
+          <div className="w-24 px-4 text-center shrink-0">Stock</div>
+          <div className="w-32 px-4 hidden lg:block shrink-0">Warehouse-Loc</div>
+          <div className="w-48 px-4 hidden xl:block shrink-0">Client / Outlet</div>
+          <div className="w-32 flex justify-end shrink-0">Actions</div>
+        </div>
+        <div className="flex-1 relative">
+          <AutoSizer>
+            {({ height, width }) => (
+              <List
+                ref={listRef}
+                height={height}
+                width={width}
+                itemCount={filteredItems.length}
+                itemSize={getItemSize}
+                itemData={itemData}
+              >
+                {InventoryRow}
+              </List>
+            )}
+          </AutoSizer>
+        </div>
 
         {filteredItems.length === 0 && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 bg-slate-950/20 backdrop-blur-sm">

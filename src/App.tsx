@@ -27,7 +27,7 @@ import { auth, db, OperationType, handleFirestoreError } from './lib/firebase';
 import { 
   LayoutDashboard, 
   Package, 
-  History, 
+  History as LucideHistory, 
   Users, 
   MessageSquare, 
   Bell, 
@@ -46,7 +46,7 @@ import {
   ShieldCheck,
   Sparkles
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 import type { 
   UserProfile, 
@@ -55,6 +55,8 @@ import type {
   AppNotification,
   Project
 } from './types';
+
+import { Skeleton, InventoryRowSkeleton, StatCardSkeleton } from './components/ui/Skeleton';
 
 // Components
 import Sidebar from './components/Sidebar';
@@ -430,8 +432,16 @@ export default function App() {
         )}        <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8 custom-scrollbar">
           <div className="max-w-7xl mx-auto">
             <React.Suspense fallback={
-              <div className="flex h-full w-full items-center justify-center py-20">
-                <Loader2 className="w-8 h-8 text-primary animate-spin" />
+              <div className="space-y-6">
+                {activeTab === 'dashboard' ? (
+                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-5">
+                    {Array(5).fill(0).map((_, i) => <StatCardSkeleton key={i} />)}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {Array(10).fill(0).map((_, i) => <InventoryRowSkeleton key={i} />)}
+                  </div>
+                )}
               </div>
             }>
               <AnimatePresence mode="wait">
@@ -557,7 +567,7 @@ export default function App() {
           <MobileNavButton 
             active={activeTab === 'transactions'} 
             onClick={() => handleMobileTabChange('transactions')} 
-            icon={History} 
+            icon={LucideHistory} 
             label="Logs" 
           />
           <MobileNavButton 
@@ -578,33 +588,34 @@ function MobileNavButton({ active, onClick, icon: Icon, label }: any) {
     <button 
       onClick={onClick}
       className={cn(
-        "flex flex-col items-center justify-center min-w-[56px] space-y-1 transition-all active:scale-75 relative",
+        "flex flex-col items-center justify-center min-w-[64px] space-y-1 transition-all active:scale-90 relative touch-manipulation",
         active ? "text-primary" : "text-slate-500"
       )}
     >
       <motion.div
         initial={false}
         animate={{ 
-          scale: active ? 1.1 : 1,
-          y: active ? -2 : 0,
+          scale: active ? 1.15 : 1,
+          y: active ? -4 : 0,
         }}
+        whileTap={{ scale: 0.85 }}
         className={cn(
-          "w-10 h-10 flex items-center justify-center rounded-2xl transition-colors",
-          active && "bg-primary/10 shadow-lg shadow-primary/5"
+          "w-11 h-11 flex items-center justify-center rounded-2xl transition-all",
+          active ? "bg-primary/10 shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)] border border-primary/20" : "hover:bg-white/5"
         )}
       >
-        <Icon className={cn("w-5 h-5 transition-all", active ? "stroke-[2.5px]" : "stroke-[1.5px]")} />
+        <Icon className={cn("w-5 h-5 transition-all", active ? "stroke-[2.5px] scale-110" : "stroke-[1.5px]")} />
       </motion.div>
       <span className={cn(
-        "text-[8px] font-black uppercase tracking-widest transition-opacity duration-300",
-        active ? "opacity-100" : "opacity-40"
+        "text-[9px] font-black uppercase tracking-widest transition-all duration-300",
+        active ? "opacity-100 translate-y-0 text-primary" : "opacity-40 translate-y-1"
       )}>
         {label}
       </span>
       {active && (
         <motion.div 
           layoutId="nav-dot"
-          className="absolute -top-1 w-1 h-1 rounded-full bg-primary"
+          className="absolute -top-1 w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--primary-rgb),0.5)]"
         />
       )}
     </button>

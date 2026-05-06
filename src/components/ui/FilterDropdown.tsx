@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronDown, Search, Plus } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
 
 interface FilterDropdownProps {

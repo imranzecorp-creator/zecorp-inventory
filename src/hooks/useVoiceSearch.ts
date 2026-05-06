@@ -26,12 +26,17 @@ export function useVoiceSearch(onResult: (transcript: string) => void, initialLa
       }
 
       try {
+        // Some browser environments (like restricted iframes) might have the global but throw Illegal constructor on 'new'
         recognition = new (RecognitionConstructor as any)();
       } catch (err: any) {
         console.error('[VoiceSearch] Failed to instantiate SpeechRecognition:', err);
-        if (err.message?.includes('constructor') || err.name === 'TypeError') {
+        const isIllegalConstructor = err.message?.toLowerCase().includes('constructor') || err.name === 'TypeError';
+        
+        if (isIllegalConstructor) {
           console.info('[VoiceSearch] Speech Recognition constructor is restricted in this context.');
-          alert('Speech Recognition is restricted in this view. Please open the app in a new tab.');
+          alert('Speech Recognition is restricted in this view context. Please open the app in a new tab to use this feature.');
+        } else {
+          alert('Failed to initialize voice search. Please check your microphone permissions.');
         }
         setIsListening(false);
         return;

@@ -1,9 +1,9 @@
-import React, { memo } from 'react';
-import { motion } from 'framer-motion';
+import React from 'react';
+import { motion } from 'motion/react';
 import { Box } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-export default memo(function AmbientStorageBox() {
+export default React.memo(function AmbientStorageBox() {
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
       {/* Intense Energetic Orbs - Brighter and More Saturated */}
@@ -80,7 +80,7 @@ export default memo(function AmbientStorageBox() {
   );
 });
 
-const MovingBox = memo(({ color, delay, duration, size }: { color: string, delay: number, duration: number, size: number }) => {
+const MovingBox = React.memo(({ color, delay, duration, size }: { color: string, delay: number, duration: number, size: number }) => {
   return (
     <motion.div
       initial={{ 

@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Globe, MapPin, Zap, ChevronRight, RefreshCw } from 'lucide-react';
 import { getDailyKitchenNews, NewsInsight } from '../services/aiNewsService';
 import { cn } from '../lib/utils';
 
-export default function AIPoweredNews() {
+export default React.memo(function AIPoweredNews() {
   const [insights, setInsights] = useState<NewsInsight[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -118,4 +118,4 @@ export default function AIPoweredNews() {
       </div>
     </div>
   );
-}
+});

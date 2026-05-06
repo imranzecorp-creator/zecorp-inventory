@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback, memo, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef, useDeferredValue } from 'react';
 import { 
   TrendingUp, 
   Package, 
@@ -7,7 +7,7 @@ import {
   ArrowDownRight,
   Clock,
   LayoutDashboard,
-  History as HistoryIcon,
+  History as LucideHistory,
   Search,
   Filter,
   FileText,
@@ -35,7 +35,7 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, InventoryItem, StockTransaction, Project } from '../types';
 import { formatDate, cn, getDateObject } from '../lib/utils';
 import { generateInventoryReport, generateTransactionsReport } from '../services/pdfService';
@@ -46,6 +46,8 @@ import { FilterDropdown } from './ui/FilterDropdown';
 import { RotateCcw } from 'lucide-react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { FixedSizeList as List } from 'react-window';
+import AutoSizer from 'react-virtualized-auto-sizer';
 
 interface DashboardProps {
   user: UserProfile;
@@ -56,7 +58,7 @@ interface DashboardProps {
 
 
 
-const StockTableRow = memo(({ index, style, data }: { index: number, style: React.CSSProperties, data: { items: InventoryItem[] } }) => {
+const StockTableRow = React.memo(({ index, style, data }: { index: number, style: React.CSSProperties, data: { items: InventoryItem[] } }) => {
   const item = data.items[index];
   if (!item) return null;
 
@@ -110,11 +112,9 @@ const StockTableRow = memo(({ index, style, data }: { index: number, style: Reac
   );
 });
 
-import { FixedSizeList as List } from 'react-window';
-import AutoSizer from 'react-virtualized-auto-sizer';
-
 export default function Dashboard({ user, items, transactions, projects }: DashboardProps) {
   const [stockSearch, setStockSearch] = useState('');
+  const deferredStockSearch = useDeferredValue(stockSearch);
   const [showStockSuggestions, setShowStockSuggestions] = useState(false);
   const [stockJobFilter, setStockJobFilter] = useState('');
   const [showJobSuggestions, setShowJobSuggestions] = useState(false);
@@ -391,7 +391,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
       }
 
       // Basic Search
-      const searchLow = stockSearch.toLowerCase();
+      const searchLow = deferredStockSearch.toLowerCase();
       const matchesSearch = item.name.toLowerCase().includes(searchLow) || 
                            (item.brand && item.brand.toLowerCase().includes(searchLow)) ||
                            (item.modelNumber && item.modelNumber.toLowerCase().includes(searchLow));
@@ -430,7 +430,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
 
       return true;
     });
-  }, [items, stockSearch, stockJobFilter, stockClientFilter, stockLocationFilter, aiResultIds, stockTypeFilter, selectedBrands, selectedModels, selectedSuppliers, selectedOutlets, selectedWarehouseLocations, stockInStart, stockInEnd, updatedStart, updatedEnd]);
+  }, [items, deferredStockSearch, stockJobFilter, stockClientFilter, stockLocationFilter, aiResultIds, stockTypeFilter, selectedBrands, selectedModels, selectedSuppliers, selectedOutlets, selectedWarehouseLocations, stockInStart, stockInEnd, updatedStart, updatedEnd]);
 
   const handleExportTransactions = useCallback(() => {
     const filteredTx = txTypeFilter === 'ALL' 
@@ -642,7 +642,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
         {[
           { id: 'All', label: 'All Inventory', icon: Package },
           { id: 'Warehouse Stock', label: 'Warehouse', icon: Globe },
-          { id: 'Client Stock', label: 'Client', icon: HistoryIcon }
+          { id: 'Client Stock', label: 'Client', icon: LucideHistory }
         ].map((type) => (
           <motion.button
             key={type.id}
@@ -699,7 +699,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
         <StatCard 
           label="Total Logs" 
           value={transactions.length} 
-          icon={History} 
+          icon={LucideHistory} 
           trend="Sync" 
           trendUp={true} 
           color="indigo"
@@ -1328,7 +1328,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
           <div className="space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
             {recentTransactions.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-slate-500">
-                <HistoryIcon className="w-12 h-12 mb-2 opacity-20" />
+                <LucideHistory className="w-12 h-12 mb-2 opacity-20" />
                 <p className="text-sm">No transactions yet</p>
               </div>
             ) : (
@@ -1377,12 +1377,13 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
   );
 }
 
-const StatCard = memo(({ label, value, icon: Icon, trend, trendUp, color, active }: any) => {
+const StatCard = React.memo(({ label, value, icon: Icon, trend, trendUp, color, active }: any) => {
   const colors: any = {
     blue: 'bg-primary/20 text-primary border border-primary/20 shadow-lg shadow-primary/10',
     amber: 'bg-amber-500/20 text-amber-500 border border-amber-500/20 shadow-lg shadow-amber-900/10',
     red: 'bg-red-500/20 text-red-400 border border-red-500/20 shadow-lg shadow-red-900/10',
-    indigo: 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 shadow-lg shadow-indigo-900/10'
+    indigo: 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/20 shadow-lg shadow-indigo-900/10',
+    emerald: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 shadow-lg shadow-emerald-900/10'
   };
 
   return (

@@ -23,7 +23,7 @@ import {
   UserX,
   MailPlus
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, updateDoc, limit, serverTimestamp } from 'firebase/firestore';
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { UserProfile, ApprovedEmail } from '../types';

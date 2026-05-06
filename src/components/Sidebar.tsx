@@ -1,9 +1,9 @@
-import React, { useState, useEffect, memo, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   LayoutDashboard, 
   Briefcase,
   Package, 
-  History, 
+  History as LucideHistory, 
   Users, 
   MessageSquare, 
   ShieldCheck,
@@ -15,7 +15,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface SidebarProps {
   activeTab: string;
@@ -25,7 +25,7 @@ interface SidebarProps {
 
 import Logo from './Logo';
 
-export default memo(function Sidebar({ activeTab, setActiveTab, role }: SidebarProps) {
+export default React.memo(function Sidebar({ activeTab, setActiveTab, role }: SidebarProps) {
   const [uptime] = useState('99.9%');
   
   const menuItems = useMemo(() => {
@@ -33,7 +33,7 @@ export default memo(function Sidebar({ activeTab, setActiveTab, role }: SidebarP
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { id: 'inventory', label: 'Inventory', icon: Package },
       { id: 'projects', label: 'Projects', icon: Briefcase },
-      { id: 'transactions', label: 'Transactions', icon: History },
+      { id: 'transactions', label: 'Transactions', icon: LucideHistory },
       { id: 'chat', label: 'Messages', icon: MessageSquare },
       { id: 'social', label: 'Social Feed', icon: ImageIcon },
       { id: 'intelligence', label: 'AI Intelligence', icon: Sparkles },

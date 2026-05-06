@@ -1,14 +1,14 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { InventoryItem, StockTransaction, ProjectItem, Project } from "../types";
 
-let aiInstance: GoogleGenerativeAI | null = null;
+let aiInstance: GoogleGenAI | null = null;
 function getAi() {
   if (!aiInstance) {
     const key = process.env.GEMINI_API_KEY;
     if (!key) {
       console.warn("GEMINI_API_KEY is missing. AI features will fail.");
     }
-    aiInstance = new GoogleGenerativeAI(key || 'missing_key');
+    aiInstance = new GoogleGenAI({ apiKey: key || 'missing_key' });
   }
   return aiInstance;
 }
@@ -21,11 +21,22 @@ export interface InventoryInsight {
   isUrgent?: boolean;
 }
 
+function isQuotaError(error: any): boolean {
+  const errorStr = JSON.stringify(error);
+  return (
+    errorStr.includes('429') || 
+    errorStr.includes('RESOURCE_EXHAUSTED') ||
+    error?.status === 'RESOURCE_EXHAUSTED' ||
+    error?.error?.code === 429 ||
+    (error instanceof Error && (error.message.includes('429') || error.message.includes('RESOURCE_EXHAUSTED')))
+  );
+}
+
 export async function analyzeInventory(items: InventoryItem[], transactions: StockTransaction[]): Promise<InventoryInsight[]> {
   try {
     const ai = getAi();
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
-    const result = await model.generateContent({
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
       contents: [{
         role: 'user',
         parts: [{
@@ -46,24 +57,18 @@ export async function analyzeInventory(items: InventoryItem[], transactions: Sto
           `
         }]
       }],
-      generationConfig: {
+      config: {
         responseMimeType: "application/json",
       }
     });
 
-    return JSON.parse(result.response.text() || "[]");
+    return JSON.parse(response.text || "[]");
   } catch (error: any) {
-    const errorStr = JSON.stringify(error);
-    const isQuotaError = errorStr.includes('429') || 
-                        errorStr.includes('RESOURCE_EXHAUSTED') ||
-                        error?.status === 'RESOURCE_EXHAUSTED' ||
-                        error?.error?.code === 429;
-
-    if (isQuotaError) {
+    if (isQuotaError(error)) {
       console.warn("Gemini Analysis: Quota limit reached (429).");
       return [{
         title: "AI Analysis Paused",
-        message: "The AI analysis is currently at its usage limit. Defaulting to manual tracking. Please try again in a few minutes.",
+        message: "The AI analysis is currently at its usage limit. Defaulting to manual tracking. Please try again in 15 minutes.",
         type: 'WARNING'
       }];
     }
@@ -76,29 +81,28 @@ export async function analyzeInventory(items: InventoryItem[], transactions: Sto
 export async function suggestItemDetails(itemName: string, brand?: string, modelNumber?: string): Promise<{ description: string, brand?: string, modelNumber?: string }> {
   try {
     const ai = getAi();
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
     const context = [
       itemName ? `Name: ${itemName}` : '',
       brand ? `Brand: ${brand}` : '',
       modelNumber ? `Model: ${modelNumber}` : ''
     ].filter(Boolean).join(', ');
 
-    const result = await model.generateContent({
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
       contents: [{
         role: 'user',
         parts: [{
           text: `Suggest a highly professional and detailed inventory description, and if not already provided, the brand and model number for this item: "${context}". Return as JSON with: description (string), brand (string, optional), modelNumber (string, optional).`
         }]
       }],
-      generationConfig: {
+      config: {
         responseMimeType: "application/json",
       }
     });
 
-    return JSON.parse(result.response.text() || '{"description": ""}');
+    return JSON.parse(response.text || '{"description": ""}');
   } catch (error: any) {
-    const errorStr = JSON.stringify(error);
-    if (errorStr.includes('429') || errorStr.includes('RESOURCE_EXHAUSTED')) {
+    if (isQuotaError(error)) {
       return { description: "AI usage limit reached. Please specify details manually." };
     }
     console.error("Gemini Suggestion Error:", error);
@@ -109,8 +113,8 @@ export async function suggestItemDetails(itemName: string, brand?: string, model
 export async function processAiSearch(query: string, items: InventoryItem[]): Promise<string[]> {
   try {
     const ai = getAi();
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
-    const result = await model.generateContent({
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
       contents: [{
         role: 'user',
         parts: [{
@@ -124,12 +128,12 @@ export async function processAiSearch(query: string, items: InventoryItem[]): Pr
           `
         }]
       }],
-      generationConfig: {
+      config: {
         responseMimeType: "application/json",
       }
     });
 
-    return JSON.parse(result.response.text() || "[]");
+    return JSON.parse(response.text || "[]");
   } catch (error: any) {
     console.error("Gemini Search Error:", error);
     return [];
@@ -139,10 +143,10 @@ export async function processAiSearch(query: string, items: InventoryItem[]): Pr
 export async function findInventoryMatches(importedItems: Partial<ProjectItem>[], inventory: InventoryItem[]): Promise<any[]> {
   try {
     const ai = getAi();
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
     const inventorySummary = inventory.map(i => ({ id: i.id, name: i.name, brand: i.brand, model: i.modelNumber }));
     
-    const result = await model.generateContent({
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
       contents: [{
         role: 'user',
         parts: [{
@@ -160,12 +164,12 @@ export async function findInventoryMatches(importedItems: Partial<ProjectItem>[]
           `
         }]
       }],
-      generationConfig: {
+      config: {
         responseMimeType: "application/json",
       }
     });
 
-    const matches = JSON.parse(result.response.text() || "[]");
+    const matches = JSON.parse(response.text || "[]");
     return importedItems.map((item, idx) => ({
       ...item,
       inventoryItemId: matches[idx] || `EXT-${Math.random().toString(36).substr(2, 9)}`,
@@ -184,13 +188,15 @@ export async function findInventoryMatches(importedItems: Partial<ProjectItem>[]
 export async function getAiResponse(message: string): Promise<string> {
   try {
     const ai = getAi();
-    const model = ai.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
-      systemInstruction: "You are a professional Inventory Specialist and Assistant for an inventory management app. Answer concisely and professionally. You help users manage stock, understand reports, and optimize their inventory."
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [{ parts: [{ text: message }] }],
+      config: {
+        systemInstruction: "You are a professional Inventory Specialist and Assistant for an inventory management app. Answer concisely and professionally. You help users manage stock, understand reports, and optimize their inventory."
+      }
     });
     
-    const result = await model.generateContent(message);
-    return result.response.text() || "I'm sorry, I couldn't process that request.";
+    return response.text || "I'm sorry, I couldn't process that request.";
   } catch (error: any) {
     console.error("Gemini Chat Error:", error);
     return "I'm experiencing some technical difficulties at the moment.";
@@ -200,8 +206,8 @@ export async function getAiResponse(message: string): Promise<string> {
 export async function getExcelMapping(headers: string[], sampleData: any[]): Promise<Record<string, string>> {
   try {
     const ai = getAi();
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
-    const result = await model.generateContent({
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
       contents: [{
         role: 'user',
         parts: [{
@@ -225,7 +231,7 @@ export async function getExcelMapping(headers: string[], sampleData: any[]): Pro
             - eta
             - delivery
             - location
-
+ 
             Excel Headers Found:
             ${headers.join(', ')}
             
@@ -236,12 +242,12 @@ export async function getExcelMapping(headers: string[], sampleData: any[]): Pro
           `
         }]
       }],
-      generationConfig: {
+      config: {
         responseMimeType: "application/json",
       }
     });
 
-    return JSON.parse(result.response.text() || "{}");
+    return JSON.parse(response.text || "{}");
   } catch (error) {
     console.error("Gemini Mapping identification error:", error);
     return {};
@@ -251,8 +257,8 @@ export async function getExcelMapping(headers: string[], sampleData: any[]): Pro
 export async function mapExcelItems(rawData: any[]): Promise<Partial<ProjectItem>[]> {
   try {
     const ai = getAi();
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
-    const result = await model.generateContent({
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
       contents: [{
         role: 'user',
         parts: [{
@@ -265,12 +271,12 @@ export async function mapExcelItems(rawData: any[]): Promise<Partial<ProjectItem
           `
         }]
       }],
-      generationConfig: {
+      config: {
         responseMimeType: "application/json",
       }
     });
 
-    return JSON.parse(result.response.text() || "[]");
+    return JSON.parse(response.text || "[]");
   } catch (error: any) {
     console.error("Gemini Excel Mapping Error:", error);
     return [];
@@ -280,8 +286,8 @@ export async function mapExcelItems(rawData: any[]): Promise<Partial<ProjectItem
 export async function getProjectExcelMapping(headers: string[], sampleData: any[]): Promise<Record<string, string>> {
   try {
     const ai = getAi();
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
-    const result = await model.generateContent({
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
       contents: [{
         role: 'user',
         parts: [{
@@ -294,12 +300,12 @@ export async function getProjectExcelMapping(headers: string[], sampleData: any[
           `
         }]
       }],
-      generationConfig: {
+      config: {
         responseMimeType: "application/json",
       }
     });
 
-    return JSON.parse(result.response.text() || "{}");
+    return JSON.parse(response.text || "{}");
   } catch (error) {
     console.error("Gemini Project Mapping error:", error);
     return {};
@@ -309,8 +315,8 @@ export async function getProjectExcelMapping(headers: string[], sampleData: any[
 export async function mapExcelProjects(rawData: any[]): Promise<any[]> {
   try {
     const ai = getAi();
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
-    const result = await model.generateContent({
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
       contents: [{
         role: 'user',
         parts: [{
@@ -323,12 +329,12 @@ export async function mapExcelProjects(rawData: any[]): Promise<any[]> {
           `
         }]
       }],
-      generationConfig: {
+      config: {
         responseMimeType: "application/json",
       }
     });
 
-    return JSON.parse(result.response.text() || "[]");
+    return JSON.parse(response.text || "[]");
   } catch (error: any) {
     console.error("Gemini Project Mapping Error:", error);
     return [];
@@ -362,8 +368,8 @@ export async function analyzeSupplyChain(
       items: p.items.map(i => ({ name: i.name, qty: i.quantity }))
     }));
 
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
-    const result = await model.generateContent({
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
       contents: [{
         role: 'user',
         parts: [{
@@ -378,15 +384,23 @@ export async function analyzeSupplyChain(
           `
         }]
       }],
-      generationConfig: {
+      config: {
         responseMimeType: "application/json",
       }
     });
 
-    const results = JSON.parse(result.response.text() || "[]");
+    const results = JSON.parse(response.text || "[]");
     insightsCache.set(dataHash, { timestamp: Date.now(), data: results });
     return results;
   } catch (error: any) {
+    if (isQuotaError(error)) {
+      console.warn("Gemini Supply Chain: Quota limit reached (429).");
+      return [{
+        title: "Supply Chain Insights Paused",
+        message: "Real-time supply chain analysis is temporarily paused due to high demand. Your manual tracking is still active.",
+        type: 'WARNING'
+      }];
+    }
     console.error("Gemini Supply Chain Analysis Error:", error);
     return [];
   }
@@ -395,10 +409,6 @@ export async function analyzeSupplyChain(
 export async function summarizeTransactions(transactions: StockTransaction[]): Promise<string> {
   try {
     const ai = getAi();
-    const model = ai.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
-      systemInstruction: "You are an expert Inventory Analyst. Summarize transaction logs professionally."
-    });
     
     const summaryData = transactions.slice(0, 40).map(t => ({
       item: t.itemName,
@@ -407,8 +417,14 @@ export async function summarizeTransactions(transactions: StockTransaction[]): P
       date: t.date
     }));
 
-    const result = await model.generateContent(`Summarize these transactions:\n${JSON.stringify(summaryData)}`);
-    return result.response.text() || "No summary generated.";
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [{ parts: [{ text: `Summarize these transactions:\n${JSON.stringify(summaryData)}` }] }],
+      config: {
+        systemInstruction: "You are an expert Inventory Analyst. Summarize transaction logs professionally."
+      }
+    });
+    return response.text || "No summary generated.";
   } catch (error: any) {
     console.error("Gemini Summarization Error:", error);
     return "Error generating summary.";
@@ -426,19 +442,21 @@ export async function generateInventoryReport(data: {
 }) {
   try {
     const ai = getAi();
-    const model = ai.getGenerativeModel({ 
-      model: "gemini-1.5-flash",
-      systemInstruction: "You are a senior supply chain analyst. Generate professional reports in Markdown."
-    });
     
-    const result = await model.generateContent(`
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [{ parts: [{ text: `
         Generate an inventory report.
         Items: ${data.inventory.length}
         Transactions: ${data.transactions.length}
         Data: ${JSON.stringify(data.inventory.slice(0, 30))}
-      `);
+      ` }] }],
+      config: {
+        systemInstruction: "You are a senior supply chain analyst. Generate professional reports in Markdown."
+      }
+    });
 
-    return result.response.text() || "No report generated.";
+    return response.text || "No report generated.";
   } catch (error: any) {
     console.error('Error generating AI report:', error);
     return "Error generating report.";

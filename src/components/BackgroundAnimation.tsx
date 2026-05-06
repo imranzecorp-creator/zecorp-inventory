@@ -1,7 +1,7 @@
-import React, { memo } from 'react';
-import { motion } from 'framer-motion';
+import React from 'react';
+import { motion } from 'motion/react';
 
-const BackgroundAnimation: React.FC = memo(() => {
+const BackgroundAnimation: React.FC = React.memo(() => {
   return (
     <div className="fixed inset-0 pointer-events-none z-[-1] overflow-hidden select-none bg-[#020617]">
       {/* High-Energy Color Orbs */}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Languages, ChevronDown } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { VOICE_LANGUAGES, VoiceLanguage } from '../hooks/useVoiceSearch';
 import { cn } from '../lib/utils';
 

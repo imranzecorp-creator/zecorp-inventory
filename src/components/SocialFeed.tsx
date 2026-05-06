@@ -1,4 +1,4 @@
-import React, { useState, useEffect, memo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Heart, 
   MessageCircle, 
@@ -11,7 +11,7 @@ import {
   Search,
   Plus
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   collection, 
   addDoc, 
@@ -144,7 +144,7 @@ export default function SocialFeed({ user }: SocialFeedProps) {
   );
 }
 
-const PostCard = memo(({ post, currentUser }: { post: Post, currentUser: UserProfile }) => {
+const PostCard = React.memo(({ post, currentUser }: { post: Post, currentUser: UserProfile }) => {
   const [likes, setLikes] = useState(post.likes || []);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);

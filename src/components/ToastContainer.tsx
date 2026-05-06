@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { Bell, X, Package, ArrowUpRight, ArrowDownLeft, AlertCircle, Plus } from 'lucide-react';
 import { cn } from '../lib/utils';
 

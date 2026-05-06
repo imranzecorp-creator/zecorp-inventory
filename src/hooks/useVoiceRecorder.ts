@@ -15,7 +15,7 @@ export function useVoiceRecorder() {
     
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const MediaRecorderClass = (window as any).MediaRecorder;
+      const MediaRecorderClass = (window as any).MediaRecorder || (window as any).webkitMediaRecorder;
 
       if (!MediaRecorderClass || typeof MediaRecorderClass !== 'function') {
          console.warn('[VoiceRecorder] MediaRecorder not supported or restricted.');
@@ -27,9 +27,16 @@ export function useVoiceRecorder() {
         mediaRecorder = new (MediaRecorderClass as any)(stream);
       } catch (err: any) {
         console.error('[VoiceRecorder] Failed to instantiate MediaRecorder:', err);
-        if (err.message?.includes('constructor') || err.name === 'TypeError') {
+        const isIllegalConstructor = err.message?.toLowerCase().includes('constructor') || err.name === 'TypeError';
+        
+        if (isIllegalConstructor) {
             console.info('[VoiceRecorder] Media Recording constructor is restricted in this context.');
             alert('Speech Recording is restricted in this view context. Please open the app in a new tab.');
+        } else {
+            alert('Failed to initialize recording. Please check microphone permissions.');
+        }
+        if (stream) {
+          stream.getTracks().forEach(t => t.stop());
         }
         return;
       }

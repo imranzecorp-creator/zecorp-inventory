@@ -1,6 +1,6 @@
 import React from 'react';
 import { Shield, Check, X, Info, User, CheckCircle2, Lock } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 
 interface PermissionListProps {

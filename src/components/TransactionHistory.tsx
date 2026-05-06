@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, memo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect, useDeferredValue } from 'react';
 import { 
   ArrowUpRight, 
   ArrowDownRight, 
@@ -7,7 +7,7 @@ import {
   Download,
   Filter,
   User,
-  History,
+  History as LucideHistory,
   ChevronDown,
   ChevronUp,
   Tag,
@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import { useVoiceSearch } from '../hooks/useVoiceSearch';
 import { VoiceLanguageSelector } from './VoiceLanguageSelector';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { StockTransaction } from '../types';
 import { formatDate, formatTime, cn, getDateObject } from '../lib/utils';
 import { generateTransactionsReport } from '../services/pdfService';
@@ -45,7 +45,7 @@ interface TransactionHistoryProps {
   transactions: StockTransaction[];
 }
 
-const TransactionRow = memo(({ index, style, data }: { index: number, style: React.CSSProperties, data: { items: StockTransaction[], expandedId: string | null, toggleExpand: (id: string) => void } }) => {
+const TransactionRow = React.memo(({ index, style, data }: { index: number, style: React.CSSProperties, data: { items: StockTransaction[], expandedId: string | null, toggleExpand: (id: string) => void } }) => {
   const tx = data.items[index];
   if (!tx) return null;
   const isExpanded = data.expandedId === tx.id;
@@ -191,6 +191,7 @@ const TransactionRow = memo(({ index, style, data }: { index: number, style: Rea
 
 const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const deferredSearchTerm = useDeferredValue(searchTerm);
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [userFilter, setUserFilter] = useState('');
   const [inventoryTypeFilter, setInventoryTypeFilter] = useState<'Warehouse Stock' | 'Client Stock' | ''>('');
@@ -212,7 +213,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
 
   useEffect(() => {
     listRef.current?.scrollTo(0);
-  }, [searchTerm, userFilter, inventoryTypeFilter, typeFilter, startDate, endDate, categoryFilter, jobNumberFilter]);
+  }, [deferredSearchTerm, userFilter, inventoryTypeFilter, typeFilter, startDate, endDate, categoryFilter, jobNumberFilter]);
 
   const toggleExpand = useCallback((id: string) => {
     setExpandedId(prev => prev === id ? null : id);
@@ -245,8 +246,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
     const endTimestamp = endDate ? new Date(endDate).getTime() + 86400000 : null;
 
     return transactions.filter(tx => {
-      const searchLow = searchTerm.toLowerCase();
-      const matchesSearch = !searchTerm || 
+      const searchLow = deferredSearchTerm.toLowerCase();
+      const matchesSearch = !deferredSearchTerm || 
         tx.itemName.toLowerCase().includes(searchLow) ||
         (tx.brand?.toLowerCase() || '').includes(searchLow) ||
         (tx.modelNumber?.toLowerCase() || '').includes(searchLow) ||
@@ -274,7 +275,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
 
       return matchesSearch && matchesUser && matchesType && matchesTxType && matchesCategory && matchesJob && matchesDate;
     });
-  }, [transactions, searchTerm, userFilter, inventoryTypeFilter, typeFilter, startDate, endDate, categoryFilter, jobNumberFilter]);
+  }, [transactions, deferredSearchTerm, userFilter, inventoryTypeFilter, typeFilter, startDate, endDate, categoryFilter, jobNumberFilter]);
 
   const getItemSize = useCallback((index: number) => {
     return expandedId === filtered[index]?.id ? 380 : 96;
@@ -319,7 +320,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-3xl font-black text-white tracking-tighter flex items-center space-x-3">
-            <History className="w-8 h-8 text-primary shadow-glow" />
+            <LucideHistory className="w-8 h-8 text-primary shadow-glow" />
             <span>Transaction Matrix</span>
           </h1>
           <p className="text-[10px] md:text-xs text-slate-500 uppercase font-black tracking-[0.3em] mt-1">Universal Inventory Movement Stream</p>
@@ -598,7 +599,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
 
         {filtered.length === 0 && (
           <div className="absolute inset-0 flex flex-col items-center justify-center opacity-50">
-            <History className="w-20 h-20 text-slate-800 mb-6" />
+            <LucideHistory className="w-20 h-20 text-slate-800 mb-6" />
             <div className="text-center">
               <p className="text-lg font-black text-slate-300 tracking-tight">Zero Activity Detected</p>
               <p className="text-[10px] uppercase font-black text-slate-500 tracking-[0.3em] mt-1 italic">Matrix stream is currently offline</p>

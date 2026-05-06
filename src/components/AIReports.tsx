@@ -14,7 +14,7 @@ import {
   Clock,
   ArrowRight
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import Markdown from 'react-markdown';
 import { InventoryItem, StockTransaction } from '../types';
 import { generateInventoryReport } from '../services/geminiService';

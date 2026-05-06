@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, X, ChevronRight } from 'lucide-react';
 
 const TIPS = [
@@ -9,7 +9,7 @@ const TIPS = [
   "Quick Fact: Induction cooking in commercial kitchens is 90% energy efficient compared to 50% for gas."
 ];
 
-export default function AIQuickNews() {
+export default React.memo(function AIQuickNews() {
   const [isVisible, setIsVisible] = useState(false);
   const [currentTip, setCurrentTip] = useState(0);
 
@@ -64,4 +64,4 @@ export default function AIQuickNews() {
       </motion.div>
     </AnimatePresence>
   );
-}
+});

@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, doc, getDocFromServer, getDoc } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -11,6 +11,20 @@ const databaseId = firebaseConfig.firestoreDatabaseId || '(default)';
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
 }, databaseId);
+
+// Test connection on boot
+const testConnection = async () => {
+  try {
+    // Attempt a lightweight server read to confirm connectivity
+    await getDocFromServer(doc(db, '_system_', 'connectivity_check'));
+  } catch (error: any) {
+    if (error?.message?.includes('offline')) {
+      console.warn('[Firestore] Initial connection test: Client is offline.');
+    }
+  }
+};
+// Removed synchronous top-level call to prevent boot crashes
+// testConnection();
 
 export const auth = getAuth(app);
 export const storage = getStorage(app);

@@ -1,4 +1,4 @@
-import React, { useState, memo, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Bell, 
   Search, 
@@ -12,7 +12,7 @@ import {
 import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 import { UserProfile, AppNotification, InventoryItem } from '../types';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { cn, formatDate } from '../lib/utils';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
@@ -31,7 +31,7 @@ import Logo from './Logo';
 import { useVoiceSearch } from '../hooks/useVoiceSearch';
 import { VoiceLanguageSelector } from './VoiceLanguageSelector';
 
-export default memo(function Header({ user, unreadCount, notifications, setActiveTab, items, onGlobalSearch }: HeaderProps) {
+export default React.memo(function Header({ user, unreadCount, notifications, setActiveTab, items, onGlobalSearch }: HeaderProps) {
   const [showNotify, setShowNotify] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
