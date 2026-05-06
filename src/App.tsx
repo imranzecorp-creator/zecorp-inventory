@@ -157,20 +157,32 @@ export default function App() {
               
               // Auto-promote hardcoded admin
               if (isAdmin && (userData.role !== 'admin' || !userData.isApproved)) {
-                await updateDoc(userRef, { role: 'admin', isApproved: true });
+                try {
+                  await updateDoc(userRef, { role: 'admin', isApproved: true });
+                } catch (err) {
+                  handleFirestoreError(err, OperationType.UPDATE, `users/${idUser.uid}`);
+                }
               }
 
               // Update emailVerified in DB if it changed
               if (data.emailVerified !== idUser.emailVerified) {
-                await updateDoc(userRef, { emailVerified: idUser.emailVerified });
+                try {
+                  await updateDoc(userRef, { emailVerified: idUser.emailVerified });
+                } catch (err) {
+                  handleFirestoreError(err, OperationType.UPDATE, `users/${idUser.uid}`);
+                }
               }
 
               // Cross-check with approved_emails whitelist if not admin or approved
               if (userData.role !== 'admin' && !userData.isApproved) {
-                const approvedQuery = query(collection(db, 'approved_emails'), where('email', '==', email));
-                const approvedSnap = await getDocs(approvedQuery);
-                if (!approvedSnap.empty) {
-                  await updateDoc(userRef, { isApproved: true });
+                try {
+                  const approvedQuery = query(collection(db, 'approved_emails'), where('email', '==', email));
+                  const approvedSnap = await getDocs(approvedQuery);
+                  if (!approvedSnap.empty) {
+                    await updateDoc(userRef, { isApproved: true });
+                  }
+                } catch (err) {
+                  handleFirestoreError(err, OperationType.GET, 'approved_emails');
                 }
               }
               
@@ -182,9 +194,13 @@ export default function App() {
               let isApproved = isAdmin;
               
               if (!isAdmin) {
-                const approvedQuery = query(collection(db, 'approved_emails'), where('email', '==', email));
-                const approvedSnap = await getDocs(approvedQuery);
-                isApproved = !approvedSnap.empty;
+                try {
+                  const approvedQuery = query(collection(db, 'approved_emails'), where('email', '==', email));
+                  const approvedSnap = await getDocs(approvedQuery);
+                  isApproved = !approvedSnap.empty;
+                } catch (err) {
+                  handleFirestoreError(err, OperationType.GET, 'approved_emails');
+                }
               }
 
               const newUser: UserProfile = {
@@ -198,21 +214,24 @@ export default function App() {
                 createdAt: Date.now(),
               };
               
-              await setDoc(userRef, {
-                ...newUser,
-                createdAt: serverTimestamp()
-              });
+              try {
+                await setDoc(userRef, {
+                  ...newUser,
+                  createdAt: serverTimestamp()
+                });
+              } catch (err) {
+                handleFirestoreError(err, OperationType.WRITE, `users/${idUser.uid}`);
+              }
               
               // Set initial user state to move past loading screen immediately
               setUser(newUser);
               setLoading(false);
             }
           } catch (err) {
-            console.error("Profile sync error:", err);
+            handleFirestoreError(err, OperationType.GET, `users/${idUser.uid}`);
             setLoading(false);
           }
         }, (err) => {
-          console.error("Profile onSnapshot error:", err);
           handleFirestoreError(err, OperationType.GET, 'users');
           setLoading(false);
         });
@@ -246,14 +265,7 @@ export default function App() {
         return timeB - timeA;
       }));
     }, (err) => {
-      console.error("Inventory sync error:", err);
-      // Don't throw here to avoid crashing the sync loop, just log
-      try {
-        handleFirestoreError(err, OperationType.LIST, 'inventory');
-      } catch (e) {
-        // Log the JSON error but don't re-throw
-        console.error("Formatted Inventory Error:", e);
-      }
+      handleFirestoreError(err, OperationType.LIST, 'inventory');
     });
 
     const projectsQuery = query(collection(db, 'projects'));
@@ -264,8 +276,7 @@ export default function App() {
       } as Project));
       setProjects(data.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)));
     }, (err) => {
-      console.error("Projects sync error:", err);
-      try { handleFirestoreError(err, OperationType.LIST, 'projects'); } catch (e) {}
+      handleFirestoreError(err, OperationType.LIST, 'projects');
     });
 
     const transQuery = query(collection(db, 'transactions_log'), limit(300));
@@ -273,16 +284,14 @@ export default function App() {
       const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as StockTransaction));
       setTransactions(data.sort((a, b) => (b.date || 0) - (a.date || 0)));
     }, (err) => {
-      console.error("Transactions sync error:", err);
-      try { handleFirestoreError(err, OperationType.LIST, 'transactions_log'); } catch (e) {}
+      handleFirestoreError(err, OperationType.LIST, 'transactions_log');
     });
 
     const clientsQuery = query(collection(db, 'clients'));
     const clientsUnsub = onSnapshot(clientsQuery, (snapshot) => {
       setClients(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     }, (err) => {
-      console.error("Clients sync error:", err);
-      try { handleFirestoreError(err, OperationType.LIST, 'clients'); } catch (e) {}
+      handleFirestoreError(err, OperationType.LIST, 'clients');
     });
 
     // Simplify notification query to avoid complex OR index issues
@@ -318,8 +327,7 @@ export default function App() {
       }
       setIsInitialLoad(false);
     }, (err) => {
-      console.error("Notifications sync error:", err);
-      try { handleFirestoreError(err, OperationType.LIST, 'notifications'); } catch (e) {}
+      handleFirestoreError(err, OperationType.LIST, 'notifications');
     });
 
     return () => {

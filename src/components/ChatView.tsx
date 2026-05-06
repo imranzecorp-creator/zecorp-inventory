@@ -80,7 +80,11 @@ export default function ChatView({ user }: ChatViewProps) {
         createdAt: Date.now()
       };
 
-      await addDoc(collection(db, `chats/${chatId}/messages`), userMsg);
+      try {
+        await addDoc(collection(db, `chats/${chatId}/messages`), userMsg);
+      } catch (err) {
+        handleFirestoreError(err, OperationType.CREATE, `chats/${chatId}/messages`);
+      }
     } catch (error) {
       console.error(error);
     } finally {
@@ -127,6 +131,8 @@ export default function ChatView({ user }: ChatViewProps) {
     const q = query(collection(db, 'users'), limit(50));
     getDocs(q).then(snapshot => {
       setUsers(snapshot.docs.map(d => d.data() as UserProfile).filter(u => u.uid !== user.uid));
+    }).catch(err => {
+      handleFirestoreError(err, OperationType.GET, 'users');
     });
   }, [user.uid]);
 
@@ -191,17 +197,25 @@ export default function ChatView({ user }: ChatViewProps) {
         createdAt: Date.now()
       };
 
-      await addDoc(collection(db, `chats/${chatId}/messages`), userMsg);
+      try {
+        await addDoc(collection(db, `chats/${chatId}/messages`), userMsg);
+      } catch (err) {
+        handleFirestoreError(err, OperationType.CREATE, `chats/${chatId}/messages`);
+      }
 
       if (isAiMode) {
         const aiResponse = await getAiResponse(content);
-        await addDoc(collection(db, `chats/${chatId}/messages`), {
-          senderId: 'ai',
-          senderName: 'MasterAI',
-          content: aiResponse,
-          isAi: true,
-          createdAt: Date.now()
-        });
+        try {
+          await addDoc(collection(db, `chats/${chatId}/messages`), {
+            senderId: 'ai',
+            senderName: 'MasterAI',
+            content: aiResponse,
+            isAi: true,
+            createdAt: Date.now()
+          });
+        } catch (err) {
+          handleFirestoreError(err, OperationType.CREATE, `chats/${chatId}/messages`);
+        }
       }
     } catch (error) {
       console.error(error);

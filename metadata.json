@@ -1,8 +1,10 @@
 {
-  "name": "ZECORP OS",
-  "description": "A comprehensive inventory management system with real-time stock tracking, data analytics, social collaboration, and AI-powered assistance.",
+  "name": "ZECORP LOGISTICS SYSTEM",
+  "description": "Next-generation supply chain management platform featuring AI-powered predictive inventory, real-time tracking, and multi-user collaboration.",
   "requestFramePermissions": [
-    "camera"
+    "camera",
+    "microphone",
+    "geolocation"
   ],
   "majorCapabilities": []
 }

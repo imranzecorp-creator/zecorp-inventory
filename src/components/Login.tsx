@@ -23,7 +23,7 @@ import {
   createUserWithEmailAndPassword,
   updateProfile
 } from 'firebase/auth';
-import { auth, db } from '../lib/firebase';
+import { auth, db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 
 import Logo from './Logo';
@@ -106,15 +106,19 @@ export default function Login() {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(cred.user, { displayName: name });
         // Create user doc
-        await setDoc(doc(db, 'users', cred.user.uid), {
-          uid: cred.user.uid,
-          email: email.toLowerCase(),
-          displayName: name,
-          role: 'user',
-          isApproved: false,
-          emailVerified: false,
-          createdAt: Date.now()
-        });
+        try {
+          await setDoc(doc(db, 'users', cred.user.uid), {
+            uid: cred.user.uid,
+            email: email.toLowerCase(),
+            displayName: name,
+            role: 'user',
+            isApproved: false,
+            emailVerified: false,
+            createdAt: Date.now()
+          });
+        } catch (err) {
+          handleFirestoreError(err, OperationType.WRITE, `users/${cred.user.uid}`);
+        }
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }

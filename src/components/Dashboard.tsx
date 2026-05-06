@@ -45,7 +45,7 @@ import AIQuickNews from './AIQuickNews';
 import { FilterDropdown } from './ui/FilterDropdown';
 import { RotateCcw } from 'lucide-react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 interface DashboardProps {
   user: UserProfile;
@@ -174,7 +174,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
       
       // Show toast indirectly via Firestore listener in App.tsx
     } catch (error) {
-      console.error("Failed to persist AI insights:", error);
+      handleFirestoreError(error, OperationType.CREATE, 'notifications');
     } finally {
       setPersistingInsights(false);
     }
@@ -271,38 +271,34 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
         dailyData[dayString] = { name: dayString.split('-')[2], stock: 0, in: 0, out: 0 };
     }
 
-    // Work backwards from today using pre-grouped logic if possible, 
-    // but here we just optimize the iteration
-    let runningStock = currentTotalStock;
-    const sortedTx = [...filteredTxs].sort((a, b) => {
-      const dateA = getDateObject(a.date)?.getTime() || 0;
-      const dateB = getDateObject(b.date)?.getTime() || 0;
-      return dateB - dateA;
-    });
+    // Group transactions by day for efficient lookup
+    const txByDay: Record<string, StockTransaction[]> = {};
+    for (const tx of filteredTxs) {
+      const d = getDateObject(tx.date);
+      if (!d) continue;
+      const day = d.toISOString().split('T')[0];
+      if (!txByDay[day]) txByDay[day] = [];
+      txByDay[day].push(tx);
+    }
 
-    // AI Analytics: Most frequently moved items
+    let runningStock = currentTotalStock;
     const moveCounts: Record<string, number> = {};
 
     last7Days.slice().reverse().forEach(day => {
       if (dailyData[day]) {
         dailyData[day].stock = runningStock;
         
-        // Find transactions for this day
-        for (const tx of sortedTx) {
-          const d = getDateObject(tx.date);
-          if (!d) continue;
-          const txDay = d.toISOString().split('T')[0];
-          if (txDay === day) {
-              if (tx.type === 'IN') {
-                dailyData[day].in += tx.quantity;
-                runningStock -= tx.quantity; 
-              } else {
-                dailyData[day].out += tx.quantity;
-                runningStock += tx.quantity;
-              }
-              // Transaction count for AI sidebar
-              moveCounts[tx.itemName] = (moveCounts[tx.itemName] || 0) + 1;
+        const dayTxs = txByDay[day] || [];
+        for (const tx of dayTxs) {
+          if (tx.type === 'IN') {
+            dailyData[day].in += tx.quantity;
+            runningStock -= tx.quantity; 
+          } else {
+            dailyData[day].out += tx.quantity;
+            runningStock += tx.quantity;
           }
+          // Transaction count for AI sidebar
+          moveCounts[tx.itemName] = (moveCounts[tx.itemName] || 0) + 1;
         }
       }
     });
@@ -666,9 +662,9 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-5">
         <StatCard 
-          label="Items" 
+          label="Total Assets" 
           value={stats.totalItems} 
           icon={Package} 
           trend="+12%" 
@@ -676,41 +672,38 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
           color="blue"
         />
         <StatCard 
-          label="Jobs" 
+          label="Active Jobs" 
           value={stats.totalProjects} 
           icon={Zap} 
-          trend="Sync" 
+          trend="Live" 
           trendUp={true} 
           color="indigo"
         />
         <StatCard 
-          label="Low Stock" 
-          value={stats.lowStock} 
+          label="Risk Level" 
+          value={stats.lowStock + stats.outOfStock} 
           icon={AlertCircle} 
-          trend={`${Math.round((stats.lowStock / (stats.totalItems || 1)) * 100)}%`} 
+          trend={`${Math.round(((stats.lowStock + stats.outOfStock) / (stats.totalItems || 1)) * 100)}%`} 
           trendUp={false} 
-          color="amber"
-          active={stats.lowStock > 0}
+          color={(stats.lowStock + stats.outOfStock) > 0 ? "amber" : "emerald"}
+          active={(stats.lowStock + stats.outOfStock) > 0}
         />
         <StatCard 
-          label="O.O.S" 
-          value={stats.outOfStock} 
-          icon={AlertCircle} 
-          trend="Critical" 
-          trendUp={false} 
-          color="red"
-          active={stats.outOfStock > 0}
+          label="System Load" 
+          value="NOMINAL" 
+          icon={TrendingUp} 
+          trend="Stable" 
+          trendUp={true} 
+          color="emerald"
         />
-        <div className="col-span-2 lg:col-span-1">
-          <StatCard 
-            label="Total Activity" 
-            value={transactions.length} 
-            icon={TrendingUp} 
-            trend="+5 today" 
-            trendUp={true} 
-            color="indigo"
-          />
-        </div>
+        <StatCard 
+          label="Total Logs" 
+          value={transactions.length} 
+          icon={History} 
+          trend="Sync" 
+          trendUp={true} 
+          color="indigo"
+        />
       </div>
 
       {/* AI Daily Insights Section */}

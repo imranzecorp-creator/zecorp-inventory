@@ -66,7 +66,7 @@ export default function SocialFeed({ user }: SocialFeedProps) {
       setImageUrl('');
       setShowForm(false);
     } catch (error) {
-      console.error(error);
+      handleFirestoreError(error, OperationType.CREATE, 'posts');
     }
   };
 
@@ -172,7 +172,9 @@ const PostCard = memo(({ post, currentUser }: { post: Post, currentUser: UserPro
         await updateDoc(postRef, { likes: arrayUnion(currentUser.uid) });
         setLikes(prev => [...prev, currentUser.uid]);
       }
-    } catch (error) { console.error(error); }
+    } catch (error) { 
+      handleFirestoreError(error, OperationType.UPDATE, `posts/${post.id}`);
+    }
   };
 
   const handleAddComment = async (e: React.FormEvent) => {
@@ -189,7 +191,9 @@ const PostCard = memo(({ post, currentUser }: { post: Post, currentUser: UserPro
         createdAt: serverTimestamp()
       });
       setNewComment('');
-    } catch (error) { console.error(error); }
+    } catch (error) { 
+      handleFirestoreError(error, OperationType.CREATE, `posts/${post.id}/comments`);
+    }
   };
 
   return (

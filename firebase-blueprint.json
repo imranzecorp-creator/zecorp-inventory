@@ -167,6 +167,16 @@
         "createdAt": { "type": "number" }
       },
       "required": ["name"]
+    },
+    "ApprovedEmail": {
+      "title": "Approved Email",
+      "description": "Whitelisted email address",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["email"]
     }
   },
   "firestore": {
@@ -209,6 +219,10 @@
     "/clients/{clientId}": {
       "schema": "Client",
       "description": "Predefined client names"
+    },
+    "/approved_emails/{emailId}": {
+      "schema": "ApprovedEmail",
+      "description": "Whitelisted emails for auto-approval"
     }
   }
 }

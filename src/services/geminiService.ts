@@ -1,7 +1,17 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { InventoryItem, StockTransaction, ProjectItem, Project } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY as string });
+let aiInstance: GoogleGenerativeAI | null = null;
+function getAi() {
+  if (!aiInstance) {
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) {
+      console.warn("GEMINI_API_KEY is missing. AI features will fail.");
+    }
+    aiInstance = new GoogleGenerativeAI(key || 'missing_key');
+  }
+  return aiInstance;
+}
 
 export interface InventoryInsight {
   title: string;
@@ -13,44 +23,35 @@ export interface InventoryInsight {
 
 export async function analyzeInventory(items: InventoryItem[], transactions: StockTransaction[]): Promise<InventoryInsight[]> {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `
-        Analyze the following inventory data and recent transactions to provide top 3 actionable insights.
-        Focus on:
-        1. Critical low stock items.
-        2. Stagnant items (no transactions in 30 days).
-        3. Popular items (high outgoing frequency).
-        
-        Inventory Data:
-        ${JSON.stringify(items.map(i => ({ name: i.name, qty: i.currentQuantity, min: i.minStock, id: i.id })))}
-        
-        Recent Transactions:
-        ${JSON.stringify(transactions.slice(0, 20).map(t => ({ name: t.itemName, type: t.type, qty: t.quantity, date: t.date })))}
-      `,
-      config: {
+    const ai = getAi();
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
+    const result = await model.generateContent({
+      contents: [{
+        role: 'user',
+        parts: [{
+          text: `
+            Analyze the following inventory data and recent transactions to provide top 3 actionable insights.
+            Focus on:
+            1. Critical low stock items.
+            2. Stagnant items (no transactions in 30 days).
+            3. Popular items (high outgoing frequency).
+            
+            Inventory Data:
+            ${JSON.stringify(items.map(i => ({ name: i.name, qty: i.currentQuantity, min: i.minStock, id: i.id })))}
+            
+            Recent Transactions:
+            ${JSON.stringify(transactions.slice(0, 20).map(t => ({ name: t.itemName, type: t.type, qty: t.quantity, date: t.date })))}
+            
+            Return ONLY a JSON array.
+          `
+        }]
+      }],
+      generationConfig: {
         responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING },
-              message: { type: Type.STRING },
-              type: { 
-                type: Type.STRING,
-                enum: ['WARNING', 'SUGGESTION', 'POSITIVE']
-              },
-              isUrgent: { type: Type.BOOLEAN },
-              itemId: { type: Type.STRING, nullable: true }
-            },
-            required: ['title', 'message', 'type', 'isUrgent']
-          }
-        }
       }
     });
 
-    return JSON.parse(response.text || "[]");
+    return JSON.parse(result.response.text() || "[]");
   } catch (error: any) {
     const errorStr = JSON.stringify(error);
     const isQuotaError = errorStr.includes('429') || 
@@ -59,7 +60,7 @@ export async function analyzeInventory(items: InventoryItem[], transactions: Sto
                         error?.error?.code === 429;
 
     if (isQuotaError) {
-      console.warn("Gemini Analysis: Quota limit reached (429). Using fallback.");
+      console.warn("Gemini Analysis: Quota limit reached (429).");
       return [{
         title: "AI Analysis Paused",
         message: "The AI analysis is currently at its usage limit. Defaulting to manual tracking. Please try again in a few minutes.",
@@ -74,42 +75,32 @@ export async function analyzeInventory(items: InventoryItem[], transactions: Sto
 
 export async function suggestItemDetails(itemName: string, brand?: string, modelNumber?: string): Promise<{ description: string, brand?: string, modelNumber?: string }> {
   try {
+    const ai = getAi();
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
     const context = [
       itemName ? `Name: ${itemName}` : '',
       brand ? `Brand: ${brand}` : '',
       modelNumber ? `Model: ${modelNumber}` : ''
     ].filter(Boolean).join(', ');
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Suggest a highly professional and detailed inventory description, and if not already provided, the brand and model number for this item: "${context}"`,
-      config: {
+    const result = await model.generateContent({
+      contents: [{
+        role: 'user',
+        parts: [{
+          text: `Suggest a highly professional and detailed inventory description, and if not already provided, the brand and model number for this item: "${context}". Return as JSON with: description (string), brand (string, optional), modelNumber (string, optional).`
+        }]
+      }],
+      generationConfig: {
         responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            description: { type: Type.STRING },
-            brand: { type: Type.STRING, nullable: true },
-            modelNumber: { type: Type.STRING, nullable: true }
-          },
-          required: ['description']
-        }
       }
     });
 
-    return JSON.parse(response.text || '{"description": ""}');
+    return JSON.parse(result.response.text() || '{"description": ""}');
   } catch (error: any) {
     const errorStr = JSON.stringify(error);
-    const isQuotaError = errorStr.includes('429') || 
-                        errorStr.includes('RESOURCE_EXHAUSTED') ||
-                        error?.status === 'RESOURCE_EXHAUSTED' ||
-                        error?.error?.code === 429;
-
-    if (isQuotaError) {
-      console.warn("Gemini Suggestion: Quota limit reached (429).");
+    if (errorStr.includes('429') || errorStr.includes('RESOURCE_EXHAUSTED')) {
       return { description: "AI usage limit reached. Please specify details manually." };
     }
-
     console.error("Gemini Suggestion Error:", error);
     return { description: "" };
   }
@@ -117,67 +108,64 @@ export async function suggestItemDetails(itemName: string, brand?: string, model
 
 export async function processAiSearch(query: string, items: InventoryItem[]): Promise<string[]> {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `
-        Identify the IDs of items that match this natural language query: "${query}"
-        
-        Items:
-        ${JSON.stringify(items.map(i => ({ id: i.id, name: i.name, qty: i.currentQuantity, min: i.minStock })))}
-      `,
-      config: {
+    const ai = getAi();
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
+    const result = await model.generateContent({
+      contents: [{
+        role: 'user',
+        parts: [{
+          text: `
+            Identify the IDs of items that match this natural language query: "${query}"
+            
+            Items:
+            ${JSON.stringify(items.map(i => ({ id: i.id, name: i.name, qty: i.currentQuantity, min: i.minStock })))}
+            
+            Return ONLY a JSON array of matching IDs.
+          `
+        }]
+      }],
+      generationConfig: {
         responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING }
-        }
       }
     });
 
-    return JSON.parse(response.text || "[]");
+    return JSON.parse(result.response.text() || "[]");
   } catch (error: any) {
-    const errorStr = JSON.stringify(error);
-    const isQuotaError = errorStr.includes('429') || 
-                        errorStr.includes('RESOURCE_EXHAUSTED') ||
-                        error?.status === 'RESOURCE_EXHAUSTED' ||
-                        error?.error?.code === 429;
-
-    if (isQuotaError) {
-      console.warn("Gemini Search: Quota limit reached (429).");
-    } else {
-      console.error("Gemini Search Error:", error);
-    }
+    console.error("Gemini Search Error:", error);
     return [];
   }
 }
 
 export async function findInventoryMatches(importedItems: Partial<ProjectItem>[], inventory: InventoryItem[]): Promise<any[]> {
   try {
+    const ai = getAi();
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
     const inventorySummary = inventory.map(i => ({ id: i.id, name: i.name, brand: i.brand, model: i.modelNumber }));
-    const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash", // Use a cheaper model for this high-volume task if possible, or stick to provided aliases
-      contents: `
-        Match these imported items to the existing inventory. 
-        If a match is found, return the inventory 'id'. If no match is found, leave 'id' null.
-        
-        Imported Items:
-        ${JSON.stringify(importedItems.map(i => ({ name: i.name, brand: i.brand, model: i.model })))}
-        
-        Existing Inventory:
-        ${JSON.stringify(inventorySummary.slice(0, 300))} 
-        
-        Return a JSON array of matched IDs corresponding to the imported items (one-to-one mapping).
-      `,
-      config: {
+    
+    const result = await model.generateContent({
+      contents: [{
+        role: 'user',
+        parts: [{
+          text: `
+            Match these imported items to the existing inventory. 
+            If a match is found, return the inventory 'id'. If no match is found, leave 'id' null.
+            
+            Imported Items:
+            ${JSON.stringify(importedItems.map(i => ({ name: i.name, brand: i.brand, model: i.model })))}
+            
+            Existing Inventory:
+            ${JSON.stringify(inventorySummary.slice(0, 300))} 
+            
+            Return ONLY a JSON array of matched IDs (strings or null) corresponding to the imported items.
+          `
+        }]
+      }],
+      generationConfig: {
         responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING, nullable: true }
-        }
       }
     });
 
-    const matches = JSON.parse(response.text || "[]");
+    const matches = JSON.parse(result.response.text() || "[]");
     return importedItems.map((item, idx) => ({
       ...item,
       inventoryItemId: matches[idx] || `EXT-${Math.random().toString(36).substr(2, 9)}`,
@@ -195,27 +183,15 @@ export async function findInventoryMatches(importedItems: Partial<ProjectItem>[]
 
 export async function getAiResponse(message: string): Promise<string> {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: message,
-      config: {
-        systemInstruction: "You are a professional Inventory Specialist and Assistant for an inventory management app. Answer concisely and professionally. You help users manage stock, understand reports, and optimize their inventory."
-      }
+    const ai = getAi();
+    const model = ai.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      systemInstruction: "You are a professional Inventory Specialist and Assistant for an inventory management app. Answer concisely and professionally. You help users manage stock, understand reports, and optimize their inventory."
     });
-
-    return response.text || "I'm sorry, I couldn't process that request.";
+    
+    const result = await model.generateContent(message);
+    return result.response.text() || "I'm sorry, I couldn't process that request.";
   } catch (error: any) {
-    const errorStr = JSON.stringify(error);
-    const isQuotaError = errorStr.includes('429') || 
-                        errorStr.includes('RESOURCE_EXHAUSTED') ||
-                        error?.status === 'RESOURCE_EXHAUSTED' ||
-                        error?.error?.code === 429;
-
-    if (isQuotaError) {
-      console.warn("Gemini Chat: Quota limit reached (429).");
-      return "I've reached my AI usage limit for the moment. Please try again shortly or continue with manual operations.";
-    }
-
     console.error("Gemini Chat Error:", error);
     return "I'm experiencing some technical difficulties at the moment.";
   }
@@ -223,58 +199,49 @@ export async function getAiResponse(message: string): Promise<string> {
 
 export async function getExcelMapping(headers: string[], sampleData: any[]): Promise<Record<string, string>> {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `
-        Analyze these Excel headers and sample data to map them to our internal Inventory Schema.
-        
-        Internal Fields:
-        - name: The item's primary name or description.
-        - brand: Manufacturer or brand name.
-        - modelNumber: Specific model identifier or part number.
-        - quantity: Current stock level (number).
-        - category: Type of item (e.g. Lighting, Audio, Cable).
-        - location: Where it's usually stored or used.
-        - supplier: Who provides the item.
-        - warehouseLocation: Specific bin, shelf, or aisle in the warehouse.
-        - unitPrice: The cost of a single unit.
-        - client: If it belongs to a specific client.
-        - outlet: The project or outlet name.
-        - jobNumber: The associated job or project number.
+    const ai = getAi();
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
+    const result = await model.generateContent({
+      contents: [{
+        role: 'user',
+        parts: [{
+          text: `
+            Analyze these Excel headers and sample data to map them to our internal Inventory Schema.
+            
+            Internal Fields:
+            - name
+            - brand
+            - modelNumber
+            - quantity
+            - category
+            - posNo
+            - dimensions
+            - supplier
+            - origin
+            - logistics
+            - unitLocation
+            - alternateBrand
+            - approvedQuote
+            - eta
+            - delivery
+            - location
 
-        Excel Headers Found:
-        ${headers.join(', ')}
-        
-        Sample Data (first few rows):
-        ${JSON.stringify(sampleData)}
-        
-        Identify which Excel header matches each Internal Field. 
-        Return a JSON object where keys are Internal Fields and values are the corresponding Excel Header names.
-        If no match is found for a field, omit it from the object or use null.
-      `,
-      config: {
+            Excel Headers Found:
+            ${headers.join(', ')}
+            
+            Sample Data (first few rows):
+            ${JSON.stringify(sampleData)}
+            
+            Return a JSON object where keys are Internal Fields and values are the corresponding Excel Header names.
+          `
+        }]
+      }],
+      generationConfig: {
         responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            name: { type: Type.STRING, nullable: true },
-            brand: { type: Type.STRING, nullable: true },
-            modelNumber: { type: Type.STRING, nullable: true },
-            quantity: { type: Type.STRING, nullable: true },
-            category: { type: Type.STRING, nullable: true },
-            location: { type: Type.STRING, nullable: true },
-            supplier: { type: Type.STRING, nullable: true },
-            warehouseLocation: { type: Type.STRING, nullable: true },
-            unitPrice: { type: Type.STRING, nullable: true },
-            client: { type: Type.STRING, nullable: true },
-            outlet: { type: Type.STRING, nullable: true },
-            jobNumber: { type: Type.STRING, nullable: true }
-          }
-        }
       }
     });
 
-    return JSON.parse(response.text || "{}");
+    return JSON.parse(result.response.text() || "{}");
   } catch (error) {
     console.error("Gemini Mapping identification error:", error);
     return {};
@@ -283,75 +250,28 @@ export async function getExcelMapping(headers: string[], sampleData: any[]): Pro
 
 export async function mapExcelItems(rawData: any[]): Promise<Partial<ProjectItem>[]> {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `
-        Map this raw data from an Excel file to the application's ProjectItem schema.
-        
-        ProjectItem Schema & Guidance:
-        - posNo: string (Mapping to "Pos No" or "Position")
-        - name: string (Mapping to "Item description" or "Item name")
-        - quantity: number (The quantity of items, "qty")
-        - brand: string (The manufacturer or primary brand)
-        - model: string (The model number or specific identifier)
-        - dimensions: string (Mapping to "Dim" or "Dimensions")
-        - logistics: string (Mapping to "Logistics")
-        - origin: string (Mapping to "origin" or "orgin")
-        - supplier: string (Who supplied the item, "supplier")
-        - unitLocation: string (Mapping to "unit Location")
-        - alternateBrand: string (Mapping to "alternate brand if any")
-        - delivery: string (Delivery status or details, "delivery")
-        - category: string (Mapping to "category description")
-        - location: string (General storage location)
-        - warehouseLocation: string (Aisle, Shelf, or Bin)
-        - clientAssignment: string (Team or department assignment)
-        - approvedQuote: string (Pricing or quote info)
-        - eta: string (Estimated Time of Arrival)
-        
-        Raw Data (sample or all):
-        ${JSON.stringify(rawData.slice(0, 80))}
-        
-        Identify which columns correspond to the fields above. If a field is missing, leave it as an empty string (or 0 for quantity).
-        Return a JSON array of objects that strictly follow the schema. Ensure quantity is a number.
-      `,
-      config: {
+    const ai = getAi();
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
+    const result = await model.generateContent({
+      contents: [{
+        role: 'user',
+        parts: [{
+          text: `
+            Map this raw data from an Excel file to the application's ProjectItem schema.
+            Raw Data (sample or all):
+            ${JSON.stringify(rawData.slice(0, 80))}
+            
+            Return a JSON array of objects following the ProjectItem schema. Ensure quantity is a number.
+          `
+        }]
+      }],
+      generationConfig: {
         responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              name: { type: Type.STRING },
-              brand: { type: Type.STRING },
-              model: { type: Type.STRING },
-              quantity: { type: Type.NUMBER },
-              supplier: { type: Type.STRING },
-              location: { type: Type.STRING },
-              warehouseLocation: { type: Type.STRING },
-              clientAssignment: { type: Type.STRING },
-              approvedQuote: { type: Type.STRING },
-              category: { type: Type.STRING },
-              posNo: { type: Type.STRING },
-              eta: { type: Type.STRING },
-              delivery: { type: Type.STRING },
-              dimensions: { type: Type.STRING },
-              logistics: { type: Type.STRING },
-              origin: { type: Type.STRING },
-              unitLocation: { type: Type.STRING },
-              alternateBrand: { type: Type.STRING }
-            },
-            required: ['name', 'quantity']
-          }
-        }
       }
     });
 
-    return JSON.parse(response.text || "[]");
+    return JSON.parse(result.response.text() || "[]");
   } catch (error: any) {
-    const errorStr = JSON.stringify(error);
-    if (errorStr.includes('429') || errorStr.includes('RESOURCE_EXHAUSTED')) {
-      throw new Error("Gemini API quota exceeded. Please try again in 1-2 minutes.");
-    }
     console.error("Gemini Excel Mapping Error:", error);
     return [];
   }
@@ -359,70 +279,27 @@ export async function mapExcelItems(rawData: any[]): Promise<Partial<ProjectItem
 
 export async function getProjectExcelMapping(headers: string[], sampleData: any[]): Promise<Record<string, string>> {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `
-        Analyze these Excel headers and sample data to map them to our internal Project Schema.
-        Projects usually contain multiple items.
-        
-        Internal Project Fields:
-        - client: The name of the client/company.
-        - jobNumber: Unique job or project number.
-        - outlet: Project name or site name.
-        - location: General location of the project.
-
-        Internal Item Fields (per project):
-        - posNo: Position number in the project.
-        - name: Item description.
-        - brand: Manufacturer.
-        - model: Model number.
-        - quantity: Required quantity.
-        - dimensions: Item dimensions.
-        - logistics: Logistics info.
-        - origin: Item origin.
-        - supplier: Who provides the item.
-        - unitLocation: Unit location.
-        - alternateBrand: Alternative brand suggestion.
-        - delivery: Delivery details.
-        - category: Item category.
-
-        Excel Headers Found:
-        ${headers.join(', ')}
-        
-        Sample Data (first few rows):
-        ${JSON.stringify(sampleData)}
-        
-        Identify which Excel header matches each Internal Field. 
-        Return a JSON object where keys are Internal Fields (both Project and Item fields) and values are the corresponding Excel Header names.
-      `,
-      config: {
+    const ai = getAi();
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
+    const result = await model.generateContent({
+      contents: [{
+        role: 'user',
+        parts: [{
+          text: `
+            Analyze these Excel headers and map them to our internal Project Schema.
+            Excel Headers Found:
+            ${headers.join(', ')}
+            
+            Return a JSON object mapping internal fields to excel headers.
+          `
+        }]
+      }],
+      generationConfig: {
         responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            client: { type: Type.STRING, nullable: true },
-            jobNumber: { type: Type.STRING, nullable: true },
-            outlet: { type: Type.STRING, nullable: true },
-            location: { type: Type.STRING, nullable: true },
-            name: { type: Type.STRING, nullable: true },
-            brand: { type: Type.STRING, nullable: true },
-            model: { type: Type.STRING, nullable: true },
-            quantity: { type: Type.STRING, nullable: true },
-            supplier: { type: Type.STRING, nullable: true },
-            category: { type: Type.STRING, nullable: true },
-            posNo: { type: Type.STRING, nullable: true },
-            dimensions: { type: Type.STRING, nullable: true },
-            logistics: { type: Type.STRING, nullable: true },
-            origin: { type: Type.STRING, nullable: true },
-            unitLocation: { type: Type.STRING, nullable: true },
-            alternateBrand: { type: Type.STRING, nullable: true },
-            delivery: { type: Type.STRING, nullable: true }
-          }
-        }
       }
     });
 
-    return JSON.parse(response.text || "{}");
+    return JSON.parse(result.response.text() || "{}");
   } catch (error) {
     console.error("Gemini Project Mapping error:", error);
     return {};
@@ -431,101 +308,33 @@ export async function getProjectExcelMapping(headers: string[], sampleData: any[
 
 export async function mapExcelProjects(rawData: any[]): Promise<any[]> {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `
-        Map this raw data from an Excel file to the application's Project and ProjectItem schema.
-        The data might contain multiple rows for the same project (identified by Job Number).
-        
-        Project Schema:
-        - client: string
-        - jobNumber: string
-        - outlet: string
-        - location: string
-        
-        ProjectItem Schema:
-        - posNo: string (Mapping to "Pos No")
-        - name: string (Mapping to "Item description")
-        - brand: string (Primary brand)
-        - model: string
-        - quantity: number (qty)
-        - supplier: string
-        - dimensions: string (Dim)
-        - logistics: string
-        - origin: string (orgin)
-        - unitLocation: string (Unit location)
-        - alternateBrand: string (alternate brand if any)
-        - delivery: string
-        - category: string
-        - location: string (Mapping to "unit location" or specific storage)
-        - warehouseLocation: string
-        - clientAssignment: string
-        - approvedQuote: string
-        - eta: string
-        
-        Raw Data (sample):
-        ${JSON.stringify(rawData.slice(0, 50))}
-        
-        Return a JSON array of projects, where each project has the fields above and an "items" array of ProjectItems.
-        Ensure quantity is a number.
-      `,
-      config: {
+    const ai = getAi();
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
+    const result = await model.generateContent({
+      contents: [{
+        role: 'user',
+        parts: [{
+          text: `
+            Map this raw data to Project and ProjectItem schema.
+            Raw Data:
+            ${JSON.stringify(rawData.slice(0, 50))}
+            
+            Return a JSON array of projects with nested items.
+          `
+        }]
+      }],
+      generationConfig: {
         responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              client: { type: Type.STRING },
-              jobNumber: { type: Type.STRING },
-              outlet: { type: Type.STRING },
-              location: { type: Type.STRING },
-              items: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING },
-                    brand: { type: Type.STRING },
-                    model: { type: Type.STRING },
-                    quantity: { type: Type.NUMBER },
-                    supplier: { type: Type.STRING },
-                    location: { type: Type.STRING },
-                    warehouseLocation: { type: Type.STRING },
-                    clientAssignment: { type: Type.STRING },
-                    approvedQuote: { type: Type.STRING },
-                    category: { type: Type.STRING },
-                    posNo: { type: Type.STRING },
-                    eta: { type: Type.STRING },
-                    delivery: { type: Type.STRING },
-                    dimensions: { type: Type.STRING },
-                    logistics: { type: Type.STRING },
-                    origin: { type: Type.STRING },
-                    unitLocation: { type: Type.STRING },
-                    alternateBrand: { type: Type.STRING }
-                  },
-                  required: ['name', 'quantity']
-                }
-              }
-            },
-            required: ['client', 'jobNumber', 'items']
-          }
-        }
       }
     });
 
-    return JSON.parse(response.text || "[]");
+    return JSON.parse(result.response.text() || "[]");
   } catch (error: any) {
-    const errorStr = JSON.stringify(error);
-    if (errorStr.includes('429') || errorStr.includes('RESOURCE_EXHAUSTED')) {
-      throw new Error("Gemini API quota exceeded. Please try again in 1-2 minutes.");
-    }
     console.error("Gemini Project Mapping Error:", error);
     return [];
   }
 }
 
-// Simple cache to prevent excessive API calls
 const insightsCache = new Map<string, { timestamp: number, data: InventoryInsight[] }>();
 
 export async function analyzeSupplyChain(
@@ -534,6 +343,7 @@ export async function analyzeSupplyChain(
   projects: Project[]
 ): Promise<InventoryInsight[]> {
   try {
+    const ai = getAi();
     const dataHash = JSON.stringify({
       invCount: inventory.length,
       txCount: transactions.length,
@@ -542,7 +352,7 @@ export async function analyzeSupplyChain(
     });
 
     const cached = insightsCache.get(dataHash);
-    if (cached && Date.now() - cached.timestamp < 600000) { // 10 minute cache
+    if (cached && Date.now() - cached.timestamp < 600000) {
       return cached.data;
     }
 
@@ -552,73 +362,31 @@ export async function analyzeSupplyChain(
       items: p.items.map(i => ({ name: i.name, qty: i.quantity }))
     }));
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `
-        Analyze the supply chain status and predict potential stockouts or overstock situations.
-        
-        Inventory:
-        ${JSON.stringify(inventory.slice(0, 100).map(i => ({ id: i.id, name: i.name, stock: i.currentQuantity, min: i.minStock })))}
-        
-        Recent Transactions (last 15):
-        ${JSON.stringify(transactions.slice(0, 15).map(t => ({ name: t.itemName, type: t.type, qty: t.quantity })))}
-        
-        Active Projects Requirements:
-        ${JSON.stringify(projectSummary)}
-        
-        Task:
-        1. Predict if any item will fall below min stock based on active project requirements.
-        2. Identify overstock if items have high stock but low transaction frequency and no project demand.
-        3. Suggest proactive restocks with estimated urgency.
-        
-        Return a JSON array of actionable insights.
-      `,
-      config: {
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
+    const result = await model.generateContent({
+      contents: [{
+        role: 'user',
+        parts: [{
+          text: `
+            Analyze supply chain status.
+            Inventory:
+            ${JSON.stringify(inventory.slice(0, 100).map(i => ({ id: i.id, name: i.name, stock: i.currentQuantity, min: i.minStock })))}
+            Active Projects:
+            ${JSON.stringify(projectSummary)}
+            
+            Return a JSON array of insights.
+          `
+        }]
+      }],
+      generationConfig: {
         responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING },
-              message: { type: Type.STRING },
-              type: { 
-                type: Type.STRING,
-                enum: ['WARNING', 'SUGGESTION', 'POSITIVE']
-              },
-              isUrgent: { type: Type.BOOLEAN },
-              itemId: { type: Type.STRING, nullable: true }
-            },
-            required: ['title', 'message', 'type', 'isUrgent']
-          }
-        }
       }
     });
 
-    const results = JSON.parse(response.text || "[]");
+    const results = JSON.parse(result.response.text() || "[]");
     insightsCache.set(dataHash, { timestamp: Date.now(), data: results });
     return results;
   } catch (error: any) {
-    const errorStr = JSON.stringify(error);
-    const isQuotaError = errorStr.includes('429') || 
-                        errorStr.includes('RESOURCE_EXHAUSTED') ||
-                        error?.status === 'RESOURCE_EXHAUSTED' ||
-                        error?.error?.code === 429;
-
-    if (isQuotaError) {
-      console.warn("Gemini Supply Chain Analysis: Quota limit reached (429). Using cache if available.");
-      // Return a friendly message if no cache exists
-      const lastCache = Array.from(insightsCache.values()).pop();
-      if (lastCache) return lastCache.data;
-      
-      return [{
-        title: "Analysis Delayed",
-        message: "Predictive analysis is currently throttled due to high usage. Please refresh in a moment.",
-        type: 'SUGGESTION',
-        isUrgent: false
-      }];
-    }
-    
     console.error("Gemini Supply Chain Analysis Error:", error);
     return [];
   }
@@ -626,51 +394,24 @@ export async function analyzeSupplyChain(
 
 export async function summarizeTransactions(transactions: StockTransaction[]): Promise<string> {
   try {
-    const summaryData = transactions.map(t => ({
+    const ai = getAi();
+    const model = ai.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      systemInstruction: "You are an expert Inventory Analyst. Summarize transaction logs professionally."
+    });
+    
+    const summaryData = transactions.slice(0, 40).map(t => ({
       item: t.itemName,
       type: t.type,
       qty: t.quantity,
-      client: t.client,
-      user: t.userName,
-      date: t.date,
-      job: t.jobNumber
+      date: t.date
     }));
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `
-        Analyze and summarize the following transaction history. 
-        Focus on identifying:
-        1. Key movements (large inflows or outflows).
-        2. Frequent users or clients.
-        3. Potential patterns or anomalies.
-        4. Brief overall sentiment of the stock flow.
-        
-        Format the response in a professional, concise summary with bullet points. Use markdown formatting.
-        
-        Transactions:
-        ${JSON.stringify(summaryData.slice(0, 40))}
-      `,
-      config: {
-        systemInstruction: "You are an expert Inventory Analyst. Your job is to provide deep insights from transaction logs. Use a professional, executive summary tone."
-      }
-    });
-
-    return response.text || "No summary could be generated.";
+    const result = await model.generateContent(`Summarize these transactions:\n${JSON.stringify(summaryData)}`);
+    return result.response.text() || "No summary generated.";
   } catch (error: any) {
-    const errorStr = JSON.stringify(error);
-    const isQuotaError = errorStr.includes('429') || 
-                        errorStr.includes('RESOURCE_EXHAUSTED') ||
-                        error?.status === 'RESOURCE_EXHAUSTED' ||
-                        error?.error?.code === 429;
-
-    if (isQuotaError) {
-      console.warn("Gemini Summarization: Quota limit reached (429).");
-      return "### ⚠️ AI Usage Limit Reached\n\nThe transaction summarization feature is temporarily unavailable due to API rate limits. \n\n**Manual Overview:**\n- You have " + transactions.length + " transactions in the current view.\n- Please review the activity log below for individual movement details.\n- Try regenerating this summary in a few minutes.";
-    }
-
     console.error("Gemini Summarization Error:", error);
-    return "Error generating transaction summary. Please try again later.";
+    return "Error generating summary.";
   }
 }
 
@@ -684,62 +425,22 @@ export async function generateInventoryReport(data: {
   }
 }) {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `
-        You are a specialized Supply Chain and Inventory Analyst. 
-        Generate a professional executive summary report based on the following inventory and transaction data.
-
-        PARAMETERS:
-        - Date Range: ${data.parameters.dateRange ? `${data.parameters.dateRange.start} to ${data.parameters.dateRange.end}` : 'All Time'}
-        - Transaction Type Filter: ${data.parameters.transactionType || 'All'}
-        - Categories Filter: ${data.parameters.categories?.join(', ') || 'All'}
-
-        DATA SUMMARY:
-        - Total Inventory Items: ${data.inventory.length}
-        - Total Transactions in Period: ${data.transactions.length}
-        - Low Stock Items: ${data.inventory.filter(i => i.currentQuantity <= i.minStock).length}
-
-        TRANSACTIONS (Sample/Summary):
-        ${JSON.stringify(data.transactions.slice(0, 50).map(t => ({
-          name: t.itemName,
-          type: t.type,
-          qty: t.quantity,
-          client: t.client,
-          date: t.date,
-          job: t.jobNumber
-        })))}
-
-        INVENTORY (Top Items):
-        ${JSON.stringify(data.inventory.slice(0, 50).map(i => ({
-          name: i.name,
-          category: i.category,
-          qty: i.currentQuantity,
-          min: i.minStock,
-          location: i.location,
-          warehouse: i.warehouseLocation
-        })))}
-
-        REPORT REQUIREMENTS:
-        1. Overview: High-level summary of stock levels and movement velocity.
-        2. Key Performance Indicators: Analysis of turnover, stockouts, and project fulfillment efficiency.
-        3. Critical Insights: Identify any anomalies, seasonal trends (if applicable), or efficiency gaps.
-        4. Recommendations: Actionable steps to optimize stock levels and warehouse operations.
-        
-        Format the output in clean Markdown with professional headings. Use bold text for emphasis and bullet points for lists.
-      `,
-      config: {
-        systemInstruction: "You are a senior supply chain analyst. Your reports are used by executives to make strategic decisions. Be precise, data-driven, and professional."
-      }
+    const ai = getAi();
+    const model = ai.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      systemInstruction: "You are a senior supply chain analyst. Generate professional reports in Markdown."
     });
+    
+    const result = await model.generateContent(`
+        Generate an inventory report.
+        Items: ${data.inventory.length}
+        Transactions: ${data.transactions.length}
+        Data: ${JSON.stringify(data.inventory.slice(0, 30))}
+      `);
 
-    return response.text || "No report could be generated.";
+    return result.response.text() || "No report generated.";
   } catch (error: any) {
-    const errorStr = JSON.stringify(error);
-    if (errorStr.includes('429') || errorStr.includes('RESOURCE_EXHAUSTED')) {
-      return "### ⚠️ AI Usage Limit Reached\n\nAI report generation is temporarily unavailable due to API rate limits. Please try again in 1-2 minutes.";
-    }
     console.error('Error generating AI report:', error);
-    return "Error generating AI report. Please try again later.";
+    return "Error generating report.";
   }
 }

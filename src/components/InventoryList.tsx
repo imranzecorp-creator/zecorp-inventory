@@ -247,10 +247,49 @@ const InventoryRow = memo(({ index, style, data }: { index: number, style: React
                      </div>
                   </div>
                   <div className="space-y-4">
-                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><FileText className="w-3 h-3" />Technical Notes</p>
-                     <p className="text-xs text-slate-400 italic leading-relaxed border-l-2 border-white/5 pl-3">
-                        {item.description || 'No additional technical data available for this asset signature.'}
-                     </p>
+                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><FileText className="w-3 h-3" />Technical Spec</p>
+                     <div className="space-y-2">
+                        {item.posNo && (
+                          <div className="flex flex-col">
+                             <span className="text-[10px] text-slate-500 uppercase font-bold">Pos No</span>
+                             <span className="text-sm text-slate-200 font-medium">{item.posNo}</span>
+                          </div>
+                        )}
+                        {item.dimensions && (
+                          <div className="flex flex-col">
+                             <span className="text-[10px] text-slate-500 uppercase font-bold">Dimensions</span>
+                             <span className="text-sm text-slate-200 font-medium">{item.dimensions}</span>
+                          </div>
+                        )}
+                        {item.origin && (
+                          <div className="flex flex-col">
+                             <span className="text-[10px] text-slate-500 uppercase font-bold">Origin</span>
+                             <span className="text-sm text-slate-200 font-medium">{item.origin}</span>
+                          </div>
+                        )}
+                     </div>
+                  </div>
+                  <div className="space-y-4">
+                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Sparkles className="w-3 h-3" />Status & Logistics</p>
+                     <div className="space-y-2">
+                        {item.logistics && (
+                          <div className="flex flex-col">
+                             <span className="text-[10px] text-slate-500 uppercase font-bold">Logistics</span>
+                             <span className="text-sm text-slate-200 font-medium">{item.logistics}</span>
+                          </div>
+                        )}
+                        {(item.eta || item.deliveryDate) && (
+                          <div className="flex flex-col">
+                             <span className="text-[10px] text-slate-500 uppercase font-bold">ETA / Delivery</span>
+                             <span className="text-sm text-slate-200 font-medium truncate">{item.eta || ''} {item.deliveryDate ? `| ${item.deliveryDate}` : ''}</span>
+                          </div>
+                        )}
+                        {item.description && (
+                          <p className="text-xs text-slate-400 italic leading-relaxed border-l-2 border-white/5 pl-3 mt-2">
+                            {item.description}
+                          </p>
+                        )}
+                     </div>
                   </div>
                </div>
             </motion.div>
@@ -319,6 +358,15 @@ export default function InventoryList({ items, clients, user, projects, initialS
               client: getVal('client') || '',
               outlet: getVal('outlet') || '',
               jobNumber: getVal('jobNumber') || '',
+              posNo: getVal('posNo') || '',
+              dimensions: getVal('dimensions') || '',
+              logistics: getVal('logistics') || '',
+              origin: getVal('origin') || '',
+              unitLocation: getVal('unitLocation') || '',
+              alternateBrand: getVal('alternateBrand') || '',
+              deliveryDate: getVal('delivery') || '',
+              approvedQuote: getVal('approvedQuote') || '',
+              eta: getVal('eta') || '',
               inventoryType: 'Warehouse Stock'
             };
           });
@@ -335,6 +383,15 @@ export default function InventoryList({ items, clients, user, projects, initialS
             warehouseLocation: item.warehouseLocation || '',
             clientAssignment: item.clientAssignment || '',
             supplier: item.supplier || '',
+            posNo: item.posNo || '',
+            dimensions: item.dimensions || '',
+            logistics: item.logistics || '',
+            origin: item.origin || '',
+            unitLocation: item.unitLocation || '',
+            alternateBrand: item.alternateBrand || '',
+            deliveryDate: item.delivery || '',
+            approvedQuote: item.approvedQuote || '',
+            eta: item.eta || '',
             inventoryType: 'Warehouse Stock'
           }));
         }
@@ -376,12 +433,16 @@ export default function InventoryList({ items, clients, user, projects, initialS
       }
       
       // Activity Log
-      addDoc(collection(db, 'activity_logs'), {
-        userId: user.uid,
-        action: 'AI_IMPORT_INVENTORY',
-        details: `Imported ${importPreview.length} items via AI Mapping`,
-        createdAt: serverTimestamp()
-      }).catch(e => console.warn('Logging failed:', e));
+      try {
+        await addDoc(collection(db, 'activity_logs'), {
+          userId: user.uid,
+          action: 'AI_IMPORT_INVENTORY',
+          details: `Imported ${importPreview.length} items via AI Mapping`,
+          createdAt: serverTimestamp()
+        });
+      } catch (e) {
+        console.warn('Logging failed:', e);
+      }
 
       alert(`Successfully AI-integrated ${importPreview.length} inventory items!`);
       setImportPreview(null);
@@ -553,6 +614,11 @@ export default function InventoryList({ items, clients, user, projects, initialS
       return items.filter(item => aiFilteredIds.includes(item.id));
     }
     
+    const stockInStartTime = stockInStart ? new Date(stockInStart).getTime() : null;
+    const stockInEndTime = stockInEnd ? new Date(stockInEnd).setHours(23, 59, 59, 999) : null;
+    const updatedStartTime = updatedStart ? new Date(updatedStart).getTime() : null;
+    const updatedEndTime = updatedEnd ? new Date(updatedEnd).setHours(23, 59, 59, 999) : null;
+
     return items.filter(item => {
       const searchLow = searchTerm.toLowerCase();
       
@@ -584,21 +650,21 @@ export default function InventoryList({ items, clients, user, projects, initialS
       if (inventoryTypeFilter && item.inventoryType !== inventoryTypeFilter) return false;
 
       // Date Range Filters
-      if (stockInStart) {
+      if (stockInStartTime) {
         const itemDate = getDateObject(item.stockInDate)?.getTime();
-        if (!itemDate || itemDate < new Date(stockInStart).getTime()) return false;
+        if (!itemDate || itemDate < stockInStartTime) return false;
       }
-      if (stockInEnd) {
+      if (stockInEndTime) {
         const itemDate = getDateObject(item.stockInDate)?.getTime();
-        if (!itemDate || itemDate > new Date(stockInEnd).setHours(23, 59, 59, 999)) return false;
+        if (!itemDate || itemDate > stockInEndTime) return false;
       }
-      if (updatedStart) {
+      if (updatedStartTime) {
         const itemDate = getDateObject(item.lastUpdated)?.getTime();
-        if (!itemDate || itemDate < new Date(updatedStart).getTime()) return false;
+        if (!itemDate || itemDate < updatedStartTime) return false;
       }
-      if (updatedEnd) {
+      if (updatedEndTime) {
         const itemDate = getDateObject(item.lastUpdated)?.getTime();
-        if (!itemDate || itemDate > new Date(updatedEnd).setHours(23, 59, 59, 999)) return false;
+        if (!itemDate || itemDate > updatedEndTime) return false;
       }
 
       return true;
@@ -662,18 +728,19 @@ export default function InventoryList({ items, clients, user, projects, initialS
       setSelectedIds(prev => prev.filter(i => i !== item.id));
       setItemToDelete(null);
 
-      // 4. Activity Log (Non-blocking)
-      addDoc(collection(db, 'activity_logs'), {
-        userId: user.uid,
-        action: 'DELETE_ITEM',
-        details: `Deleted item: ${item.name} and ${txSnapshot.size} transactions`,
-        createdAt: serverTimestamp()
-      }).catch(e => console.warn('Logging failed:', e));
+      // 4. Activity Log
+      try {
+        await addDoc(collection(db, 'activity_logs'), {
+          userId: user.uid,
+          action: 'DELETE_ITEM',
+          details: `Deleted item: ${item.name} and ${txSnapshot.size} transactions`,
+          createdAt: serverTimestamp()
+        });
+      } catch (e) {
+        console.warn('Logging failed:', e);
+      }
       
     } catch (err) {
-      console.error('Delete operation failed:', err);
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      setInventoryError(`Delete failed: ${msg}`);
       handleFirestoreError(err, OperationType.DELETE, `inventory/${item.id}`);
     } finally {
       setDeletingId(null);
@@ -2657,9 +2724,19 @@ function ItemFormModal({ item, items, clients, projects, onClose, user }: any) {
     stockInDate: formatDateForInput(item?.stockInDate || new Date()),
     brand: item?.brand || '',
     modelNumber: item?.modelNumber || '',
+    category: item?.category || '',
     supplier: item?.supplier || '',
     outlet: item?.outlet || '',
     inventoryType: item?.inventoryType || 'Warehouse Stock',
+    dimensions: item?.dimensions || '',
+    logistics: item?.logistics || '',
+    origin: item?.origin || '',
+    unitLocation: item?.unitLocation || '',
+    alternateBrand: item?.alternateBrand || '',
+    approvedQuote: item?.approvedQuote || '',
+    eta: item?.eta || '',
+    deliveryDate: item?.deliveryDate || '',
+    posNo: item?.posNo || '',
     stockInAmount: 0,
     stockOutAmount: 0,
   });
@@ -3145,6 +3222,61 @@ function ItemFormModal({ item, items, clients, projects, onClose, user }: any) {
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Model Number</label>
               <input value={formData.modelNumber} onChange={e => setFormData({...formData, modelNumber: e.target.value})} placeholder="e.g., v8.0, MX-200" className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Category / Type</label>
+              <input value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} placeholder="e.g., Lighting, Audio" className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Pos No</label>
+              <input value={formData.posNo} onChange={e => setFormData({...formData, posNo: e.target.value})} placeholder="e.g., POS-001" className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Dimensions</label>
+              <input value={formData.dimensions} onChange={e => setFormData({...formData, dimensions: e.target.value})} placeholder="e.g., 100x50x20 cm" className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Origin</label>
+              <input value={formData.origin} onChange={e => setFormData({...formData, origin: e.target.value})} placeholder="e.g., Germany" className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Logistics</label>
+              <input value={formData.logistics} onChange={e => setFormData({...formData, logistics: e.target.value})} placeholder="e.g., Sea Freight" className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Unit Location</label>
+              <input value={formData.unitLocation} onChange={e => setFormData({...formData, unitLocation: e.target.value})} placeholder="e.g., Bin-42" className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">ETA</label>
+              <input value={formData.eta} onChange={e => setFormData({...formData, eta: e.target.value})} placeholder="e.g., 2024-12-01" className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Delivery Date</label>
+              <input value={formData.deliveryDate} onChange={e => setFormData({...formData, deliveryDate: e.target.value})} placeholder="e.g., 2024-12-05" className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Approved Quote</label>
+              <input value={formData.approvedQuote} onChange={e => setFormData({...formData, approvedQuote: e.target.value})} placeholder="Quote reference..." className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Alt Brand</label>
+              <input value={formData.alternateBrand} onChange={e => setFormData({...formData, alternateBrand: e.target.value})} placeholder="Alternate suggestion..." className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-medium focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
             </div>
           </div>
 

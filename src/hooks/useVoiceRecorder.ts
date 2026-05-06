@@ -10,9 +10,32 @@ export function useVoiceRecorder() {
   const timerRef = useRef<any>(null);
 
   const startRecording = async () => {
+    let mediaRecorder: MediaRecorder | null = null;
+    let stream: MediaStream | null = null;
+    
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const MediaRecorderClass = (window as any).MediaRecorder;
+
+      if (!MediaRecorderClass || typeof MediaRecorderClass !== 'function') {
+         console.warn('[VoiceRecorder] MediaRecorder not supported or restricted.');
+         alert('Media recording is not supported in your browser or is restricted.');
+         return;
+      }
+      
+      try {
+        mediaRecorder = new (MediaRecorderClass as any)(stream);
+      } catch (err: any) {
+        console.error('[VoiceRecorder] Failed to instantiate MediaRecorder:', err);
+        if (err.message?.includes('constructor') || err.name === 'TypeError') {
+            console.info('[VoiceRecorder] Media Recording constructor is restricted in this context.');
+            alert('Speech Recording is restricted in this view context. Please open the app in a new tab.');
+        }
+        return;
+      }
+
+      if (!mediaRecorder) return;
+
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
 

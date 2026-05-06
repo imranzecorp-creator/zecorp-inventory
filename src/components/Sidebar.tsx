@@ -85,6 +85,14 @@ export default memo(function Sidebar({ activeTab, setActiveTab, role }: SidebarP
           className="flex flex-col items-center"
         >
           <Logo className="scale-75" />
+          <div className="mt-4 flex items-center space-x-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
+            <motion.div 
+              animate={{ opacity: [1, 0.4, 1] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" 
+            />
+            <span className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em]">System Optimal</span>
+          </div>
         </motion.div>
       </div>
 

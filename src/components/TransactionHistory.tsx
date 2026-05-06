@@ -241,6 +241,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
   }, [searchTerm, transactions]);
 
   const filtered = useMemo(() => {
+    const startTimestamp = startDate ? new Date(startDate).getTime() : null;
+    const endTimestamp = endDate ? new Date(endDate).getTime() + 86400000 : null;
+
     return transactions.filter(tx => {
       const searchLow = searchTerm.toLowerCase();
       const matchesSearch = !searchTerm || 
@@ -266,8 +269,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
 
       const txDateObj = getDateObject(tx.date);
       const txDate = txDateObj?.getTime() || 0;
-      const matchesDate = (!startDate || txDate >= new Date(startDate).getTime()) &&
-                          (!endDate || txDate <= new Date(endDate).getTime() + 86400000);
+      const matchesDate = (!startTimestamp || txDate >= startTimestamp) &&
+                          (!endTimestamp || txDate <= endTimestamp);
 
       return matchesSearch && matchesUser && matchesType && matchesTxType && matchesCategory && matchesJob && matchesDate;
     });

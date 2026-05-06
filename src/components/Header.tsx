@@ -15,7 +15,7 @@ import { UserProfile, AppNotification, InventoryItem } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn, formatDate } from '../lib/utils';
 import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 interface HeaderProps {
   user: UserProfile;
@@ -62,7 +62,7 @@ export default memo(function Header({ user, unreadCount, notifications, setActiv
     try {
       await updateDoc(doc(db, 'notifications', id), { read: true });
     } catch (error) {
-      console.error(error);
+      handleFirestoreError(error, OperationType.UPDATE, `notifications/${id}`);
     }
   };
 

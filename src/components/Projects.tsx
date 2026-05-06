@@ -88,6 +88,33 @@ const ManifestRow = memo(({ index, style, data }: { index: number, style: React.
                   </span>
                 </>
               )}
+              {item.origin && (
+                <>
+                  <span className="w-1 h-1 rounded-full bg-slate-700" />
+                  <span className="flex items-center space-x-1">
+                     <span className="text-slate-600 font-black">ORG:</span>
+                     <span className="text-slate-300">{item.origin}</span>
+                  </span>
+                </>
+              )}
+              {item.logistics && (
+                <>
+                  <span className="w-1 h-1 rounded-full bg-slate-700" />
+                  <span className="flex items-center space-x-1">
+                     <span className="text-slate-600 font-black">LOG:</span>
+                     <span className="text-slate-300">{item.logistics}</span>
+                  </span>
+                </>
+              )}
+              {item.eta && (
+                <>
+                  <span className="w-1 h-1 rounded-full bg-slate-700" />
+                  <span className="flex items-center space-x-1">
+                     <span className="text-primary font-black uppercase">ETA:</span>
+                     <span className="text-primary/80">{item.eta}</span>
+                  </span>
+                </>
+              )}
               {item.unitLocation && (
                 <>
                   <span className="w-1 h-1 rounded-full bg-slate-700" />
@@ -200,7 +227,16 @@ export default function Projects({ projects, inventory, clients, user, transacti
                 model: r[mapping.model || ''] || '',
                 quantity: Number(r[mapping.quantity || '']) || 0,
                 category: r[mapping.category || ''] || '',
-                posNo: r[mapping.posNo || ''] || ''
+                posNo: r[mapping.posNo || ''] || '',
+                dimensions: r[mapping.dimensions || ''] || '',
+                logistics: r[mapping.logistics || ''] || '',
+                origin: r[mapping.origin || ''] || '',
+                supplier: r[mapping.supplier || ''] || '',
+                unitLocation: r[mapping.unitLocation || ''] || '',
+                alternateBrand: r[mapping.alternateBrand || ''] || '',
+                delivery: r[mapping.delivery || ''] || '',
+                approvedQuote: r[mapping.approvedQuote || ''] || '',
+                eta: r[mapping.eta || ''] || ''
               }))
             };
           });
@@ -269,16 +305,24 @@ export default function Projects({ projects, inventory, clients, user, transacti
           totalQuantityIn: 0,
           totalQuantityOut: 0
         };
-        await addDoc(collection(db, 'projects'), finalPayload);
+        try {
+          await addDoc(collection(db, 'projects'), finalPayload);
+        } catch (err) {
+          handleFirestoreError(err, OperationType.CREATE, 'projects');
+        }
       }
       
       // Activity Log
-      addDoc(collection(db, 'activity_logs'), {
-        userId: user.uid,
-        action: 'AI_IMPORT_PROJECTS',
-        details: `Bulk imported ${projectImportPreview.length} projects via AI Mapping`,
-        createdAt: serverTimestamp()
-      }).catch(e => console.warn('Logging failed:', e));
+      try {
+        await addDoc(collection(db, 'activity_logs'), {
+          userId: user.uid,
+          action: 'AI_IMPORT_PROJECTS',
+          details: `Bulk imported ${projectImportPreview.length} projects via AI Mapping`,
+          createdAt: serverTimestamp()
+        });
+      } catch (e) {
+        console.warn('Logging failed:', e);
+      }
 
       alert(`Successfully AI-imported ${projectImportPreview.length} projects!`);
       setProjectImportPreview(null);
@@ -397,8 +441,7 @@ export default function Projects({ projects, inventory, clients, user, transacti
       setIsDeleteMode(false);
       // No alert, just feedback via state
     } catch (err) {
-      console.error('Batch delete failed:', err);
-      alert('Some projects could not be deleted.');
+      handleFirestoreError(err, OperationType.DELETE, 'projects');
     } finally {
       setIsImporting(false);
     }
@@ -993,7 +1036,9 @@ function ProjectFormModal({
               origin: getVal('origin') || '',
               unitLocation: getVal('unitLocation') || '',
               alternateBrand: getVal('alternateBrand') || '',
-              delivery: getVal('delivery') || ''
+              delivery: getVal('delivery') || '',
+              approvedQuote: getVal('approvedQuote') || '',
+              eta: getVal('eta') || ''
             };
           });
         } else {
@@ -2012,6 +2057,7 @@ function ProjectImportPreviewModal({ data, onConfirm, onCancel, isImporting }: {
                       <tr className="text-[8px] font-black text-slate-600 uppercase tracking-[0.2em] border-b border-white/5">
                         <th className="pb-3 px-2">Description</th>
                         <th className="pb-3 px-2">Brand/Model</th>
+                        <th className="pb-3 px-2">Tech Specs</th>
                         <th className="pb-3 px-2 text-center">Status</th>
                         <th className="pb-3 px-2 text-right">Quantity</th>
                       </tr>
@@ -2021,9 +2067,18 @@ function ProjectImportPreviewModal({ data, onConfirm, onCancel, isImporting }: {
                         <tr key={i} className="border-b border-white/[0.02] last:border-0">
                            <td className="py-3 px-2">
                              <p className="text-xs font-bold text-slate-300">{item.name}</p>
-                             <p className="text-[8px] text-slate-500 font-mono mt-0.5">{item.category}</p>
+                             <div className="flex items-center space-x-2 mt-0.5">
+                               {item.posNo && <span className="text-[8px] font-black text-indigo-400 font-mono">#{item.posNo}</span>}
+                               <span className="text-[8px] text-slate-500 font-mono uppercase tracking-tighter">{item.category}</span>
+                             </div>
                            </td>
                           <td className="py-3 px-2 text-[10px] text-slate-500 font-mono">{item.brand} / {item.model}</td>
+                          <td className="py-3 px-2">
+                            <div className="space-y-0.5">
+                              {item.dimensions && <p className="text-[8px] text-slate-600 truncate max-w-[100px]">DIM: {item.dimensions}</p>}
+                              {item.eta && <p className="text-[8px] text-primary/60 truncate max-w-[100px]">ETA: {item.eta}</p>}
+                            </div>
+                          </td>
                           <td className="py-3 px-2">
                             <span className={cn(
                               "inline-flex items-center px-1.5 py-0.5 rounded text-[7px] font-black uppercase tracking-widest",
@@ -2136,6 +2191,9 @@ function ItemImportPreviewModal({ data, onConfirm, onCancel }: { data: any[], on
                       {item.dimensions && <p className="text-[9px] text-slate-500 font-mono tracking-tighter"><span className="text-slate-700">DIM:</span> {item.dimensions}</p>}
                       {item.origin && <p className="text-[9px] text-slate-500 font-mono tracking-tighter"><span className="text-slate-700">ORIGIN:</span> {item.origin}</p>}
                       {item.unitLocation && <p className="text-[9px] text-slate-500 font-mono tracking-tighter"><span className="text-slate-700">UNIT LOC:</span> {item.unitLocation}</p>}
+                      {item.logistics && <p className="text-[9px] text-slate-500 font-mono tracking-tighter"><span className="text-slate-700">LOGIS:</span> {item.logistics}</p>}
+                      {item.eta && <p className="text-[9px] text-primary/60 font-mono tracking-tighter"><span className="text-primary/40">ETA:</span> {item.eta}</p>}
+                      {item.delivery && <p className="text-[9px] text-slate-500 font-mono tracking-tighter"><span className="text-slate-700">DELIVERY:</span> {item.delivery}</p>}
                     </div>
                   </td>
                   <td className="px-6 py-4 bg-white/[0.02] border-y border-white/5 group-hover:bg-white/[0.05] transition-colors text-center">

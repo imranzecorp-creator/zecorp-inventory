@@ -15,30 +15,49 @@ export function useVoiceSearch(onResult: (transcript: string) => void, initialLa
   const [currentLang, setCurrentLang] = useState<VoiceLanguage>(initialLang);
 
   const startListening = useCallback(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert('Speech recognition is not supported in your browser.');
-      return;
-    }
+    let recognition: any;
+    try {
+      const RecognitionConstructor = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+      
+      if (!RecognitionConstructor || typeof RecognitionConstructor !== 'function') {
+        console.warn('[VoiceSearch] SpeechRecognition not supported or restricted.');
+        alert('Speech recognition is not supported in your browser or is restricted in this view.');
+        return;
+      }
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = currentLang;
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
+      try {
+        recognition = new (RecognitionConstructor as any)();
+      } catch (err: any) {
+        console.error('[VoiceSearch] Failed to instantiate SpeechRecognition:', err);
+        if (err.message?.includes('constructor') || err.name === 'TypeError') {
+          console.info('[VoiceSearch] Speech Recognition constructor is restricted in this context.');
+          alert('Speech Recognition is restricted in this view. Please open the app in a new tab.');
+        }
+        setIsListening(false);
+        return;
+      }
+      
+      recognition.lang = currentLang;
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
 
-    recognition.onstart = () => setIsListening(true);
-    recognition.onend = () => setIsListening(false);
-    recognition.onerror = (event: any) => {
-      console.error('Speech recognition error', event.error);
+      recognition.onstart = () => setIsListening(true);
+      recognition.onend = () => setIsListening(false);
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error', event.error);
+        setIsListening(false);
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        onResult(transcript);
+      };
+
+      recognition.start();
+    } catch (err) {
+      console.error('Speech recognition failed to initialize', err);
       setIsListening(false);
-    };
-
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      onResult(transcript);
-    };
-
-    recognition.start();
+    }
   }, [currentLang, onResult]);
 
   return { isListening, startListening, currentLang, setCurrentLang };

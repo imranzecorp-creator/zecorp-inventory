@@ -36,6 +36,15 @@ export interface InventoryItem {
   supplier?: string;
   outlet?: string;
   inventoryType?: 'Warehouse Stock' | 'Client Stock';
+  dimensions?: string;
+  logistics?: string;
+  origin?: string;
+  unitLocation?: string;
+  alternateBrand?: string;
+  approvedQuote?: string;
+  eta?: string;
+  deliveryDate?: string;
+  posNo?: string;
 }
 
 export interface StockTransaction {

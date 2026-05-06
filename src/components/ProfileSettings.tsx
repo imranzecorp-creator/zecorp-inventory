@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { updateProfile, updateEmail, updatePassword } from 'firebase/auth';
 import { doc, updateDoc } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { UserProfile } from '../types';
 import { motion } from 'framer-motion';
 import { formatDate } from '../lib/utils';
@@ -60,6 +60,7 @@ export default memo(function ProfileSettings({ user, setUser }: ProfileSettingsP
       setSuccess('Profile updated successfully!');
     } catch (err: any) {
       setError(err.message || 'Failed to update profile.');
+      handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}`);
     } finally {
       setLoading(false);
     }

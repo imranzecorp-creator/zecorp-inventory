@@ -172,5 +172,10 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow create: if isSignedIn();
     }
+
+    match /approved_emails/{emailId} {
+      allow read: if isVerified();
+      allow write: if isAdmin();
+    }
   }
 }

@@ -1,6 +1,13 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+let aiInstance: GoogleGenerativeAI | null = null;
+function getAi() {
+  if (!aiInstance) {
+    const key = process.env.GEMINI_API_KEY;
+    aiInstance = new GoogleGenerativeAI(key || 'missing_key');
+  }
+  return aiInstance;
+}
 
 export interface NewsInsight {
   title: string;
@@ -11,15 +18,21 @@ export interface NewsInsight {
 
 export async function getDailyKitchenNews(): Promise<NewsInsight[]> {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: "Generate 3 short, professional news snippets about commercial kitchen equipment. Focus on: 1. A recent UAE-specific industry update. 2. A global innovation in kitchen tech. 3. An energy-efficiency trend. Return ONLY a JSON array of objects with keys: title, content (max 120 chars), source, category ('UAE', 'Global', or 'Trend').",
-      config: {
+    const ai = getAi();
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
+    const result = await model.generateContent({
+      contents: [{
+        role: "user",
+        parts: [{
+          text: "Generate 3 short, professional news snippets about commercial kitchen equipment. Focus on: 1. A recent UAE-specific industry update. 2. A global innovation in kitchen tech. 3. An energy-efficiency trend. Return ONLY a JSON array of objects with keys: title, content (max 120 chars), source, category ('UAE', 'Global', or 'Trend')."
+        }]
+      }],
+      generationConfig: {
         responseMimeType: "application/json",
       },
     });
 
-    const text = response.text;
+    const text = result.response.text();
     if (!text) return [];
     
     return JSON.parse(text);

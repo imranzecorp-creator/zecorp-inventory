@@ -199,6 +199,8 @@ function ApprovalManagement({ admin }: { admin: UserProfile }) {
     const q = query(collection(db, 'approved_emails'), orderBy('createdAt', 'desc'));
     return onSnapshot(q, (snapshot) => {
       setEmails(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ApprovedEmail)));
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, 'approved_emails');
     });
   }, []);
 
@@ -300,6 +302,8 @@ function UserManagement() {
     const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
     return onSnapshot(q, (snapshot) => {
       setUsers(snapshot.docs.map(d => ({ ...d.data() } as UserProfile)));
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, 'users');
     });
   }, []);
 
@@ -452,7 +456,7 @@ function SystemLogs() {
       setLogs(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
     }, (err) => {
-      console.error('Logs fetch failed:', err);
+      handleFirestoreError(err, OperationType.LIST, 'activity_logs');
       setLoading(false);
     });
     return () => unsubscribe();
