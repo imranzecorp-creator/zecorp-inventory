@@ -35,7 +35,18 @@ export async function getDailyKitchenNews(): Promise<NewsInsight[]> {
     const text = response.text;
     if (!text) return [];
     
-    return JSON.parse(text);
+    try {
+      // Clean markdown code blocks if present
+      const cleaned = text.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
+      return JSON.parse(cleaned);
+    } catch (e) {
+      console.warn("AI News Parse Error:", e, "Raw Text:", text);
+      const match = text.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
+      if (match) {
+        return JSON.parse(match[0]);
+      }
+      throw e;
+    }
   } catch (error: any) {
     const errorStr = JSON.stringify(error);
     const isQuotaError = errorStr.includes('429') || 
