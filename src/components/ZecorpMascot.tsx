@@ -101,7 +101,7 @@ export const ZecorpMascot: React.FC<ZecorpMascotProps> = ({ userDisplayName = 'U
         animate={{ 
           left: `${position.x}%`, 
           top: `${position.y}%`,
-          scale: [1, 1.05, 1],
+          scale: [0.8, 0.85, 0.8], // Scale down slightly by default
           rotate: [0, 5, -5, 0]
         }}
         transition={{ 
@@ -110,7 +110,7 @@ export const ZecorpMascot: React.FC<ZecorpMascotProps> = ({ userDisplayName = 'U
           scale: { duration: 3, repeat: Infinity, ease: "easeInOut" },
           rotate: { duration: 5, repeat: Infinity, ease: "easeInOut" }
         }}
-        className="absolute pointer-events-auto group cursor-grab active:cursor-grabbing gpu-accelerated"
+        className="absolute pointer-events-auto group cursor-grab active:cursor-grabbing gpu-accelerated scale-75 md:scale-100"
         onMouseEnter={() => {
           if (!showAbout && !isDragging) {
             setCurrentNews(`Hi ${userDisplayName.split(' ')[0]}! I'm Zec AI, Your Assistant.`);

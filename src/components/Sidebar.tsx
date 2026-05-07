@@ -30,16 +30,16 @@ export default React.memo(function Sidebar({ activeTab, setActiveTab, role }: Si
   
   const menuItems = useMemo(() => {
     const items = [
-      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { id: 'inventory', label: 'Inventory', icon: Package },
-      { id: 'projects', label: 'Projects', icon: Briefcase },
-      { id: 'transactions', label: 'Transactions', icon: LucideHistory },
-      { id: 'chat', label: 'Messages', icon: MessageSquare },
-      { id: 'social', label: 'Social Feed', icon: ImageIcon },
-      { id: 'intelligence', label: 'AI Intelligence', icon: Sparkles },
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, color: 'text-primary' },
+      { id: 'inventory', label: 'Inventory', icon: Package, color: 'text-amber-400' },
+      { id: 'projects', label: 'Projects', icon: Briefcase, color: 'text-emerald-400' },
+      { id: 'transactions', label: 'Transactions', icon: LucideHistory, color: 'text-indigo-400' },
+      { id: 'chat', label: 'Messages', icon: MessageSquare, color: 'text-violet-400' },
+      { id: 'social', label: 'Social Feed', icon: ImageIcon, color: 'text-rose-400' },
+      { id: 'intelligence', label: 'AI Intelligence', icon: Sparkles, color: 'text-cyan-400' },
     ];
     if (role === 'admin') {
-      items.push({ id: 'admin', label: 'Admin Panel', icon: ShieldCheck });
+      items.push({ id: 'admin', label: 'Admin Panel', icon: ShieldCheck, color: 'text-red-400' });
     }
     return items;
   }, [role]);
@@ -142,8 +142,8 @@ export default React.memo(function Sidebar({ activeTab, setActiveTab, role }: Si
               <item.icon className={cn(
                 "w-5 h-5 transition-all duration-300",
                 activeTab === item.id 
-                  ? "text-slate-900 drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]" 
-                  : "text-slate-300 group-hover:text-primary group-hover:drop-shadow-[0_0_8px_rgba(var(--primary-rgb),0.5)]"
+                  ? "text-slate-900 drop-shadow-[0_0_8px_rgba(255,255,255,0.7)]" 
+                  : cn("text-slate-300 opacity-60 group-hover:text-white group-hover:opacity-100", item.color?.replace('text-', 'group-hover:text-'))
               )} />
             </motion.div>
             {item.label}
@@ -176,7 +176,7 @@ export default React.memo(function Sidebar({ activeTab, setActiveTab, role }: Si
                    <Database className="w-2.5 h-2.5 text-amber-500 group-hover:scale-110 transition-transform" />
                    <span className="text-[8px] font-black text-slate-300 uppercase tracking-tighter">Vault</span>
                 </div>
-                <span className="text-[9px] font-bold text-white">Distressed</span>
+                <span className="text-[9px] font-bold text-white uppercase tracking-tighter">SECURE</span>
              </div>
           </div>
         </div>

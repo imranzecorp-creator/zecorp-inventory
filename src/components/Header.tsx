@@ -7,7 +7,13 @@ import {
   ChevronDown,
   Mic,
   MicOff,
-  Sparkles
+  Sparkles,
+  Menu,
+  X,
+  Briefcase,
+  MessageSquare,
+  Image as ImageIcon,
+  History as LucideHistory
 } from 'lucide-react';
 import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
@@ -36,6 +42,7 @@ export default React.memo(function Header({ user, unreadCount, notifications, se
   const [showProfile, setShowProfile] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   
   const { isListening, startListening, currentLang, setCurrentLang } = useVoiceSearch((transcript) => {
     setSearchTerm(transcript);
@@ -68,12 +75,64 @@ export default React.memo(function Header({ user, unreadCount, notifications, se
 
   return (
     <header className="h-16 glass-morphism border-b border-white/5 px-4 md:px-8 flex items-center justify-between sticky top-0 z-[100]">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
+        <button 
+          onClick={() => setShowMobileMenu(!showMobileMenu)}
+          className="md:hidden p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-full relative transition-all active:scale-95"
+          aria-label="Toggle mobile menu"
+        >
+          {showMobileMenu ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </button>
         <Logo variant="full" className="scale-50 origin-left hidden md:flex" />
         <Logo variant="icon" className="md:hidden" />
       </div>
 
-      <div className="flex-1 max-w-xl mx-4">
+      <AnimatePresence>
+        {showMobileMenu && (
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="fixed inset-0 top-16 bg-[#020617]/95 backdrop-blur-xl z-[90] md:hidden overflow-y-auto"
+          >
+            <div className="p-6 space-y-6">
+              <div className="space-y-2">
+                {[
+                  { id: 'dashboard', label: 'Dashboard', icon: Sparkles },
+                  { id: 'inventory', label: 'Inventory', icon: Search },
+                  { id: 'projects', label: 'Projects', icon: Briefcase },
+                  { id: 'transactions', label: 'Transactions', icon: LucideHistory },
+                  { id: 'chat', label: 'Messages', icon: MessageSquare },
+                  { id: 'social', label: 'Social Feed', icon: ImageIcon },
+                  { id: 'intelligence', label: 'AI Intel', icon: Sparkles },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveTab(item.id);
+                      setShowMobileMenu(false);
+                    }}
+                    className="w-full flex items-center space-x-4 p-4 rounded-2xl bg-white/5 border border-white/5 text-lg font-black text-white hover:bg-primary/20 transition-all active:scale-[0.98]"
+                  >
+                    <item.icon className="w-6 h-6 text-primary" />
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+              
+              <div className="p-4 rounded-2xl bg-primary/5 border border-primary/20">
+                <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-1">System Status</p>
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-sm font-bold text-slate-300">ZECORP Core Operational</span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="flex-1 max-w-xl mx-2 md:mx-4">
         <div className="relative group">
           <motion.div
             whileFocus={{ scale: 1.2, color: 'var(--color-primary)' }}
@@ -100,9 +159,9 @@ export default React.memo(function Header({ user, unreadCount, notifications, se
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
-                  className="absolute top-full left-0 right-0 mt-2 bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                  className="absolute top-full left-[-1rem] right-[-1rem] md:left-0 md:right-0 mt-2 bg-[#0f172a] border-y md:border border-white/10 md:rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
                 >
-                  <div className="p-2 space-y-1">
+                  <div className="p-1 md:p-2 space-y-0.5 md:space-y-1 max-h-[60vh] overflow-y-auto">
                     {searchSuggestions.map((suggestion, index) => (
                       <button
                         key={index}
@@ -111,7 +170,7 @@ export default React.memo(function Header({ user, unreadCount, notifications, se
                           setShowSearchSuggestions(false);
                           onGlobalSearch(suggestion);
                         }}
-                        className="w-full px-4 py-2.5 flex items-center space-x-3 hover:bg-white/5 transition-colors text-left rounded-xl group"
+                        className="w-full px-4 py-3.5 md:py-2.5 flex items-center space-x-3 hover:bg-white/5 transition-colors text-left rounded-xl group active:bg-white/10 touch-manipulation"
                       >
                         <Search className="w-4 h-4 text-slate-500 group-hover:text-primary transition-colors" />
                         <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">{suggestion}</span>

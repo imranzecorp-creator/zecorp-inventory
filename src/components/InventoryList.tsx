@@ -74,7 +74,7 @@ const InventoryRow = React.memo(({ index, style, data }: { index: number, style:
   const isSelected = selectedIds.includes(item.id);
 
   return (
-    <div style={style} className="px-2">
+    <div style={style} className="px-1 md:px-2">
       <motion.div 
         layout
         initial={false}
@@ -83,15 +83,15 @@ const InventoryRow = React.memo(({ index, style, data }: { index: number, style:
           scale: isSelected ? 1.002 : 1,
         }}
         className={cn(
-          "group cursor-pointer border border-white/[0.03] rounded-2xl overflow-hidden transition-all duration-200",
+          "group cursor-pointer border border-white/[0.03] rounded-xl md:rounded-2xl overflow-hidden transition-all duration-200 active:bg-white/[0.05] touch-manipulation",
           isSelected && "ring-1 ring-inset ring-primary/20",
-          isExpanded ? "bg-white/[0.04] mb-4" : "hover:bg-white/[0.02] mb-1"
+          isExpanded ? "bg-white/[0.04] mb-4 shadow-xl" : "hover:bg-white/[0.02] mb-1"
         )}
         onClick={() => toggleExpand(item.id)}
       >
-        <div className="flex items-center p-3">
+        <div className="flex items-center p-2 md:p-3">
           {isApproved && (
-            <div className="w-10 flex items-center justify-center shrink-0" onClick={(e) => { e.stopPropagation(); toggleSelectItem(item.id); }}>
+            <div className="w-8 md:w-10 flex items-center justify-center shrink-0" onClick={(e) => { e.stopPropagation(); toggleSelectItem(item.id); }}>
               <div className="text-slate-500 group-hover:text-primary transition-colors">
                 <AnimatePresence mode="wait">
                   {isSelected ? (
@@ -108,38 +108,38 @@ const InventoryRow = React.memo(({ index, style, data }: { index: number, style:
             </div>
           )}
           
-          <div className="flex-1 flex items-center space-x-3 truncate">
-            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden border border-white/10 shrink-0">
+          <div className="flex-1 flex items-center space-x-2 md:space-x-3 truncate">
+            <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-white/10 flex items-center justify-center overflow-hidden border border-white/10 shrink-0">
               {item.imageUrl ? (
                 <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               ) : (
-                <Package className="w-5 h-5 text-slate-500" />
+                <Package className="w-4 h-4 md:w-5 md:h-5 text-slate-500" />
               )}
             </div>
             <div className="flex flex-col truncate">
               <div className="flex items-center space-x-2">
-                <p className="text-sm font-bold text-slate-200 group-hover:text-primary transition-colors truncate">{item.name}</p>
-                {item.inventoryType === 'Client Stock' && <Warehouse className="w-3 h-3 text-amber-500/60" />}
+                <p className="text-xs md:text-sm font-bold text-slate-200 group-hover:text-primary transition-colors truncate">{item.name}</p>
+                {item.inventoryType === 'Client Stock' && <Warehouse className="w-2.5 h-2.5 md:w-3 md:h-3 text-amber-500/60" />}
               </div>
-              <p className="text-[10px] text-slate-500 font-medium truncate">
+              <p className="text-[9px] md:text-[10px] text-slate-500 font-medium truncate">
                 {item.modelNumber || 'No Model'}
               </p>
             </div>
           </div>
 
-          <div className="w-24 px-4 hidden md:block shrink-0 text-slate-400">
-             <span className="text-[10px] font-black uppercase tracking-tighter truncate block">{item.brand || 'No Brand'}</span>
+          <div className="w-20 md:w-24 px-2 md:px-4 hidden sm:block shrink-0 text-slate-400">
+             <span className="text-[9px] md:text-[10px] font-black uppercase tracking-tighter truncate block">{item.brand || 'No Brand'}</span>
           </div>
 
-          <div className="w-24 px-4 text-center shrink-0">
+          <div className="w-20 md:w-24 px-2 md:px-4 text-center shrink-0">
             <div className={cn(
-              "px-2 py-1 rounded-lg border flex flex-col justify-center",
+              "px-1.5 md:px-2 py-0.5 md:py-1 rounded-lg border flex flex-col justify-center",
               item.currentQuantity <= item.minStock 
                 ? "bg-amber-500/10 border-amber-500/30 text-amber-400" 
                 : "bg-primary/10 border-primary/30 text-primary"
             )}>
-              <span className="text-sm font-black leading-none">{item.currentQuantity}</span>
-              <span className="text-[8px] font-black uppercase opacity-60 mt-0.5">Units</span>
+              <span className="text-xs md:text-sm font-black leading-none">{item.currentQuantity}</span>
+              <span className="text-[7px] md:text-[8px] font-black uppercase opacity-60 mt-0.5">Units</span>
             </div>
           </div>
 
@@ -159,34 +159,36 @@ const InventoryRow = React.memo(({ index, style, data }: { index: number, style:
           </div>
 
           {isApproved && (
-            <div className="w-32 flex items-center justify-end pr-4 space-x-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+            <div className="w-24 md:w-32 flex items-center justify-end pr-2 md:pr-4 space-x-1 md:space-x-2 shrink-0" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center space-x-1">
                 <button 
                   onClick={() => openAdjustment('IN', item)}
-                  className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg hover:bg-emerald-500/20 hover:scale-110 transition-all border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.2)] hover:shadow-[0_0_15px_rgba(16,185,129,0.4)]"
+                  className="p-1.5 md:p-2 bg-emerald-500/10 text-emerald-400 rounded-lg h-8 w-8 md:h-10 md:w-10 flex items-center justify-center hover:bg-emerald-500/20 hover:scale-110 transition-all border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
                 >
-                  <Plus className="w-3.5 h-3.5" />
+                  <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />
                 </button>
                 <button 
                   onClick={() => openAdjustment('OUT', item)}
-                  className="p-1.5 bg-amber-500/10 text-amber-500 rounded-lg hover:bg-amber-500/20 hover:scale-110 transition-all border border-amber-500/20 shadow-[0_0_10px_rgba(245,158,11,0.2)] hover:shadow-[0_0_15px_rgba(245,158,11,0.4)]"
+                  className="p-1.5 md:p-2 bg-amber-500/10 text-amber-500 rounded-lg h-8 w-8 md:h-10 md:w-10 flex items-center justify-center hover:bg-amber-500/20 hover:scale-110 transition-all border border-amber-500/20 shadow-[0_0_10px_rgba(245,158,11,0.2)]"
                 >
-                  <Minus className="w-3.5 h-3.5" />
+                  <Minus className="w-3.5 h-3.5 md:w-4 md:h-4" />
                 </button>
               </div>
-              <div className="h-6 w-px bg-white/10 mx-1" />
-              <button 
-                onClick={() => setEditingItem(item)}
-                className="p-1.5 hover:bg-white/10 rounded-lg transition-all text-slate-400 hover:text-white"
-              >
-                <Edit className="w-3.5 h-3.5" />
-              </button>
-              <button 
-                onClick={() => setItemToDelete(item)}
-                className="p-1.5 hover:bg-red-500/10 rounded-lg transition-all text-slate-400 hover:text-red-500"
-              >
-                <Trash className="w-3.5 h-3.5" />
-              </button>
+              <div className="hidden sm:block h-6 w-px bg-white/10 mx-1" />
+              <div className="hidden sm:flex items-center space-x-1">
+                <button 
+                  onClick={() => setEditingItem(item)}
+                  className="p-1.5 hover:bg-white/10 rounded-lg transition-all text-slate-400 hover:text-white"
+                >
+                  <Edit className="w-3.5 h-3.5" />
+                </button>
+                <button 
+                  onClick={() => setItemToDelete(item)}
+                  className="p-1.5 hover:bg-red-500/10 rounded-lg transition-all text-slate-400 hover:text-red-500"
+                >
+                  <Trash className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           )}
         </div>

@@ -63,30 +63,30 @@ const StockTableRow = React.memo(({ index, style, data }: { index: number, style
   if (!item) return null;
 
   return (
-    <div style={style} className="flex items-center group hover:bg-white/[0.02] transition-colors border-b border-white/[0.02]">
-      <div className="px-4 py-4 flex-1 flex items-center space-x-3 truncate">
+    <div style={style} className="flex items-center group hover:bg-white/[0.02] transition-colors border-b border-white/[0.02] active:bg-white/[0.05] touch-manipulation">
+      <div className="px-2 md:px-4 py-3 md:py-4 flex-1 flex items-center space-x-2 md:space-x-3 truncate">
         <motion.div 
-          whileHover={{ scale: 1.2, rotate: 15 }}
-          className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/5 overflow-hidden shrink-0"
+          whileHover={{ scale: 1.1 }}
+          className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-white/10 flex items-center justify-center border border-white/5 overflow-hidden shrink-0"
         >
           {item.imageUrl ? (
             <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
           ) : (
-            <Package className="w-5 h-5 text-slate-600" />
+            <Package className="w-4 h-4 md:w-5 md:h-5 text-slate-600" />
           )}
         </motion.div>
         <div className="flex flex-col truncate">
-          <span className="text-sm font-bold text-white group-hover:text-primary transition-colors truncate">{item.name}</span>
+          <span className="text-xs md:text-sm font-bold text-white group-hover:text-primary transition-colors truncate">{item.name}</span>
           {(item.brand || item.modelNumber) && (
-            <span className="text-[9px] text-primary font-black uppercase tracking-tighter truncate">
+            <span className="text-[8px] md:text-[9px] text-primary font-black uppercase tracking-tighter truncate">
               {item.brand} {item.modelNumber}
             </span>
           )}
         </div>
       </div>
-      <div className="px-4 py-4 w-24 text-center shrink-0">
+      <div className="px-2 md:px-4 py-4 w-16 md:w-24 text-center shrink-0">
         <span className={cn(
-          "text-sm font-black px-3 py-1 rounded-lg border shadow-sm",
+          "text-[10px] md:text-xs font-black px-2 md:px-3 py-0.5 md:py-1 rounded-lg border shadow-sm",
           item.currentQuantity <= item.minStock 
             ? "bg-amber-500 text-white border-white/20" 
             : "bg-primary text-white border-white/20"
@@ -1389,25 +1389,27 @@ const StatCard = React.memo(({ label, value, icon: Icon, trend, trendUp, color, 
   return (
     <motion.div 
       whileHover={{ y: -5 }}
+      whileTap={{ scale: 0.98 }}
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className={`p-4 md:p-6 rounded-[24px] md:rounded-3xl glass-morphism border border-white/5 shadow-sm transition-all duration-300 ${active ? 'ring-2 ring-red-500/20 bg-red-500/5' : ''}`}
+      className={`p-4 md:p-6 rounded-[24px] md:rounded-3xl glass-morphism border border-white/5 shadow-sm transition-all duration-300 active:bg-white/5 touch-manipulation relative overflow-hidden ${active ? 'ring-2 ring-red-500/20 bg-red-500/5' : ''}`}
     >
+      <div className={`absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-${color === 'blue' ? 'primary' : color + '-400'}/40 to-transparent`} />
       <div className="flex items-start justify-between">
         <motion.div 
           whileHover={{ rotate: [0, -10, 10, -10, 0], scale: 1.1 }}
           transition={{ duration: 0.5 }}
-          className={`p-2.5 md:p-3 rounded-xl md:rounded-2xl ${colors[color]}`}
+          className={`p-2 md:p-3 rounded-xl md:rounded-2xl ${colors[color]}`}
         >
-          <Icon className="w-5 h-5 md:w-6 md:h-6" />
+          <Icon className="w-4 h-4 md:w-6 md:h-6" />
         </motion.div>
         <span className={`text-[8px] md:text-[10px] font-black px-1.5 md:px-2 py-0.5 md:py-1 rounded-full border ${trendUp ? 'bg-green-500/20 text-green-300 border-green-500/20' : 'bg-white/10 text-slate-200 border-white/10'}`}>
           {trend}
         </span>
       </div>
-      <div className="mt-3 md:mt-4">
-        <p className="text-slate-300 text-xs md:text-sm font-black uppercase tracking-widest">{label}</p>
-        <h3 className="text-2xl md:text-3xl font-black text-white mt-0.5 md:mt-1 tracking-tight">{value}</h3>
+      <div className="mt-2 md:mt-4">
+        <p className="text-slate-300 text-[10px] md:text-sm font-black uppercase tracking-widest leading-tight">{label}</p>
+        <h3 className="text-xl md:text-3xl font-black text-white mt-0.5 md:mt-1 tracking-tight truncate">{value}</h3>
       </div>
     </motion.div>
   );
