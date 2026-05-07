@@ -53,7 +53,7 @@ export default React.memo(function AIPoweredNews() {
             </div>
             <div>
               <h4 className="text-xs font-black text-white uppercase tracking-widest">Industry Insights</h4>
-              <p className="text-[9px] text-slate-500 font-bold uppercase tracking-tighter">AI-Curated Intelligence</p>
+              <p className="text-[9px] text-slate-300 font-black uppercase tracking-[0.2em]">AI-Curated Intelligence</p>
             </div>
           </div>
           <button 
@@ -85,7 +85,7 @@ export default React.memo(function AIPoweredNews() {
                 {current?.category === 'Trend' && <Zap className="w-2 h-2 inline mr-1 -mt-0.5" />}
                 {current?.category}
               </span>
-              <span className="text-[10px] text-slate-500 font-mono tracking-tighter">Source: {current?.source}</span>
+              <span className="text-[10px] text-slate-300 font-black font-mono tracking-widest uppercase">Source: {current?.source}</span>
             </div>
 
             <h5 className="text-sm font-bold text-slate-100 line-clamp-1">{current?.title}</h5>

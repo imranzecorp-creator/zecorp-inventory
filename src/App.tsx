@@ -351,54 +351,54 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-screen w-full items-center justify-center space-y-12 bg-[#050810] relative overflow-hidden">
+      <div className="flex flex-col h-screen w-full items-center justify-center space-y-12 bg-[#020617] relative overflow-hidden">
         {/* Multi-Glowing Energetic Background */}
         <div className="absolute inset-0 z-0">
           <motion.div 
             animate={{ 
-              scale: [1, 1.4, 1.1],
+              scale: [1, 1.5, 1.2],
+              opacity: [0.4, 0.7, 0.4],
+              x: [-100, 150, -100],
+              y: [-100, 100, -100]
+            }}
+            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute top-0 left-0 w-[90%] h-[90%] bg-blue-600/40 rounded-full blur-[150px]"
+          />
+          <motion.div 
+            animate={{ 
+              scale: [1.3, 1.7, 1.3],
               opacity: [0.3, 0.6, 0.3],
-              x: [-50, 100, -50],
-              y: [-50, 50, -50]
+              x: [150, -150, 150],
+              y: [150, -150, 150]
             }}
-            transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute top-0 left-0 w-[80%] h-[80%] bg-primary/40 rounded-full blur-[150px]"
+            transition={{ duration: 15, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+            className="absolute bottom-0 right-0 w-[80%] h-[80%] bg-fuchsia-600/30 rounded-full blur-[160px]"
           />
           <motion.div 
             animate={{ 
-              scale: [1.2, 1.6, 1.2],
+              scale: [1.1, 1.9, 1.1],
               opacity: [0.2, 0.5, 0.2],
-              x: [100, -100, 100],
-              y: [100, -100, 100]
+              x: [-200, 200, -200],
             }}
-            transition={{ duration: 18, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-            className="absolute bottom-0 right-0 w-[70%] h-[70%] bg-violet-600/30 rounded-full blur-[160px]"
+            transition={{ duration: 18, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+            className="absolute top-1/2 left-1/4 w-[70%] h-[70%] bg-emerald-500/25 rounded-full blur-[170px]"
           />
           <motion.div 
             animate={{ 
-              scale: [1, 1.8, 1],
-              opacity: [0.1, 0.4, 0.1],
-              x: [-150, 150, -150],
-            }}
-            transition={{ duration: 20, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-            className="absolute top-1/2 left-1/4 w-[60%] h-[60%] bg-cyan-500/20 rounded-full blur-[170px]"
-          />
-          <motion.div 
-            animate={{ 
-              scale: [1.3, 1.1, 1.3],
-              opacity: [0.1, 0.3, 0.1],
-              y: [-100, 100, -100],
-            }}
-            transition={{ duration: 22, repeat: Infinity, ease: "easeInOut", delay: 3 }}
-            className="absolute bottom-1/4 left-1/2 w-[55%] h-[55%] bg-rose-500/20 rounded-full blur-[180px]"
-          />
-          <motion.div 
-            animate={{ 
-              scale: [1, 1.5, 1],
+              scale: [1.4, 1.2, 1.4],
               opacity: [0.2, 0.4, 0.2],
+              y: [-150, 150, -150],
             }}
-            transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute top-1/3 right-1/4 w-[40%] h-[40%] bg-emerald-400/20 rounded-full blur-[140px]"
+            transition={{ duration: 20, repeat: Infinity, ease: "easeInOut", delay: 3 }}
+            className="absolute bottom-1/4 left-1/2 w-[65%] h-[65%] bg-amber-500/25 rounded-full blur-[180px]"
+          />
+          <motion.div 
+            animate={{ 
+              scale: [1, 1.6, 1],
+              opacity: [0.25, 0.5, 0.25],
+            }}
+            transition={{ duration: 13, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute top-1/3 right-1/4 w-[50%] h-[50%] bg-violet-500/25 rounded-full blur-[140px]"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#050810]/40 to-[#050810]" />
           
@@ -521,7 +521,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden selection:bg-primary/30 selection:text-white bg-[#0a0f1e] relative">
+    <div className="flex h-screen overflow-hidden selection:bg-primary/30 selection:text-white relative bg-[#020617]/50 backdrop-blur-[2px]">
       <BackgroundAnimation />
       <FloatingEquipments />
       <ToastContainer toasts={toasts} removeToast={removeToast} />

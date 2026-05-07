@@ -45,7 +45,7 @@ export default React.memo(function Sidebar({ activeTab, setActiveTab, role }: Si
   }, [role]);
 
   return (
-    <div className="hidden md:flex flex-col w-60 bg-[#0a0f1e] border-r border-white/10 relative z-50 overflow-hidden shadow-[10px_0_40px_-20px_rgba(0,0,0,0.5)]">
+    <div className="hidden md:flex flex-col w-60 bg-[#030712]/60 border-r border-white/10 relative z-50 overflow-hidden shadow-[10px_0_40px_-20px_rgba(0,0,0,0.5)] backdrop-blur-xl">
       {/* Dynamic Background Glows */}
       <motion.div 
         animate={{ 
@@ -143,7 +143,7 @@ export default React.memo(function Sidebar({ activeTab, setActiveTab, role }: Si
                 "w-5 h-5 transition-all duration-300",
                 activeTab === item.id 
                   ? "text-slate-900 drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]" 
-                  : "text-slate-500 group-hover:text-primary group-hover:drop-shadow-[0_0_8px_rgba(var(--primary-rgb),0.5)]"
+                  : "text-slate-300 group-hover:text-primary group-hover:drop-shadow-[0_0_8px_rgba(var(--primary-rgb),0.5)]"
               )} />
             </motion.div>
             {item.label}
@@ -151,7 +151,7 @@ export default React.memo(function Sidebar({ activeTab, setActiveTab, role }: Si
         ))}
       </nav>
 
-      <div className="p-4 border-t border-white/10 mt-auto space-y-3 relative z-10 bg-[#0a0f1e]/80 backdrop-blur-md">
+      <div className="p-4 border-t border-white/10 mt-auto space-y-3 relative z-10 bg-[#030712]/80 backdrop-blur-md">
         {/* System Health Widget - Pro Desktop UI */}
         <div className="px-3.5 py-3.5 rounded-2xl bg-white/[0.03] border border-white/10 space-y-2.5 shadow-inner">
         <div className="flex items-center justify-between">
@@ -167,14 +167,14 @@ export default React.memo(function Sidebar({ activeTab, setActiveTab, role }: Si
              <div className="flex flex-col space-y-1 p-2 rounded-xl bg-white/[0.02] border border-white/5 group hover:bg-primary/5 transition-colors">
                 <div className="flex items-center space-x-1">
                    <Cpu className="w-2.5 h-2.5 text-primary group-hover:animate-spin" />
-                   <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">AI Node</span>
+                   <span className="text-[8px] font-black text-slate-300 uppercase tracking-tighter">AI Node</span>
                 </div>
                 <span className="text-[9px] font-bold text-white">Synchronized</span>
              </div>
              <div className="flex flex-col space-y-1 p-2 rounded-xl bg-white/[0.02] border border-white/5 group hover:bg-amber-500/5 transition-colors">
                 <div className="flex items-center space-x-1">
                    <Database className="w-2.5 h-2.5 text-amber-500 group-hover:scale-110 transition-transform" />
-                   <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Vault</span>
+                   <span className="text-[8px] font-black text-slate-300 uppercase tracking-tighter">Vault</span>
                 </div>
                 <span className="text-[9px] font-bold text-white">Distressed</span>
              </div>
@@ -208,7 +208,7 @@ export default React.memo(function Sidebar({ activeTab, setActiveTab, role }: Si
           >
             <Settings className={cn(
               "w-5 h-5 transition-colors",
-              activeTab === 'profile' ? "text-primary" : "text-slate-500 group-hover:text-slate-200"
+              activeTab === 'profile' ? "text-primary" : "text-slate-400 group-hover:text-slate-100"
             )} />
           </motion.div>
           Settings

@@ -72,7 +72,7 @@ const TransactionRow = React.memo(({ index, style, data }: { index: number, styl
             <div className="min-w-0 flex-1">
               <h3 className="text-base font-bold text-white truncate tracking-tight">{tx.itemName}</h3>
               <div className="flex items-center space-x-3 mt-1 overflow-hidden">
-                <div className="flex items-center space-x-1 text-[10px] text-slate-500 font-bold whitespace-nowrap">
+                <div className="flex items-center space-x-1 text-[10px] text-slate-300 font-black whitespace-nowrap uppercase tracking-widest">
                   <Clock className="w-3 h-3" />
                   <span className="uppercase tracking-tighter">{formatDate(tx.date)}</span>
                 </div>
@@ -118,7 +118,7 @@ const TransactionRow = React.memo(({ index, style, data }: { index: number, styl
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-              className="border-t border-white/5 bg-[#1e293b]/20"
+              className="border-t border-white/5 bg-[#030712]/20"
             >
               <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                 <div className="space-y-4">
@@ -126,7 +126,7 @@ const TransactionRow = React.memo(({ index, style, data }: { index: number, styl
                     <div className="p-2 bg-primary/10 rounded-xl text-primary">
                       <Box className="w-4 h-4" />
                     </div>
-                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Asset Specs</h4>
+                    <h4 className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Asset Specs</h4>
                   </div>
                   <div className="bg-white/5 rounded-2xl p-4 border border-white/5 space-y-3">
                     <div>
@@ -145,7 +145,7 @@ const TransactionRow = React.memo(({ index, style, data }: { index: number, styl
                     <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-400">
                       <MapPin className="w-4 h-4" />
                     </div>
-                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Logistics</h4>
+                    <h4 className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">Logistics</h4>
                   </div>
                   <div className="bg-white/5 rounded-2xl p-4 border border-white/5 space-y-3">
                     <div>
@@ -164,7 +164,7 @@ const TransactionRow = React.memo(({ index, style, data }: { index: number, styl
                     <div className="p-2 bg-amber-500/10 rounded-xl text-amber-500">
                       <FileText className="w-4 h-4" />
                     </div>
-                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">System Remarks</h4>
+                    <h4 className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">System Remarks</h4>
                   </div>
                    <div className="p-5 bg-white/5 rounded-2xl border border-white/5 min-h-[100px] italic text-sm text-slate-400 leading-relaxed shadow-inner">
                       {tx.notes || 'Routine movement detected. Authorized through secure personnel verification pulse.'}
@@ -330,7 +330,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
             <LucideHistory className="w-8 h-8 text-primary shadow-glow" />
             <span>Transaction Matrix</span>
           </h1>
-          <p className="text-[10px] md:text-xs text-slate-500 uppercase font-black tracking-[0.3em] mt-1">Universal Inventory Movement Stream</p>
+          <p className="text-[10px] md:text-xs text-slate-300 uppercase font-black tracking-[0.3em] mt-1">Universal Inventory Movement Stream</p>
         </div>
         
         <div className="flex items-center space-x-3">
@@ -433,7 +433,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
           >
             <div className="glass-morphism p-6 md:p-8 rounded-[32px] border border-white/5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6 md:gap-8 mb-4 shadow-2xl">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Universal Search</label>
+                <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest ml-1">Universal Search</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600" />
                   <input 
@@ -447,20 +447,20 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Movement Type</label>
+                <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest ml-1">Movement Type</label>
                 <select 
                   value={typeFilter}
                   onChange={(e) => setTypeFilter(e.target.value as any)}
                   className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:ring-2 focus:ring-primary/20 outline-none appearance-none"
                 >
-                  <option value="" className="bg-[#1e293b]">All Movements</option>
-                  <option value="IN" className="bg-[#1e293b] font-bold text-green-400">Stock In (+)</option>
-                  <option value="OUT" className="bg-[#1e293b] font-bold text-red-400">Stock Out (-)</option>
+                  <option value="" className="bg-[#0f172a]">All Movements</option>
+                  <option value="IN" className="bg-[#0f172a] font-bold text-green-400">Stock In (+)</option>
+                  <option value="OUT" className="bg-[#0f172a] font-bold text-red-400">Stock Out (-)</option>
                 </select>
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Asset Category</label>
+                <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest ml-1">Asset Category</label>
                 <div className="relative">
                   <Tag className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600" />
                   <input 
@@ -474,7 +474,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Vault Location (Warehouse)</label>
+                <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest ml-1">Vault Location (Warehouse)</label>
                 <div className="relative">
                   <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600" />
                   <input 
@@ -488,7 +488,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Start Date</label>
+                <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest ml-1">Start Date</label>
                 <div className="relative">
                   <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600" />
                   <input 
@@ -501,7 +501,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">End Date</label>
+                <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest ml-1">End Date</label>
                 <div className="relative">
                   <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600" />
                   <input 
@@ -514,7 +514,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Job Matrix (ID)</label>
+                <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest ml-1">Job Matrix (ID)</label>
                 <div className="relative">
                   <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600" />
                   <input 
@@ -528,7 +528,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Personnel</label>
+                <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest ml-1">Personnel</label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600" />
                   <input 
@@ -542,15 +542,15 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Protocol Tier</label>
+                <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest ml-1">Protocol Tier</label>
                 <select 
                   value={inventoryTypeFilter}
                   onChange={(e) => setInventoryTypeFilter(e.target.value as any)}
                   className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:ring-2 focus:ring-primary/20 outline-none appearance-none"
                 >
-                  <option value="" className="bg-[#1e293b]">All Protocol Tiers</option>
-                  <option value="Warehouse Stock" className="bg-[#1e293b]">Warehouse Stock</option>
-                  <option value="Client Stock" className="bg-[#1e293b]">Client Stock</option>
+                  <option value="" className="bg-[#0f172a]">All Protocol Tiers</option>
+                  <option value="Warehouse Stock" className="bg-[#0f172a]">Warehouse Stock</option>
+                  <option value="Client Stock" className="bg-[#0f172a]">Client Stock</option>
                 </select>
               </div>
 
@@ -589,7 +589,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-white uppercase tracking-widest">Intelligence Synthesis</h3>
-                  <p className="text-[9px] text-slate-500 font-bold uppercase tracking-tighter">Gemini Engine Analysis</p>
+                  <p className="text-[9px] text-slate-300 font-black uppercase tracking-[0.2em]">Gemini Engine Analysis</p>
                 </div>
               </div>
               <div className="prose prose-invert prose-xs max-w-none prose-p:text-slate-300 prose-p:leading-relaxed prose-strong:text-primary">
@@ -629,7 +629,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
         )}
       </div>
 
-      <div className="flex items-center justify-between px-8 py-5 glass-morphism rounded-[32px] border border-white/5 text-[10px] font-black text-slate-500 uppercase tracking-widest bg-[#1e293b]/20">
+      <div className="flex items-center justify-between px-8 py-5 glass-morphism rounded-[32px] border border-white/5 text-[10px] font-black text-slate-300 uppercase tracking-widest bg-[#030712]/20">
         <div className="flex items-center space-x-8">
           <div className="flex items-center space-x-2">
             <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_12px_rgba(34,197,94,0.6)]" />

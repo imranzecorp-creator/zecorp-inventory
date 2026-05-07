@@ -155,7 +155,7 @@ const InventoryRow = React.memo(({ index, style, data }: { index: number, style:
           </div>
 
           <div className="w-32 px-4 hidden xl:block shrink-0">
-             <span className="text-[10px] text-slate-500 font-bold truncate block">{item.outlet || item.location || '-'}</span>
+             <span className="text-[10px] text-slate-300 font-bold truncate block">{item.outlet || item.location || '-'}</span>
           </div>
 
           {isApproved && (
@@ -201,49 +201,49 @@ const InventoryRow = React.memo(({ index, style, data }: { index: number, style:
             >
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                   <div className="space-y-4">
-                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Info className="w-3 h-3" />Item Info</p>
+                     <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-1.5"><Info className="w-3 h-3" />Item Info</p>
                      <div className="space-y-2">
                         <div className="flex flex-col">
-                           <span className="text-[10px] text-slate-500 uppercase font-bold">Category</span>
-                           <span className="text-sm text-slate-200 font-medium">{item.category || 'Standard Asset'}</span>
+                           <span className="text-[10px] text-slate-400 uppercase font-bold">Category</span>
+                           <span className="text-sm text-white font-medium">{item.category || 'Standard Asset'}</span>
                         </div>
                         <div className="flex flex-col">
-                           <span className="text-[10px] text-slate-500 uppercase font-bold">Supplier</span>
-                           <span className="text-sm text-slate-200 font-medium">{item.supplier || 'Not Specified'}</span>
+                           <span className="text-[10px] text-slate-400 uppercase font-bold">Supplier</span>
+                           <span className="text-sm text-white font-medium">{item.supplier || 'Not Specified'}</span>
                         </div>
                         <div className="flex flex-col">
-                           <span className="text-[10px] text-slate-500 uppercase font-bold">Warehouse-Loc</span>
+                           <span className="text-[10px] text-slate-400 uppercase font-bold">Warehouse-Loc</span>
                            <span className="text-[10px] text-primary font-bold">{item.warehouseLocation || 'N/A'}</span>
                         </div>
                      </div>
                   </div>
                   <div className="space-y-4">
-                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Building className="w-3 h-3" />Project Details</p>
+                     <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-1.5"><Building className="w-3 h-3" />Project Details</p>
                      <div className="space-y-2">
                         <div className="flex flex-col">
-                           <span className="text-[10px] text-slate-500 uppercase font-bold">Client</span>
-                           <span className="text-sm text-slate-200 font-medium">{item.client || 'Internal'}</span>
+                           <span className="text-[10px] text-slate-400 uppercase font-bold">Client</span>
+                           <span className="text-sm text-white font-medium">{item.client || 'Internal'}</span>
                         </div>
                         <div className="flex flex-col">
-                           <span className="text-[10px] text-slate-500 uppercase font-bold">Assignment</span>
+                           <span className="text-[10px] text-slate-400 uppercase font-bold">Assignment</span>
                            <span className="text-[10px] text-amber-500 font-bold">{item.clientAssignment || 'N/A'}</span>
                         </div>
                         <div className="flex flex-col">
-                           <span className="text-[10px] text-slate-500 uppercase font-bold">Project Outlet</span>
-                           <span className="text-sm text-slate-200 font-medium">{item.outlet || 'Unknown'}</span>
+                           <span className="text-[10px] text-slate-400 uppercase font-bold">Project Outlet</span>
+                           <span className="text-sm text-white font-medium">{item.outlet || 'Unknown'}</span>
                         </div>
                      </div>
                   </div>
                   <div className="space-y-4">
-                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Hash className="w-3 h-3" />System Meta</p>
+                     <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-1.5"><Hash className="w-3 h-3" />System Meta</p>
                      <div className="space-y-2">
                         <div className="flex flex-col">
-                           <span className="text-[10px] text-slate-500 uppercase font-bold">Job Number</span>
+                           <span className="text-[10px] text-slate-400 uppercase font-bold">Job Number</span>
                            <span className="text-sm font-mono text-primary font-bold">{item.jobNumber || 'PENDING'}</span>
                         </div>
                         <div className="flex flex-col">
-                           <span className="text-[10px] text-slate-500 uppercase font-bold">Entry ID</span>
-                           <span className="text-[10px] font-mono text-slate-500 truncate">{item.id}</span>
+                           <span className="text-[10px] text-slate-400 uppercase font-bold">Entry ID</span>
+                           <span className="text-[10px] font-mono text-slate-300 truncate">{item.id}</span>
                         </div>
                      </div>
                   </div>
@@ -1193,9 +1193,9 @@ export default function InventoryList({ items, clients, user, projects, initialS
                     onChange={(e) => setInventoryTypeFilter(e.target.value as any)}
                     className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:ring-2 focus:ring-primary/20 outline-none appearance-none"
                   >
-                    <option value="" className="bg-[#1e293b]">All Stock Types</option>
-                    <option value="Warehouse Stock" className="bg-[#1e293b]">Warehouse Stock</option>
-                    <option value="Client Stock" className="bg-[#1e293b]">Client Stock</option>
+                    <option value="" className="bg-[#0f172a]">All Stock Types</option>
+                    <option value="Warehouse Stock" className="bg-[#0f172a]">Warehouse Stock</option>
+                    <option value="Client Stock" className="bg-[#0f172a]">Client Stock</option>
                   </select>
                 </div>
 
@@ -1362,7 +1362,7 @@ export default function InventoryList({ items, clients, user, projects, initialS
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60] bg-[#1e293b] border border-primary/30 rounded-full px-6 py-4 shadow-2xl shadow-primary/20 flex items-center space-x-6 backdrop-blur-xl"
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60] bg-[#0f172a] border border-primary/30 rounded-full px-6 py-4 shadow-2xl shadow-primary/20 flex items-center space-x-6 backdrop-blur-xl"
           >
             <div className="flex items-center space-x-3 pr-6 border-r border-white/10">
               <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
@@ -1413,7 +1413,7 @@ export default function InventoryList({ items, clients, user, projects, initialS
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setItemToDelete(null)}
-              className="absolute inset-0 bg-[#020617]/80 backdrop-blur-sm"
+              className="absolute inset-0 bg-[#030712]/80 backdrop-blur-sm"
             />
             <motion.div 
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
@@ -2338,7 +2338,7 @@ function ItemDetailModal({ item, clients, onClose, onDelete, user, initialAction
         exit={{ opacity: 0, scale: 0.9, y: 40 }}
         className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-2xl glass-morphism rounded-[40px] shadow-2xl z-[51] overflow-hidden border border-white/10"
       >
-        <div className="relative h-56 bg-[#1e293b] overflow-hidden">
+        <div className="relative h-56 bg-[#030712] overflow-hidden">
           {item.imageUrl ? (
             <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
           ) : (
@@ -2621,7 +2621,7 @@ function ImportPreviewModal({ data, onConfirm, onCancel, isImporting }: { data: 
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-[#1e293b]/20">
+        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-[#030712]/20">
           <table className="w-full text-left border-separate border-spacing-y-2">
             <thead>
               <tr className="text-[10px] font-black text-slate-500 uppercase tracking-widest">

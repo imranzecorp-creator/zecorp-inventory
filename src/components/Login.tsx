@@ -146,7 +146,7 @@ export default function Login() {
         <div className="absolute inset-0 rounded-[40px] pointer-events-none ring-1 ring-white/10" />
         <div className="absolute -inset-[1px] bg-gradient-to-tr from-cyan-500/20 via-transparent to-fuchsia-500/20 rounded-[40px] pointer-events-none opacity-50" />
         {/* Left Panel - Branding */}
-        <div className="hidden lg:flex flex-col justify-between p-12 bg-[#1e293b]/20 relative overflow-hidden">
+        <div className="hidden lg:flex flex-col justify-between p-12 bg-[#030712]/20 relative overflow-hidden">
           <div className="relative z-10">
             <Logo className="mb-10 scale-125 origin-left" />
             

@@ -60,22 +60,22 @@ const ManifestRow = React.memo(({ index, style, data }: { index: number, style: 
           </div>
           <div>
             <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{item.name}</p>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-500 font-medium tracking-wide mt-1">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-300 font-medium tracking-wide mt-1">
               <span className="flex items-center space-x-1">
-                 <span className="text-slate-600 font-black">BRAND:</span>
-                 <span className="text-slate-300">{item.brand || 'Generic'}</span>
+                 <span className="text-slate-400 font-black">BRAND:</span>
+                 <span className="text-slate-200">{item.brand || 'Generic'}</span>
               </span>
               <span className="w-1 h-1 rounded-full bg-slate-700" />
               <span className="flex items-center space-x-1">
-                 <span className="text-slate-600 font-black">CAT:</span>
-                 <span className="text-slate-300">{item.category || 'Unset'}</span>
+                 <span className="text-slate-400 font-black">CAT:</span>
+                 <span className="text-slate-200">{item.category || 'Unset'}</span>
               </span>
               {item.posNo && (
                 <>
                   <span className="w-1 h-1 rounded-full bg-slate-700" />
                   <span className="flex items-center space-x-1">
-                     <span className="text-slate-600 font-black">POS:</span>
-                     <span className="text-slate-300">{item.posNo}</span>
+                     <span className="text-slate-400 font-black">POS:</span>
+                     <span className="text-slate-200">{item.posNo}</span>
                   </span>
                 </>
               )}
@@ -83,8 +83,8 @@ const ManifestRow = React.memo(({ index, style, data }: { index: number, style: 
                 <>
                   <span className="w-1 h-1 rounded-full bg-slate-700" />
                   <span className="flex items-center space-x-1">
-                     <span className="text-slate-600 font-black">DIM:</span>
-                     <span className="text-slate-300">{item.dimensions}</span>
+                     <span className="text-slate-400 font-black">DIM:</span>
+                     <span className="text-slate-200">{item.dimensions}</span>
                   </span>
                 </>
               )}
@@ -92,8 +92,8 @@ const ManifestRow = React.memo(({ index, style, data }: { index: number, style: 
                 <>
                   <span className="w-1 h-1 rounded-full bg-slate-700" />
                   <span className="flex items-center space-x-1">
-                     <span className="text-slate-600 font-black">ORG:</span>
-                     <span className="text-slate-300">{item.origin}</span>
+                     <span className="text-slate-400 font-black">ORG:</span>
+                     <span className="text-slate-200">{item.origin}</span>
                   </span>
                 </>
               )}
@@ -128,7 +128,7 @@ const ManifestRow = React.memo(({ index, style, data }: { index: number, style: 
           </div>
         </div>
         
-        <div className="flex items-center gap-6 md:gap-8 bg-[#1e293b]/40 p-4 rounded-2xl border border-white/5 shadow-inner">
+        <div className="flex items-center gap-6 md:gap-8 bg-[#030712]/40 p-4 rounded-2xl border border-white/5 shadow-inner">
           <div className="text-center min-w-[40px]">
             <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Req</p>
             <span className="text-lg font-black text-white">{item.quantity}</span>
@@ -464,7 +464,7 @@ export default function Projects({ projects, inventory, clients, user, transacti
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-black text-white tracking-tighter">Project Control</h1>
-          <p className="text-[10px] md:text-xs text-slate-500 uppercase font-black tracking-[0.2em] mt-1">Enterprise Asset Management & Logistics</p>
+          <p className="text-[10px] md:text-xs text-slate-300 uppercase font-black tracking-[0.2em] mt-1">Enterprise Asset Management & Logistics</p>
         </div>
         <div className="flex items-center space-x-1.5 md:space-x-3 overflow-x-auto pb-2 md:pb-0 custom-scrollbar-hide max-w-full">
           {isDeleteMode ? (
@@ -556,7 +556,7 @@ export default function Projects({ projects, inventory, clients, user, transacti
         {[
           { label: 'Total Jobs', value: stats.total, icon: Briefcase, color: 'text-blue-400', bg: 'bg-blue-500/10' },
           { label: 'Active Pipeline', value: stats.active, icon: ArrowDownLeft, color: 'text-green-400', bg: 'bg-green-500/10' },
-          { label: 'Finalized', value: stats.completed, icon: Save, color: 'text-slate-400', bg: 'bg-slate-500/10' },
+          { label: 'Finalized', value: stats.completed, icon: Save, color: 'text-slate-300', bg: 'bg-slate-500/10' },
           { label: 'SKU Allocation', value: stats.inventoryLinked, icon: Package, color: 'text-primary', bg: 'bg-primary/10' }
         ].map((stat, i) => (
           <div key={i} className="glass-morphism p-3 md:p-6 rounded-2xl shadow-sm md:rounded-[32px] border border-white/5 space-y-3 md:space-y-4">
@@ -565,7 +565,7 @@ export default function Projects({ projects, inventory, clients, user, transacti
                 <stat.icon className={cn("w-4 h-4 md:w-5 md:h-5", stat.color)} />
               </div>
               <div className="text-right">
-                <p className="text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">{stat.label}</p>
+                <p className="text-[9px] md:text-[10px] font-black text-slate-300 uppercase tracking-widest leading-none">{stat.label}</p>
                 <p className="text-xl md:text-2xl font-black text-white mt-1">{stat.value}</p>
               </div>
             </div>
@@ -660,7 +660,7 @@ export default function Projects({ projects, inventory, clients, user, transacti
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: 10 }}
-                          className="absolute top-full left-0 right-0 mt-2 bg-[#1e293b] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                          className="absolute top-full left-0 right-0 mt-2 bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
                         >
                           <div className="p-2 space-y-1">
                             {jobSuggestions.map((suggestion, index) => (
@@ -718,7 +718,7 @@ export default function Projects({ projects, inventory, clients, user, transacti
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 10 }}
-                className="absolute top-full left-0 right-0 mt-2 bg-[#1e293b] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                className="absolute top-full left-0 right-0 mt-2 bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
               >
                 <div className="p-2 space-y-1">
                   {searchSuggestions.map((suggestion, index) => (
@@ -893,7 +893,7 @@ function ProjectCard({
           <p className="text-[11px] md:text-sm text-slate-500 font-black uppercase tracking-widest mt-1">JN-#{project.jobNumber}</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-x-4 gap-y-3 pb-2 border-t border-white/5 pt-4">
+        <div className="grid grid-cols-2 lg:grid-cols-2 gap-x-4 gap-y-4 pb-2 border-t border-white/5 pt-4">
           <div className="space-y-1">
             <div className="flex items-center space-x-1.5 text-[8px] md:text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">
               <Store className="w-3 h-3" />
@@ -908,6 +908,14 @@ function ProjectCard({
             </div>
             <p className="text-xs md:text-sm font-bold text-slate-300 truncate">{project.location || 'Local Site'}</p>
           </div>
+          <div className="space-y-1">
+            <div className="flex items-center space-x-1.5 text-[8px] md:text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">
+              <Package className="w-3 h-3 text-primary" />
+              <span>Total Units</span>
+            </div>
+            <p className="text-xs md:text-sm font-bold text-white">{itemCount}</p>
+          </div>
+          <div className="space-y-0 opacity-0 pointer-events-none md:hidden lg:block h-0" />
           <div className="space-y-1">
             <div className="flex items-center space-x-1.5 text-[8px] md:text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">
               <ArrowDownLeft className="w-3 h-3 text-green-500" />
@@ -1226,7 +1234,7 @@ function ProjectFormModal({
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
-                    className="absolute top-full left-0 right-0 mt-2 bg-[#1e293b] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden"
+                    className="absolute top-full left-0 right-0 mt-2 bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden"
                   >
                     <div className="max-h-48 overflow-y-auto custom-scrollbar">
                       {filteredClients.map((c: any) => (
@@ -1301,9 +1309,9 @@ function ProjectFormModal({
                 value={formData.status}
                 onChange={e => setFormData({ ...formData, status: e.target.value as any })}
               >
-                <option value="Active" className="bg-[#1e293b]">Active</option>
-                <option value="Draft" className="bg-[#1e293b]">Draft</option>
-                <option value="Completed" className="bg-[#1e293b]">Completed</option>
+                <option value="Active" className="bg-[#0f172a]">Active</option>
+                <option value="Draft" className="bg-[#0f172a]">Draft</option>
+                <option value="Completed" className="bg-[#0f172a]">Completed</option>
               </select>
             </div>
           </div>
@@ -1362,7 +1370,7 @@ function ProjectFormModal({
           </div>
         </form>
 
-        <div className="p-6 border-t border-white/5 bg-[#1e293b]/20 flex items-center justify-between">
+        <div className="p-6 border-t border-white/5 bg-[#030712]/20 flex items-center justify-between">
           <div className="hidden md:flex items-center space-x-6">
             <div className="flex flex-col">
               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total SKU items</span>
@@ -1401,7 +1409,7 @@ function ProjectFormModal({
         {/* Item Picker Modal Overlay */}
         <AnimatePresence>
           {showItemPicker && (
-            <div className="absolute inset-0 bg-[#1e293b]/90 backdrop-blur-md z-[65] flex flex-col">
+            <div className="absolute inset-0 bg-[#030712]/90 backdrop-blur-md z-[65] flex flex-col">
               <div className="p-6 border-b border-white/5 flex items-center justify-between">
                 <h3 className="text-lg font-bold text-white">Full Inventory Lookup</h3>
                 <button onClick={() => setShowItemPicker(false)} className="p-2 hover:bg-white/10 rounded-xl"><X className="w-5 h-5" /></button>
@@ -1563,7 +1571,7 @@ function ProjectItemRow({ item, inventory, onRemove, onUpdate }: { item: Project
                   onChange={e => setSearch(e.target.value)}
                   onBlur={() => setTimeout(() => setShowSearch(false), 200)}
                 />
-                <div className="absolute top-full left-0 right-0 mt-2 bg-[#1e293b] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden">
                   {filteredInventory.length === 0 ? (
                     <div className="p-4 text-center text-xs text-slate-500">No matching items</div>
                   ) : (
@@ -1991,7 +1999,7 @@ function ProjectDetailModal({ project, inventory, transactions, onClose, onDelet
           </div>
         </div>
 
-        <div className="p-8 border-t border-white/10 bg-[#1e293b]/20">
+        <div className="p-8 border-t border-white/10 bg-[#030712]/20">
           <div className="flex items-center justify-between text-[10px] font-black text-slate-500 uppercase tracking-wider">
             <p>Created: {formatDate(project.createdAt)}</p>
             <p>ID: {project.id}</p>

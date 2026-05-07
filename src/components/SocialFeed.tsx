@@ -212,7 +212,7 @@ const PostCard = React.memo(({ post, currentUser }: { post: Post, currentUser: U
           </div>
           <div>
             <h4 className="text-sm font-bold text-white">{post.authorName}</h4>
-            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">{formatDate(post.createdAt)}</p>
+            <p className="text-[10px] text-slate-300 uppercase font-black tracking-widest">{formatDate(post.createdAt)}</p>
           </div>
         </div>
         <button className="text-slate-500 hover:text-white hover:bg-white/10 p-2 rounded-full transition-colors">
@@ -268,7 +268,7 @@ const PostCard = React.memo(({ post, currentUser }: { post: Post, currentUser: U
       </div>
 
           {showComments && (
-        <div className="bg-[#1e293b]/20 p-4 space-y-4 border-t border-white/5">
+        <div className="bg-[#030712]/20 p-4 space-y-4 border-t border-white/5">
           <div className="space-y-4 max-h-60 overflow-y-auto custom-scrollbar pr-2">
             {comments.map((comment) => (
               <div key={comment.id} className="flex space-x-3">
@@ -282,7 +282,7 @@ const PostCard = React.memo(({ post, currentUser }: { post: Post, currentUser: U
                 <div className="flex-1 bg-white/[0.03] p-3 rounded-2xl shadow-sm border border-white/5">
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-xs font-bold text-white">{comment.authorName}</span>
-                    <span className="text-[10px] text-slate-500 font-bold uppercase">
+                    <span className="text-[10px] text-slate-300 font-black uppercase tracking-widest">
                       {formatDistanceToNow(
                         typeof comment.createdAt?.toDate === 'function' 
                           ? comment.createdAt.toDate() 
@@ -295,7 +295,7 @@ const PostCard = React.memo(({ post, currentUser }: { post: Post, currentUser: U
               </div>
             ))}
             {comments.length === 0 && (
-              <p className="text-center text-xs text-slate-600 py-4 italic">No comments yet</p>
+              <p className="text-center text-xs text-slate-400 py-4 italic font-black uppercase tracking-widest">No comments yet</p>
             )}
           </div>
 

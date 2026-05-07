@@ -288,7 +288,7 @@ export function AIReports({ inventory, transactions }: AIReportsProps) {
                 className="h-full min-h-[500px] glass-morphism rounded-[40px] border border-white/5 flex flex-col items-center justify-center text-center p-12 overflow-hidden relative group"
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="w-24 h-24 rounded-[40px] bg-[#1e293b] border border-white/10 flex items-center justify-center mb-8 shadow-2xl relative z-10 transition-transform group-hover:scale-110 duration-500">
+                <div className="w-24 h-24 rounded-[40px] bg-[#0f172a] border border-white/10 flex items-center justify-center mb-8 shadow-2xl relative z-10 transition-transform group-hover:scale-110 duration-500">
                   <Sparkles className="w-10 h-10 text-primary animate-pulse" />
                 </div>
                 <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-4 relative z-10">Ready for Insights?</h3>
@@ -372,14 +372,14 @@ export function AIReports({ inventory, transactions }: AIReportsProps) {
                 </div>
 
                 {/* Report Content */}
-                <div className="flex-1 p-10 overflow-y-auto custom-scrollbar bg-[#1e293b]/40">
+                <div className="flex-1 p-10 overflow-y-auto custom-scrollbar bg-[#030712]/40">
                   <div className="prose prose-invert prose-slate max-w-none prose-headings:font-black prose-headings:uppercase prose-headings:tracking-tighter prose-headings:text-white prose-p:text-slate-300 prose-p:leading-relaxed prose-strong:text-primary prose-li:text-slate-300 prose-hr:border-white/10">
                     <Markdown>{report || ''}</Markdown>
                   </div>
                 </div>
 
                 {/* Report Footer */}
-                <div className="px-10 py-6 bg-[#0a0f1e]/50 border-t border-white/5 flex items-center justify-between">
+                <div className="px-10 py-6 bg-[#030712]/50 border-t border-white/5 flex items-center justify-between">
                   <div className="flex items-center gap-6">
                     <div className="flex items-center gap-2">
                       <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />

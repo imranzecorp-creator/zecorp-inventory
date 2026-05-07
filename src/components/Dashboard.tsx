@@ -76,9 +76,9 @@ const StockTableRow = React.memo(({ index, style, data }: { index: number, style
           )}
         </motion.div>
         <div className="flex flex-col truncate">
-          <span className="text-sm font-bold text-slate-200 group-hover:text-white transition-colors truncate">{item.name}</span>
+          <span className="text-sm font-bold text-white group-hover:text-primary transition-colors truncate">{item.name}</span>
           {(item.brand || item.modelNumber) && (
-            <span className="text-[9px] text-primary/80 font-black uppercase tracking-tighter truncate">
+            <span className="text-[9px] text-primary font-black uppercase tracking-tighter truncate">
               {item.brand} {item.modelNumber}
             </span>
           )}
@@ -86,26 +86,26 @@ const StockTableRow = React.memo(({ index, style, data }: { index: number, style
       </div>
       <div className="px-4 py-4 w-24 text-center shrink-0">
         <span className={cn(
-          "text-sm font-black px-3 py-1 rounded-lg border",
+          "text-sm font-black px-3 py-1 rounded-lg border shadow-sm",
           item.currentQuantity <= item.minStock 
-            ? "bg-amber-500/10 text-amber-500 border-amber-500/20" 
-            : "bg-primary/10 text-primary border-primary/20"
+            ? "bg-amber-500 text-white border-white/20" 
+            : "bg-primary text-white border-white/20"
         )}>
           {item.currentQuantity}
         </span>
       </div>
-      <div className="px-4 py-4 flex-1 hidden md:block truncate text-[10px] text-slate-300 uppercase font-black tracking-tighter">
+      <div className="px-4 py-4 flex-1 hidden md:block truncate text-[10px] text-slate-200 uppercase font-black tracking-tighter">
         {item.client || 'Internal'}
       </div>
-      <div className="px-4 py-4 flex-1 hidden lg:block truncate text-[10px] text-slate-400 uppercase font-black tracking-tighter">
+      <div className="px-4 py-4 flex-1 hidden lg:block truncate text-[10px] text-slate-300 uppercase font-black tracking-tighter">
         {item.outlet || item.location || '-'}
       </div>
       <div className="px-4 py-4 w-24 hidden lg:block text-right shrink-0">
-        <span className="text-[10px] font-mono text-slate-400 bg-white/5 px-2 py-1 rounded-md border border-white/10">
+        <span className="text-[10px] font-mono text-white bg-white/10 px-2 py-1 rounded-md border border-white/10">
           {item.jobNumber || 'PENDING'}
         </span>
       </div>
-      <div className="px-4 py-4 flex-1 hidden xl:block truncate text-[10px] text-slate-300 uppercase font-black tracking-tighter">
+      <div className="px-4 py-4 flex-1 hidden xl:block truncate text-[10px] text-slate-200 uppercase font-black tracking-tighter">
         {item.warehouseLocation || '-'}
       </div>
     </div>
@@ -487,13 +487,13 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
                 animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
                 transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
                 style={{ backgroundSize: "200% auto" }}
-                className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-fuchsia-400 to-primary"
+                className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-fuchsia-400 to-cyan-400"
               >
                 {user.displayName?.split(' ')[0] || 'Friend'}
               </motion.span>
             </h1>
-            <p className="text-slate-400 text-xs md:text-base font-medium max-w-lg border-l-2 border-white/5 pl-4 ml-1">
-              Synchronizing with central grid. <span className="text-white">{items.length} assets</span> currently under management.
+            <p className="text-white/90 text-xs md:text-base font-bold max-w-lg border-l-2 border-primary/50 pl-4 ml-1">
+              Synchronizing with central grid. <span className="text-cyan-400 font-black">{items.length} assets</span> currently under management.
             </p>
           </div>
 
@@ -508,13 +508,13 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
                 </motion.div>
               </div>
               <div className="flex flex-col">
-                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Standard Time</span>
-                <span className="text-sm font-bold text-slate-200">{new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+                <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none mb-1">Standard Time</span>
+                <span className="text-sm font-bold text-white">{new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
               </div>
               <div className="w-px h-6 bg-white/10 mx-1" />
               <div className="flex flex-col">
-                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Date Signature</span>
-                <span className="text-sm font-bold text-slate-200">{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none mb-1">Date Signature</span>
+                <span className="text-sm font-bold text-white">{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
               </div>
             </div>
             <AIQuickNews />
@@ -858,7 +858,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
-                    className="absolute top-full left-0 right-0 mt-2 bg-[#1e293b] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                    className="absolute top-full left-0 right-0 mt-2 bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
                   >
                     <div className="p-2 space-y-1">
                       {stockSuggestions.map((suggestion, index) => (
@@ -950,7 +950,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
                                initial={{ opacity: 0, y: 10 }}
                                animate={{ opacity: 1, y: 0 }}
                                exit={{ opacity: 0, y: 10 }}
-                               className="absolute top-full left-0 right-0 mt-2 bg-[#1e293b] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                               className="absolute top-full left-0 right-0 mt-2 bg-[#0f172a] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
                              >
                                <div className="p-1 space-y-0.5">
                                  {clientSuggestions.map((suggestion, index) => (
@@ -996,7 +996,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
                                initial={{ opacity: 0, y: 10 }}
                                animate={{ opacity: 1, y: 0 }}
                                exit={{ opacity: 0, y: 10 }}
-                               className="absolute top-full left-0 right-0 mt-2 bg-[#1e293b] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                               className="absolute top-full left-0 right-0 mt-2 bg-[#0f172a] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
                              >
                                <div className="p-1 space-y-0.5">
                                  {jobSuggestions.map((suggestion, index) => (
@@ -1042,7 +1042,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
                                initial={{ opacity: 0, y: 10 }}
                                animate={{ opacity: 1, y: 0 }}
                                exit={{ opacity: 0, y: 10 }}
-                               className="absolute top-full left-0 right-0 mt-2 bg-[#1e293b] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                               className="absolute top-full left-0 right-0 mt-2 bg-[#0f172a] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
                              >
                                <div className="p-1 space-y-0.5">
                                  {locationSuggestions.map((suggestion, index) => (
@@ -1401,13 +1401,13 @@ const StatCard = React.memo(({ label, value, icon: Icon, trend, trendUp, color, 
         >
           <Icon className="w-5 h-5 md:w-6 md:h-6" />
         </motion.div>
-        <span className={`text-[8px] md:text-[10px] font-bold px-1.5 md:px-2 py-0.5 md:py-1 rounded-full ${trendUp ? 'bg-green-500/10 text-green-400' : 'bg-white/5 text-slate-400'}`}>
+        <span className={`text-[8px] md:text-[10px] font-black px-1.5 md:px-2 py-0.5 md:py-1 rounded-full border ${trendUp ? 'bg-green-500/20 text-green-300 border-green-500/20' : 'bg-white/10 text-slate-200 border-white/10'}`}>
           {trend}
         </span>
       </div>
       <div className="mt-3 md:mt-4">
-        <p className="text-slate-400 text-xs md:text-sm font-medium">{label}</p>
-        <h3 className="text-2xl md:text-3xl font-bold text-white mt-0.5 md:mt-1">{value}</h3>
+        <p className="text-slate-300 text-xs md:text-sm font-black uppercase tracking-widest">{label}</p>
+        <h3 className="text-2xl md:text-3xl font-black text-white mt-0.5 md:mt-1 tracking-tight">{value}</h3>
       </div>
     </motion.div>
   );

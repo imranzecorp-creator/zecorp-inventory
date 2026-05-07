@@ -192,7 +192,7 @@ export const ZecorpMascot: React.FC<ZecorpMascotProps> = ({ userDisplayName = 'U
             animate={{ opacity: 1, x: 15 }}
             className="absolute top-0 -right-24 z-30"
           >
-            <div className="bg-[#020617]/80 backdrop-blur-md border border-primary/30 rounded-lg p-2 shadow-2xl min-w-[80px] overflow-hidden group-hover:scale-110 transition-transform">
+            <div className="bg-[#030712]/80 backdrop-blur-md border border-primary/30 rounded-lg p-2 shadow-2xl min-w-[80px] overflow-hidden group-hover:scale-110 transition-transform">
               <div className="flex items-center space-x-1 border-b border-primary/20 pb-1 mb-1">
                 <div className="w-1 h-1 rounded-full bg-primary animate-ping" />
                 <span className="text-[6px] font-black text-primary uppercase tracking-tighter">Today's Update</span>
@@ -259,7 +259,7 @@ export const ZecorpMascot: React.FC<ZecorpMascotProps> = ({ userDisplayName = 'U
               className="absolute z-[100]"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="w-64 bg-[#020617]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+              <div className="w-64 bg-[#030712]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
                 <div className="bg-primary/20 p-4 border-b border-white/10">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
@@ -303,7 +303,7 @@ export const ZecorpMascot: React.FC<ZecorpMascotProps> = ({ userDisplayName = 'U
                    <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Powered by Gemini Pro</span>
                 </div>
               </div>
-              <div className="w-4 h-4 bg-[#020617] border-r border-b border-white/10 rotate-45 absolute -bottom-2 left-1/2 translate-x-[40px] z-[-1]" />
+              <div className="w-4 h-4 bg-[#030712] border-r border-b border-white/10 rotate-45 absolute -bottom-2 left-1/2 translate-x-[40px] z-[-1]" />
             </motion.div>
           )}
         </AnimatePresence>
