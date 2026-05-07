@@ -9,6 +9,7 @@ interface FilterDropdownProps {
   selected: string[];
   onChange: (val: string[]) => void;
   placeholder?: string;
+  className?: string;
 }
 
 export function FilterDropdown({ 
@@ -16,7 +17,8 @@ export function FilterDropdown({
   options, 
   selected, 
   onChange,
-  placeholder
+  placeholder,
+  className
 }: FilterDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -32,7 +34,7 @@ export function FilterDropdown({
   };
 
   return (
-    <div className="space-y-1.5 relative">
+    <div className={cn("space-y-1.5 relative", className)}>
       <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">{label}</label>
       <div className="relative">
         <button

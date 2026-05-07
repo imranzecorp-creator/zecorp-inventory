@@ -134,7 +134,7 @@ export async function generateTransactionsReport(transactions: any[], options: T
     }
   }
   
-  const headers = [["Date", "Item Details", "Action", "Qty", "Job Ref", "Client / Source", "Outlet", "Location"]];
+  const headers = [["Date", "Item Details", "Action", "Qty", "Job Ref", "Client / Source", "Outlet", "Wh. Loc"]];
   if (includeNotes) headers[0].push("Notes");
 
   const tableData = transactions.map(tx => {
@@ -146,7 +146,7 @@ export async function generateTransactionsReport(transactions: any[], options: T
       tx.jobNumber || 'N/A',
       tx.client || 'Internal Operation',
       tx.outlet || '-',
-      tx.location || '-'
+      tx.warehouseLocation || '-'
     ];
     if (includeNotes) row.push(tx.notes || '-');
     return row;
@@ -164,13 +164,16 @@ export async function generateTransactionsReport(transactions: any[], options: T
     },
     alternateRowStyles: { fillColor: [245, 247, 250] },
     margin: { top: 45 },
-    styles: { fontSize: 7, cellPadding: 2 },
+    styles: { fontSize: 6.5, cellPadding: 1.5 },
     columnStyles: {
-      0: { cellWidth: 18 }, // Date
-      1: { cellWidth: 40 }, // Item
-      2: { cellWidth: 18 }, // Action
-      3: { cellWidth: 10, halign: 'center' }, // Qty
-      4: { cellWidth: 18 }, // Job
+      0: { cellWidth: 16 }, // Date
+      1: { cellWidth: 35 }, // Item
+      2: { cellWidth: 15 }, // Action
+      3: { cellWidth: 8, halign: 'center' }, // Qty
+      4: { cellWidth: 15 }, // Job
+      5: { cellWidth: 30 }, // Client/Source
+      6: { cellWidth: 25 }, // Outlet
+      7: { cellWidth: 25 }, // Wh. Loc
     }
   });
   

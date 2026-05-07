@@ -876,6 +876,15 @@ export default function InventoryList({ items, clients, user, projects, initialS
           <p className="text-[10px] md:text-sm text-slate-500 md:text-slate-400 uppercase font-black md:font-normal tracking-[0.1em]">Central Asset Grid • {items.length} Units</p>
         </div>
         <div className="flex items-center space-x-2 md:space-x-3 overflow-x-auto pb-2 md:pb-0 scrollbar-hide">
+            {isApproved && (
+              <button 
+                onClick={() => setShowAddModal(true)}
+                className="flex-shrink-0 flex items-center space-x-2 px-6 py-3.5 text-xs md:text-sm font-black text-slate-950 bg-gradient-to-r from-primary via-emerald-400 to-primary rounded-2xl bg-[length:200%_auto] hover:bg-right shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)] hover:shadow-[0_0_30px_rgba(var(--primary-rgb),0.5)] transition-all duration-500 active:scale-95 group uppercase tracking-[0.2em]"
+              >
+                <Plus className="w-3.5 h-3.5 md:w-4 md:h-4 group-hover:rotate-180 transition-transform duration-500" />
+                <span>Add Item</span>
+              </button>
+            )}
             <button 
               onClick={() => generateInventoryReport(filteredItems, {
                 search: searchTerm,
@@ -908,13 +917,6 @@ export default function InventoryList({ items, clients, user, projects, initialS
                 accept=".xlsx, .xls, .csv" 
                 className="hidden" 
               />
-              <button 
-                onClick={() => setShowAddModal(true)}
-                className="flex-shrink-0 flex items-center space-x-2 px-6 py-3 text-xs md:text-sm font-black text-slate-950 bg-gradient-to-r from-primary via-emerald-400 to-primary rounded-2xl bg-[length:200%_auto] hover:bg-right shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)] hover:shadow-[0_0_30px_rgba(var(--primary-rgb),0.5)] transition-all duration-500 active:scale-95 group uppercase tracking-[0.2em]"
-              >
-                <Plus className="w-3.5 h-3.5 md:w-4 md:h-4 group-hover:rotate-180 transition-transform duration-500" />
-                <span>Add Item</span>
-              </button>
             </div>
           )}
         </div>
