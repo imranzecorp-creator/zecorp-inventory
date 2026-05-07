@@ -28,7 +28,7 @@ export default React.memo(function AIQuickNews() {
         exit={{ opacity: 0, y: -10, scale: 0.95 }}
         className="absolute top-full right-0 mt-4 z-[100] w-72"
       >
-        <div className="relative glass-morphism p-5 rounded-[24px] border border-primary/30 shadow-2xl bg-slate-900/90 backdrop-blur-xl">
+        <div className="relative glass-morphism p-5 rounded-[24px] border border-primary/30 shadow-2xl bg-[#1e293b]/90 backdrop-blur-xl">
           <button 
             onClick={() => setIsVisible(false)}
             className="absolute -top-2 -right-2 w-6 h-6 bg-slate-800 rounded-full border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors"

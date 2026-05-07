@@ -127,8 +127,8 @@ const InventoryRow = React.memo(({ index, style, data }: { index: number, style:
             </div>
           </div>
 
-          <div className="w-32 px-4 hidden md:block shrink-0">
-             <span className="text-[10px] text-slate-400 font-black uppercase tracking-tighter truncate block">{item.brand || 'No Brand'}</span>
+          <div className="w-24 px-4 hidden md:block shrink-0 text-slate-400">
+             <span className="text-[10px] font-black uppercase tracking-tighter truncate block">{item.brand || 'No Brand'}</span>
           </div>
 
           <div className="w-24 px-4 text-center shrink-0">
@@ -150,11 +150,12 @@ const InventoryRow = React.memo(({ index, style, data }: { index: number, style:
              </div>
           </div>
 
-          <div className="w-48 px-4 hidden xl:block shrink-0">
-            <div className="flex flex-col truncate">
-              <span className="text-[10px] text-slate-300 font-black uppercase tracking-tighter truncate">{item.client || 'Internal'}</span>
-              <span className="text-[9px] text-slate-500 font-bold truncate">{item.outlet || item.location || '-'}</span>
-            </div>
+          <div className="w-32 px-4 hidden lg:block shrink-0">
+            <span className="text-[10px] text-slate-300 font-black uppercase tracking-tighter truncate block">{item.client || 'Internal'}</span>
+          </div>
+
+          <div className="w-32 px-4 hidden xl:block shrink-0">
+             <span className="text-[10px] text-slate-500 font-bold truncate block">{item.outlet || item.location || '-'}</span>
           </div>
 
           {isApproved && (
@@ -483,6 +484,7 @@ export default function InventoryList({ items, clients, user, projects, initialS
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const [selectedOutlets, setSelectedOutlets] = useState<string[]>([]);
   const [selectedWarehouseLocations, setSelectedWarehouseLocations] = useState<string[]>([]);
@@ -587,6 +589,7 @@ export default function InventoryList({ items, clients, user, projects, initialS
     setAiFilteredIds(null);
     setSelectedBrands([]);
     setSelectedModels([]);
+    setSelectedCategories([]);
     setSelectedSuppliers([]);
     setSelectedOutlets([]);
     setSelectedWarehouseLocations([]);
@@ -604,6 +607,7 @@ export default function InventoryList({ items, clients, user, projects, initialS
     return {
       brands: Array.from(new Set(items.map(i => i.brand).filter(Boolean))) as string[],
       models: Array.from(new Set(items.map(i => i.modelNumber).filter(Boolean))) as string[],
+      categories: Array.from(new Set(items.map(i => i.category).filter(Boolean))) as string[],
       suppliers: Array.from(new Set(items.map(i => i.supplier).filter(Boolean))) as string[],
       projects: Array.from(new Set(items.map(i => i.outlet).filter(Boolean))) as string[],
       warehouseLocations: Array.from(new Set(['Dip Room 35', 'AL Quoz', 'Home Box', 'Head Office', ...items.map(i => i.warehouseLocation).filter(Boolean)])) as string[],
@@ -636,6 +640,7 @@ export default function InventoryList({ items, clients, user, projects, initialS
       // New Multi-select Filters
       if (selectedBrands.length > 0 && (!item.brand || !selectedBrands.includes(item.brand))) return false;
       if (selectedModels.length > 0 && (!item.modelNumber || !selectedModels.includes(item.modelNumber))) return false;
+      if (selectedCategories.length > 0 && (!item.category || !selectedCategories.includes(item.category))) return false;
       if (selectedSuppliers.length > 0 && (!item.supplier || !selectedSuppliers.includes(item.supplier))) return false;
       if (selectedOutlets.length > 0 && (!item.outlet || !selectedOutlets.includes(item.outlet))) return false;
       if (selectedWarehouseLocations.length > 0 && (!item.warehouseLocation || !selectedWarehouseLocations.includes(item.warehouseLocation))) return false;
@@ -670,7 +675,7 @@ export default function InventoryList({ items, clients, user, projects, initialS
 
       return true;
     });
-  }, [items, deferredSearchTerm, aiFilteredIds, selectedBrands, selectedModels, selectedSuppliers, selectedOutlets, clientFilter, jobFilter, locationFilter, inventoryTypeFilter, stockInStart, stockInEnd, updatedStart, updatedEnd]);
+  }, [items, deferredSearchTerm, aiFilteredIds, selectedBrands, selectedModels, selectedCategories, selectedSuppliers, selectedOutlets, selectedWarehouseLocations, clientFilter, jobFilter, locationFilter, inventoryTypeFilter, stockInStart, stockInEnd, updatedStart, updatedEnd]);
 
   const getItemSize = useCallback((index: number) => {
     return expandedId === filteredItems[index]?.id ? 440 : 72;
@@ -875,6 +880,7 @@ export default function InventoryList({ items, clients, user, projects, initialS
               onClick={() => generateInventoryReport(filteredItems, {
                 search: searchTerm,
                 brand: selectedBrands.join(', '),
+                category: selectedCategories.join(', '),
                 client: clientFilter,
                 job: jobFilter,
                 project: selectedOutlets.join(', '),
@@ -1027,9 +1033,9 @@ export default function InventoryList({ items, clients, user, projects, initialS
                 : "bg-slate-800/50 border-white/10 text-slate-400 hover:text-white hover:bg-white/10"
             )}
           >
-            <Filter className={cn("w-4 h-4", (selectedBrands.length > 0 || selectedModels.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || selectedWarehouseLocations.length > 0 || clientFilter || jobFilter || locationFilter || stockInStart || stockInEnd || updatedStart || updatedEnd) && "animate-bounce")} />
+            <Filter className={cn("w-4 h-4", (selectedBrands.length > 0 || selectedModels.length > 0 || selectedCategories.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || selectedWarehouseLocations.length > 0 || clientFilter || jobFilter || locationFilter || stockInStart || stockInEnd || updatedStart || updatedEnd) && "animate-bounce")} />
             <span className="text-sm font-black uppercase tracking-widest">Filters</span>
-            {(selectedBrands.length > 0 || selectedModels.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || selectedWarehouseLocations.length > 0 || clientFilter || jobFilter || locationFilter || stockInStart || stockInEnd || updatedStart || updatedEnd) && (
+            {(selectedBrands.length > 0 || selectedModels.length > 0 || selectedCategories.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || selectedWarehouseLocations.length > 0 || clientFilter || jobFilter || locationFilter || stockInStart || stockInEnd || updatedStart || updatedEnd) && (
               <div className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-pulse" />
             )}
           </motion.button>
@@ -1056,6 +1062,13 @@ export default function InventoryList({ items, clients, user, projects, initialS
                   options={uniqueValues.models} 
                   selected={selectedModels} 
                   onChange={setSelectedModels} 
+                />
+                
+                <FilterDropdown 
+                  label="Categories" 
+                  options={uniqueValues.categories} 
+                  selected={selectedCategories} 
+                  onChange={setSelectedCategories} 
                 />
 
                 <FilterDropdown 
@@ -1178,9 +1191,9 @@ export default function InventoryList({ items, clients, user, projects, initialS
                     onChange={(e) => setInventoryTypeFilter(e.target.value as any)}
                     className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:ring-2 focus:ring-primary/20 outline-none appearance-none"
                   >
-                    <option value="" className="bg-slate-900">All Stock Types</option>
-                    <option value="Warehouse Stock" className="bg-slate-900">Warehouse Stock</option>
-                    <option value="Client Stock" className="bg-slate-900">Client Stock</option>
+                    <option value="" className="bg-[#1e293b]">All Stock Types</option>
+                    <option value="Warehouse Stock" className="bg-[#1e293b]">Warehouse Stock</option>
+                    <option value="Client Stock" className="bg-[#1e293b]">Client Stock</option>
                   </select>
                 </div>
 
@@ -1283,7 +1296,7 @@ export default function InventoryList({ items, clients, user, projects, initialS
                     Matching Results: <span className="text-primary">{filteredItems.length}</span>
                   </p>
                 </div>
-                { (selectedBrands.length > 0 || selectedModels.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || clientFilter || jobFilter || locationFilter || stockInStart || stockInEnd || updatedStart || updatedEnd) && (
+                { (selectedBrands.length > 0 || selectedModels.length > 0 || selectedCategories.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || clientFilter || jobFilter || locationFilter || stockInStart || stockInEnd || updatedStart || updatedEnd) && (
                   <button 
                     onClick={clearSearch}
                     className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
@@ -1302,10 +1315,11 @@ export default function InventoryList({ items, clients, user, projects, initialS
         <div className="flex items-center px-5 py-3 bg-white/[0.03] border-b border-white/5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 shrink-0">
           {isApproved && <div className="w-10 shrink-0" />}
           <div className="flex-1 px-3">Item Matrix</div>
-          <div className="w-32 px-4 hidden md:block shrink-0">Brand</div>
+          <div className="w-24 px-4 hidden md:block shrink-0">Brand</div>
           <div className="w-24 px-4 text-center shrink-0">Stock</div>
-          <div className="w-32 px-4 hidden lg:block shrink-0">Warehouse-Loc</div>
-          <div className="w-48 px-4 hidden xl:block shrink-0">Client / Outlet</div>
+          <div className="w-32 px-4 hidden lg:block shrink-0">Warehouse</div>
+          <div className="w-32 px-4 hidden lg:block shrink-0">Client</div>
+          <div className="w-32 px-4 hidden xl:block shrink-0">Outlet</div>
           <div className="w-32 flex justify-end shrink-0">Actions</div>
         </div>
         <div className="flex-1 relative">
@@ -1346,7 +1360,7 @@ export default function InventoryList({ items, clients, user, projects, initialS
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60] bg-slate-900 border border-primary/30 rounded-full px-6 py-4 shadow-2xl shadow-primary/20 flex items-center space-x-6 backdrop-blur-xl"
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60] bg-[#1e293b] border border-primary/30 rounded-full px-6 py-4 shadow-2xl shadow-primary/20 flex items-center space-x-6 backdrop-blur-xl"
           >
             <div className="flex items-center space-x-3 pr-6 border-r border-white/10">
               <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm">
@@ -2322,7 +2336,7 @@ function ItemDetailModal({ item, clients, onClose, onDelete, user, initialAction
         exit={{ opacity: 0, scale: 0.9, y: 40 }}
         className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-2xl glass-morphism rounded-[40px] shadow-2xl z-[51] overflow-hidden border border-white/10"
       >
-        <div className="relative h-56 bg-slate-900 overflow-hidden">
+        <div className="relative h-56 bg-[#1e293b] overflow-hidden">
           {item.imageUrl ? (
             <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
           ) : (
@@ -2605,7 +2619,7 @@ function ImportPreviewModal({ data, onConfirm, onCancel, isImporting }: { data: 
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-black/20">
+        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-[#1e293b]/20">
           <table className="w-full text-left border-separate border-spacing-y-2">
             <thead>
               <tr className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
@@ -3571,12 +3585,10 @@ function ItemFormModal({ item, items, clients, projects, onClose, user }: any) {
               </div>
             )}
 
-            {!item && (
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Entry Date Signature</label>
-                <input type="date" value={formData.stockInDate} onChange={e => setFormData({...formData, stockInDate: e.target.value})} className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-bold focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
-              </div>
-            )}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">{item ? 'Stock Reference Date' : 'Entry Date Signature'}</label>
+              <input type="date" value={formData.stockInDate} onChange={e => setFormData({...formData, stockInDate: e.target.value})} className="w-full px-5 py-4 bg-white/5 border border-white/10 rounded-2xl text-white font-bold focus:ring-2 focus:ring-primary/30 focus:outline-none transition-all" />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-6">

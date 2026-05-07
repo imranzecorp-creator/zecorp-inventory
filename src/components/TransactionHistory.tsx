@@ -118,7 +118,7 @@ const TransactionRow = React.memo(({ index, style, data }: { index: number, styl
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
-              className="border-t border-white/5 bg-black/20"
+              className="border-t border-white/5 bg-[#1e293b]/20"
             >
               <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                 <div className="space-y-4">
@@ -199,6 +199,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [warehouseLocationFilter, setWarehouseLocationFilter] = useState('');
   const [jobNumberFilter, setJobNumberFilter] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -213,7 +214,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
 
   useEffect(() => {
     listRef.current?.scrollTo(0);
-  }, [deferredSearchTerm, userFilter, inventoryTypeFilter, typeFilter, startDate, endDate, categoryFilter, jobNumberFilter]);
+  }, [deferredSearchTerm, userFilter, inventoryTypeFilter, typeFilter, startDate, endDate, categoryFilter, jobNumberFilter, warehouseLocationFilter]);
 
   const toggleExpand = useCallback((id: string) => {
     setExpandedId(prev => prev === id ? null : id);
@@ -236,6 +237,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
       if (tx.jobNumber && tx.jobNumber.toLowerCase().includes(searchLow)) matches.add(tx.jobNumber);
       if (tx.userName?.toLowerCase().includes(searchLow)) matches.add(tx.userName);
       if (tx.category && tx.category.toLowerCase().includes(searchLow)) matches.add(tx.category);
+      if (tx.warehouseLocation && tx.warehouseLocation.toLowerCase().includes(searchLow)) matches.add(tx.warehouseLocation);
     });
     
     return Array.from(matches).slice(0, 8);
@@ -252,7 +254,8 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
         (tx.brand?.toLowerCase() || '').includes(searchLow) ||
         (tx.modelNumber?.toLowerCase() || '').includes(searchLow) ||
         (tx.jobNumber?.toLowerCase() || '').includes(searchLow) ||
-        (tx.category?.toLowerCase() || '').includes(searchLow);
+        (tx.category?.toLowerCase() || '').includes(searchLow) ||
+        (tx.warehouseLocation?.toLowerCase() || '').includes(searchLow);
       
       const matchesUser = !userFilter || 
         tx.userName?.toLowerCase().includes(userFilter.toLowerCase());
@@ -265,6 +268,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
       const matchesCategory = !categoryFilter || 
         (tx.category?.toLowerCase() || '').includes(categoryFilter.toLowerCase());
 
+      const matchesWarehouse = !warehouseLocationFilter || 
+        (tx.warehouseLocation?.toLowerCase() || '').includes(warehouseLocationFilter.toLowerCase());
+
       const matchesJob = !jobNumberFilter || 
         (tx.jobNumber?.toLowerCase() || '').includes(jobNumberFilter.toLowerCase());
 
@@ -273,9 +279,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
       const matchesDate = (!startTimestamp || txDate >= startTimestamp) &&
                           (!endTimestamp || txDate <= endTimestamp);
 
-      return matchesSearch && matchesUser && matchesType && matchesTxType && matchesCategory && matchesJob && matchesDate;
+      return matchesSearch && matchesUser && matchesType && matchesTxType && matchesCategory && matchesWarehouse && matchesJob && matchesDate;
     });
-  }, [transactions, deferredSearchTerm, userFilter, inventoryTypeFilter, typeFilter, startDate, endDate, categoryFilter, jobNumberFilter]);
+  }, [transactions, deferredSearchTerm, userFilter, inventoryTypeFilter, typeFilter, startDate, endDate, categoryFilter, jobNumberFilter, warehouseLocationFilter]);
 
   const getItemSize = useCallback((index: number) => {
     return expandedId === filtered[index]?.id ? 380 : 96;
@@ -289,6 +295,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
     setStartDate('');
     setEndDate('');
     setCategoryFilter('');
+    setWarehouseLocationFilter('');
     setJobNumberFilter('');
   };
 
@@ -446,9 +453,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
                   onChange={(e) => setTypeFilter(e.target.value as any)}
                   className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:ring-2 focus:ring-primary/20 outline-none appearance-none"
                 >
-                  <option value="" className="bg-slate-900">All Movements</option>
-                  <option value="IN" className="bg-slate-900 font-bold text-green-400">Stock In (+)</option>
-                  <option value="OUT" className="bg-slate-900 font-bold text-red-400">Stock Out (-)</option>
+                  <option value="" className="bg-[#1e293b]">All Movements</option>
+                  <option value="IN" className="bg-[#1e293b] font-bold text-green-400">Stock In (+)</option>
+                  <option value="OUT" className="bg-[#1e293b] font-bold text-red-400">Stock Out (-)</option>
                 </select>
               </div>
 
@@ -461,6 +468,20 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
                     value={categoryFilter}
                     onChange={(e) => setCategoryFilter(e.target.value)}
                     placeholder="e.g. AV Equipment"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Vault Location (Warehouse)</label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600" />
+                  <input 
+                    type="text"
+                    value={warehouseLocationFilter}
+                    onChange={(e) => setWarehouseLocationFilter(e.target.value)}
+                    placeholder="e.g. WH-A-01"
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
                   />
                 </div>
@@ -527,9 +548,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
                   onChange={(e) => setInventoryTypeFilter(e.target.value as any)}
                   className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:ring-2 focus:ring-primary/20 outline-none appearance-none"
                 >
-                  <option value="" className="bg-slate-900">All Protocol Tiers</option>
-                  <option value="Warehouse Stock" className="bg-slate-900">Warehouse Stock</option>
-                  <option value="Client Stock" className="bg-slate-900">Client Stock</option>
+                  <option value="" className="bg-[#1e293b]">All Protocol Tiers</option>
+                  <option value="Warehouse Stock" className="bg-[#1e293b]">Warehouse Stock</option>
+                  <option value="Client Stock" className="bg-[#1e293b]">Client Stock</option>
                 </select>
               </div>
 
@@ -608,7 +629,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
         )}
       </div>
 
-      <div className="flex items-center justify-between px-8 py-5 glass-morphism rounded-[32px] border border-white/5 text-[10px] font-black text-slate-500 uppercase tracking-widest bg-black/20">
+      <div className="flex items-center justify-between px-8 py-5 glass-morphism rounded-[32px] border border-white/5 text-[10px] font-black text-slate-500 uppercase tracking-widest bg-[#1e293b]/20">
         <div className="flex items-center space-x-8">
           <div className="flex items-center space-x-2">
             <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_12px_rgba(34,197,94,0.6)]" />

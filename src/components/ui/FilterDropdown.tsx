@@ -57,7 +57,7 @@ export function FilterDropdown({
                 initial={{ opacity: 0, y: 10, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-[101] overflow-hidden min-w-[220px]"
+                className="absolute top-full left-0 right-0 mt-2 bg-[#1e293b] border border-white/10 rounded-2xl shadow-2xl z-[101] overflow-hidden min-w-[220px]"
               >
                 <div className="p-2 border-b border-white/5 bg-white/[0.02]">
                   <div className="relative">

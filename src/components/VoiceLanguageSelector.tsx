@@ -35,7 +35,7 @@ export function VoiceLanguageSelector({ currentLang, onLangChange, className }: 
               initial={{ opacity: 0, y: 5, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 5, scale: 0.95 }}
-              className="absolute bottom-full right-0 mb-2 w-32 bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-[70] overflow-hidden backdrop-blur-xl"
+              className="absolute bottom-full right-0 mb-2 w-32 bg-[#1e293b] border border-white/10 rounded-xl shadow-2xl z-[70] overflow-hidden backdrop-blur-xl"
             >
               <div className="p-1">
                 {VOICE_LANGUAGES.map((lang) => (

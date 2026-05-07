@@ -351,33 +351,166 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-screen w-full items-center justify-center space-y-12 bg-slate-950 relative overflow-hidden">
+      <div className="flex flex-col h-screen w-full items-center justify-center space-y-12 bg-[#050810] relative overflow-hidden">
+        {/* Multi-Glowing Energetic Background */}
+        <div className="absolute inset-0 z-0">
+          <motion.div 
+            animate={{ 
+              scale: [1, 1.4, 1.1],
+              opacity: [0.3, 0.6, 0.3],
+              x: [-50, 100, -50],
+              y: [-50, 50, -50]
+            }}
+            transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute top-0 left-0 w-[80%] h-[80%] bg-primary/40 rounded-full blur-[150px]"
+          />
+          <motion.div 
+            animate={{ 
+              scale: [1.2, 1.6, 1.2],
+              opacity: [0.2, 0.5, 0.2],
+              x: [100, -100, 100],
+              y: [100, -100, 100]
+            }}
+            transition={{ duration: 18, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+            className="absolute bottom-0 right-0 w-[70%] h-[70%] bg-violet-600/30 rounded-full blur-[160px]"
+          />
+          <motion.div 
+            animate={{ 
+              scale: [1, 1.8, 1],
+              opacity: [0.1, 0.4, 0.1],
+              x: [-150, 150, -150],
+            }}
+            transition={{ duration: 20, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+            className="absolute top-1/2 left-1/4 w-[60%] h-[60%] bg-cyan-500/20 rounded-full blur-[170px]"
+          />
+          <motion.div 
+            animate={{ 
+              scale: [1.3, 1.1, 1.3],
+              opacity: [0.1, 0.3, 0.1],
+              y: [-100, 100, -100],
+            }}
+            transition={{ duration: 22, repeat: Infinity, ease: "easeInOut", delay: 3 }}
+            className="absolute bottom-1/4 left-1/2 w-[55%] h-[55%] bg-rose-500/20 rounded-full blur-[180px]"
+          />
+          <motion.div 
+            animate={{ 
+              scale: [1, 1.5, 1],
+              opacity: [0.2, 0.4, 0.2],
+            }}
+            transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute top-1/3 right-1/4 w-[40%] h-[40%] bg-emerald-400/20 rounded-full blur-[140px]"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#050810]/40 to-[#050810]" />
+          
+          {/* Animated Particles */}
+          <div className="absolute inset-0">
+             {[...Array(20)].map((_, i) => (
+               <motion.div
+                 key={i}
+                 initial={{ 
+                   x: Math.random() * 100 + "%", 
+                   y: Math.random() * 100 + "%",
+                   opacity: Math.random() * 0.5
+                 }}
+                 animate={{ 
+                   y: ["-10%", "110%"],
+                   opacity: [0, 0.8, 0]
+                 }}
+                 transition={{ 
+                   duration: 5 + Math.random() * 10, 
+                   repeat: Infinity, 
+                   delay: Math.random() * 5,
+                   ease: "linear"
+                 }}
+                 className="absolute w-1 h-1 bg-white/20 rounded-full blur-sm"
+               />
+             ))}
+          </div>
+        </div>
+
         <BackgroundAnimation />
+        
         <motion.div
-           initial={{ opacity: 0, scale: 0.8 }}
+           initial={{ opacity: 0, y: 30 }}
            animate={{ 
              opacity: 1,
+             y: 0,
              scale: [1, 1.05, 1],
            }}
            transition={{ 
-             duration: 2, 
-             repeat: Infinity, 
-             ease: "easeInOut" 
+             opacity: { duration: 1.2 },
+             y: { duration: 1.2, ease: "easeOut" },
+             scale: { duration: 5, repeat: Infinity, ease: "easeInOut" }
            }}
+           className="relative z-10 flex flex-col items-center"
         >
-          <Logo className="scale-150" />
+          <div className="relative">
+            <motion.div 
+              animate={{ 
+                boxShadow: [
+                  "0 0 20px rgba(var(--primary-rgb), 0)",
+                  "0 0 50px rgba(var(--primary-rgb), 0.3)",
+                  "0 0 20px rgba(var(--primary-rgb), 0)"
+                ]
+              }}
+              transition={{ duration: 4, repeat: Infinity }}
+              className="rounded-full relative p-2"
+            >
+              <Logo className="scale-[1.7] relative z-10" />
+            </motion.div>
+          </div>
         </motion.div>
         
-        <div className="flex flex-col items-center space-y-4">
-          <div className="w-48 h-1 bg-white/5 rounded-full overflow-hidden">
-            <motion.div 
-              initial={{ x: "-100%" }}
-              animate={{ x: "100%" }}
-              transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-              className="w-1/2 h-full bg-red-600 shadow-[0_0_15px_rgba(220,38,38,0.5)]"
-            />
+        <div className="flex flex-col items-center space-y-8 relative z-10">
+          <div className="flex flex-col items-center">
+            <motion.span 
+              animate={{ 
+                color: ["#ef4444", "#3b82f6", "#10b981", "#f59e0b", "#ef4444"],
+              }}
+              transition={{ duration: 8, repeat: Infinity }}
+              className="text-[11px] font-black uppercase tracking-[0.8em] mb-5 ml-[0.8em] drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]"
+            >
+              ZEC AI
+            </motion.span>
+            
+            <div className="w-80 h-2.5 bg-white/5 rounded-full overflow-hidden p-[2px] border border-white/10 relative">
+              <motion.div 
+                initial={{ x: "-100%" }}
+                animate={{ x: "100%" }}
+                transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                className="w-1/2 h-full bg-gradient-to-r from-transparent via-primary via-indigo-500 via-emerald-400 to-transparent shadow-[0_0_25px_rgba(var(--primary-rgb),0.8)] rounded-full"
+              />
+              {/* Secondary fast pulse */}
+              <motion.div 
+                animate={{ x: ["-100%", "200%"] }}
+                transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                className="absolute inset-0 w-1/4 h-full bg-white/20 blur-md pointer-events-none"
+              />
+            </div>
           </div>
-          <span className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-700 animate-pulse">Initializing System Core</span>
+          
+          <div className="flex flex-col items-center space-y-3">
+             <div className="flex space-x-2">
+               {[0, 1, 2, 3, 4].map(i => (
+                 <motion.div
+                   key={i}
+                   animate={{ 
+                     height: [4, 16, 4],
+                     backgroundColor: ["#fff", "#ef4444", "#3b82f6", "#10b981", "#fff"][i % 5]
+                   }}
+                   transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.1 }}
+                   className="w-1.5 bg-white/40 rounded-full"
+                 />
+               ))}
+             </div>
+             <motion.span 
+                animate={{ opacity: [0.4, 1, 0.4] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="text-[11px] font-black uppercase tracking-[0.5em] text-white/50"
+             >
+               Synthesizing Global Inventory
+             </motion.span>
+          </div>
         </div>
       </div>
     );
@@ -388,7 +521,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden selection:bg-primary/30 selection:text-white bg-[#020617] relative">
+    <div className="flex h-screen overflow-hidden selection:bg-primary/30 selection:text-white bg-[#0a0f1e] relative">
       <BackgroundAnimation />
       <FloatingEquipments />
       <ToastContainer toasts={toasts} removeToast={removeToast} />

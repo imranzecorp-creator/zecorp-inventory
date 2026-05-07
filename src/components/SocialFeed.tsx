@@ -268,7 +268,7 @@ const PostCard = React.memo(({ post, currentUser }: { post: Post, currentUser: U
       </div>
 
           {showComments && (
-        <div className="bg-black/20 p-4 space-y-4 border-t border-white/5">
+        <div className="bg-[#1e293b]/20 p-4 space-y-4 border-t border-white/5">
           <div className="space-y-4 max-h-60 overflow-y-auto custom-scrollbar pr-2">
             {comments.map((comment) => (
               <div key={comment.id} className="flex space-x-3">

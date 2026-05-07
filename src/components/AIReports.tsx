@@ -95,6 +95,34 @@ export function AIReports({ inventory, transactions }: AIReportsProps) {
 
   return (
     <div className="space-y-6">
+      {/* Strategic Platform Overview - Mini Help */}
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-indigo-500/10 border border-indigo-500/20 rounded-[32px] p-6 flex flex-col md:flex-row items-center gap-6"
+      >
+        <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 shrink-0">
+          <Box className="w-8 h-8 text-indigo-400" />
+        </div>
+        <div className="flex-1">
+          <h2 className="text-sm font-black text-indigo-100 uppercase tracking-widest mb-1">About Gemini Supply Chain Intelligence</h2>
+          <p className="text-xs text-indigo-200/60 leading-relaxed">
+            Gemini Supply Chain is a next-generation logistics platform that integrates <span className="text-indigo-400 font-bold">ZECORP Gemini AI</span> to automate stock mapping, predict supply chain disruptions, and generate strategic warehouse reports. It analyzes your entire inventory matrix to provide actionable insights for demand forecasting and operational efficiency.
+          </p>
+        </div>
+        <div className="flex gap-4">
+          <div className="flex flex-col items-center">
+            <span className="text-[10px] font-black text-indigo-300 uppercase">AI Accuracy</span>
+            <span className="text-lg font-black text-white">99.8%</span>
+          </div>
+          <div className="w-px h-10 bg-indigo-500/20" />
+          <div className="flex flex-col items-center">
+            <span className="text-[10px] font-black text-indigo-300 uppercase">Efficiency Boost</span>
+            <span className="text-lg font-black text-white">+42%</span>
+          </div>
+        </div>
+      </motion.div>
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
@@ -260,7 +288,7 @@ export function AIReports({ inventory, transactions }: AIReportsProps) {
                 className="h-full min-h-[500px] glass-morphism rounded-[40px] border border-white/5 flex flex-col items-center justify-center text-center p-12 overflow-hidden relative group"
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="w-24 h-24 rounded-[40px] bg-slate-900 border border-white/10 flex items-center justify-center mb-8 shadow-2xl relative z-10 transition-transform group-hover:scale-110 duration-500">
+                <div className="w-24 h-24 rounded-[40px] bg-[#1e293b] border border-white/10 flex items-center justify-center mb-8 shadow-2xl relative z-10 transition-transform group-hover:scale-110 duration-500">
                   <Sparkles className="w-10 h-10 text-primary animate-pulse" />
                 </div>
                 <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-4 relative z-10">Ready for Insights?</h3>
@@ -344,14 +372,14 @@ export function AIReports({ inventory, transactions }: AIReportsProps) {
                 </div>
 
                 {/* Report Content */}
-                <div className="flex-1 p-10 overflow-y-auto custom-scrollbar bg-slate-900/40">
+                <div className="flex-1 p-10 overflow-y-auto custom-scrollbar bg-[#1e293b]/40">
                   <div className="prose prose-invert prose-slate max-w-none prose-headings:font-black prose-headings:uppercase prose-headings:tracking-tighter prose-headings:text-white prose-p:text-slate-300 prose-p:leading-relaxed prose-strong:text-primary prose-li:text-slate-300 prose-hr:border-white/10">
                     <Markdown>{report || ''}</Markdown>
                   </div>
                 </div>
 
                 {/* Report Footer */}
-                <div className="px-10 py-6 bg-slate-950/50 border-t border-white/5 flex items-center justify-between">
+                <div className="px-10 py-6 bg-[#0a0f1e]/50 border-t border-white/5 flex items-center justify-between">
                   <div className="flex items-center gap-6">
                     <div className="flex items-center gap-2">
                       <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />

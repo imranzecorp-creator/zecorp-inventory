@@ -128,7 +128,7 @@ const ManifestRow = React.memo(({ index, style, data }: { index: number, style: 
           </div>
         </div>
         
-        <div className="flex items-center gap-6 md:gap-8 bg-black/40 p-4 rounded-2xl border border-white/5 shadow-inner">
+        <div className="flex items-center gap-6 md:gap-8 bg-[#1e293b]/40 p-4 rounded-2xl border border-white/5 shadow-inner">
           <div className="text-center min-w-[40px]">
             <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Req</p>
             <span className="text-lg font-black text-white">{item.quantity}</span>
@@ -166,7 +166,8 @@ export default function Projects({ projects, inventory, clients, user, transacti
   const isApproved = user.isApproved || isAdmin;
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
-  const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
+  const [selectedProjectOutlets, setSelectedProjectOutlets] = useState<string[]>([]);
+  const [selectedWarehouseLocations, setSelectedWarehouseLocations] = useState<string[]>([]);
   const [jobSearch, setJobSearch] = useState('');
   const deferredJobSearch = useDeferredValue(jobSearch);
   const [showFilters, setShowFilters] = useState(false);
@@ -275,7 +276,7 @@ export default function Projects({ projects, inventory, clients, user, transacti
       }
     };
     reader.readAsBinaryString(file);
-  }, [user.uid]);
+  }, [user.uid, inventory]);
 
   const handleConfirmProjectImport = async () => {
     if (!projectImportPreview) return;
@@ -344,14 +345,12 @@ export default function Projects({ projects, inventory, clients, user, transacti
     };
   }, [projects]);
 
-  const [selectedOutlets, setSelectedOutlets] = useState<string[]>([]);
-
   const uniqueValues = useMemo(() => {
     return {
       statuses: Array.from(new Set(projects.map(p => p.status).filter(Boolean))) as string[],
       clients: Array.from(new Set(projects.map(p => p.client).filter(Boolean))) as string[],
-      projects: Array.from(new Set(projects.map(p => p.outlet).filter(Boolean))) as string[],
-      outlets: Array.from(new Set(projects.map(p => p.location).filter(Boolean))) as string[],
+      projectOutlets: Array.from(new Set(projects.map(p => p.outlet).filter(Boolean))) as string[],
+      warehouseLocations: Array.from(new Set(projects.map(p => p.location).filter(Boolean))) as string[],
     };
   }, [projects]);
 
@@ -370,14 +369,14 @@ export default function Projects({ projects, inventory, clients, user, transacti
       // Advanced Filters
       if (selectedStatuses.length > 0 && !selectedStatuses.includes(p.status)) return false;
       if (selectedClients.length > 0 && !selectedClients.includes(p.client)) return false;
-      if (selectedProjects.length > 0 && (!p.outlet || !selectedProjects.includes(p.outlet))) return false;
-      if (selectedOutlets.length > 0 && (!p.location || !selectedOutlets.includes(p.location))) return false;
+      if (selectedProjectOutlets.length > 0 && (!p.outlet || !selectedProjectOutlets.includes(p.outlet))) return false;
+      if (selectedWarehouseLocations.length > 0 && (!p.location || !selectedWarehouseLocations.includes(p.location))) return false;
       
       if (deferredJobSearch && !p.jobNumber.toLowerCase().includes(deferredJobSearch.toLowerCase())) return false;
 
       return true;
     });
-  }, [projects, deferredSearchTerm, selectedStatuses, selectedClients, selectedProjects, selectedOutlets, deferredJobSearch]);
+  }, [projects, deferredSearchTerm, selectedStatuses, selectedClients, selectedProjectOutlets, selectedWarehouseLocations, deferredJobSearch]);
 
   const searchSuggestions = useMemo(() => {
     if (!searchTerm || searchTerm.length < 1) return [];
@@ -411,8 +410,8 @@ export default function Projects({ projects, inventory, clients, user, transacti
   const clearFilters = useCallback(() => {
     setSelectedStatuses([]);
     setSelectedClients([]);
-    setSelectedProjects([]);
-    setSelectedOutlets([]);
+    setSelectedProjectOutlets([]);
+    setSelectedWarehouseLocations([]);
     setJobSearch('');
     setSearchTerm('');
   }, []);
@@ -462,25 +461,26 @@ export default function Projects({ projects, inventory, clients, user, transacti
       animate={{ opacity: 1, y: 0 }}
       className="space-y-8 pb-32 md:pb-0"
     >
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-black text-white tracking-tighter">Project Control</h1>
           <p className="text-[10px] md:text-xs text-slate-500 uppercase font-black tracking-[0.2em] mt-1">Enterprise Asset Management & Logistics</p>
         </div>
-        <div className="flex items-center space-x-2 md:space-x-3 overflow-x-auto pb-2 md:pb-0 custom-scrollbar-hide">
+        <div className="flex items-center space-x-1.5 md:space-x-3 overflow-x-auto pb-2 md:pb-0 custom-scrollbar-hide max-w-full">
           {isDeleteMode ? (
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1.5 md:space-x-2 shrink-0">
               <button 
                 onClick={handleBatchDelete}
                 disabled={selectedForDeletion.length === 0 || isImporting}
-                className="flex items-center space-x-2 px-5 py-3 rounded-2xl bg-red-500 text-white border border-red-400 shadow-lg shadow-red-500/20 text-xs font-black uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50"
+                className="flex items-center space-x-2 px-3 md:px-5 py-2.5 md:py-3 rounded-xl md:rounded-2xl bg-red-500 text-white border border-red-400 shadow-lg shadow-red-500/20 text-[10px] md:text-xs font-black uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50"
               >
-                <Trash className="w-4 h-4" />
-                <span>Delete {selectedForDeletion.length} selected</span>
+                <Trash className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Delete {selectedForDeletion.length}</span>
+                <span className="sm:hidden">{selectedForDeletion.length}</span>
               </button>
               <button 
                 onClick={() => { setIsDeleteMode(false); setSelectedForDeletion([]); }}
-                className="px-5 py-3 rounded-2xl bg-slate-800 text-slate-400 border border-white/10 text-xs font-black uppercase tracking-widest active:scale-95 transition-all"
+                className="px-3 md:px-5 py-2.5 md:py-3 rounded-xl md:rounded-2xl bg-slate-800 text-slate-400 border border-white/10 text-[10px] md:text-xs font-black uppercase tracking-widest active:scale-95 transition-all"
               >
                 Cancel
               </button>
@@ -488,33 +488,40 @@ export default function Projects({ projects, inventory, clients, user, transacti
           ) : (
             <>
               <button 
-                onClick={() => setIsDeleteMode(true)}
-                className="flex-shrink-0 flex items-center space-x-2 px-5 py-3 rounded-2xl bg-slate-800/50 border border-white/10 text-slate-400 hover:text-red-400 hover:border-red-500/30 transition-all text-[10px] md:text-xs font-black uppercase tracking-widest active:scale-95"
+                onClick={() => setShowAddModal(true)}
+                className="hidden md:flex flex-shrink-0 items-center space-x-2 px-4 md:px-6 py-2.5 md:py-3.5 text-xs font-black text-slate-950 bg-gradient-to-r from-primary via-emerald-400 to-primary rounded-xl md:rounded-2xl bg-[length:200%_auto] hover:bg-right shadow-[0_0_25px_rgba(var(--primary-rgb),0.4)] hover:shadow-[0_0_35px_rgba(var(--primary-rgb),0.6)] transition-all duration-500 active:scale-95 group uppercase tracking-[0.2em]"
               >
-                <Trash className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                <span>Quick Clean</span>
+                <Plus className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
+                <span>Engage</span>
+              </button>
+              <button 
+                onClick={() => setIsDeleteMode(true)}
+                className="flex-shrink-0 flex items-center space-x-1.5 md:space-x-2 px-3 md:px-5 py-2.5 md:py-3 rounded-xl md:rounded-2xl bg-slate-800/50 border border-white/10 text-slate-400 hover:text-red-400 hover:border-red-500/30 transition-all text-[9px] md:text-xs font-black uppercase tracking-widest active:scale-95"
+              >
+                <Trash className="w-3 h-3 md:w-4 md:h-4" />
+                <span>Clean</span>
               </button>
               <button 
                 onClick={() => setShowFilters(!showFilters)}
                 className={cn(
-                  "flex-shrink-0 flex items-center space-x-2 px-5 py-3 rounded-2xl border transition-all text-[10px] md:text-xs font-black uppercase tracking-widest active:scale-95 duration-500",
+                  "flex-shrink-0 flex items-center space-x-1.5 md:space-x-2 px-3 md:px-5 py-2.5 md:py-3 rounded-xl md:rounded-2xl border transition-all text-[9px] md:text-xs font-black uppercase tracking-widest active:scale-95 duration-500",
                   showFilters 
                     ? "bg-amber-500 text-slate-950 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.4)]" 
                     : "bg-slate-800/50 border-white/10 text-slate-400 hover:text-white hover:bg-white/10"
                 )}
               >
-                <Filter className={cn("w-3.5 h-3.5 md:w-4 md:h-4", showFilters && "animate-bounce")} />
-                <span>{showFilters ? 'Hide Filters' : 'Show Filters'}</span>
+                <Filter className={cn("w-3 h-3 md:w-4 md:h-4", showFilters && "animate-bounce")} />
+                <span>Filters</span>
               </button>
               {(isApproved) && (
                 <>
                   <button 
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isImporting}
-                    className="flex-shrink-0 flex items-center space-x-2 px-3 md:px-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl border border-blue-500/20 bg-blue-500/10 text-blue-400 hover:text-white hover:bg-blue-500/20 transition-all text-[10px] md:text-xs font-black uppercase tracking-widest active:scale-95 shadow-lg shadow-blue-500/10 group"
+                    className="flex-shrink-0 flex items-center space-x-1.5 md:space-x-2 px-3 md:px-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl border border-blue-500/20 bg-blue-500/10 text-blue-400 hover:text-white hover:bg-blue-500/20 transition-all text-[9px] md:text-xs font-black uppercase tracking-widest active:scale-95 shadow-lg shadow-blue-500/10 group"
                   >
                     {isImporting ? <Loader2 className="w-3.5 h-3.5 md:w-4 md:h-4 animate-spin" /> : <Zap className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary group-hover:animate-pulse" />}
-                    <span>{isImporting ? 'AI MAPPING...' : 'AI PROJECT BULK IMPORT'}</span>
+                    <span>{isImporting ? 'IMPORTING...' : 'AI BULK IMPORT'}</span>
                   </button>
                   <input 
                     type="file" 
@@ -523,13 +530,7 @@ export default function Projects({ projects, inventory, clients, user, transacti
                     accept=".xlsx, .xls, .csv" 
                     className="hidden" 
                   />
-                  <button 
-                    onClick={() => setShowAddModal(true)}
-                    className="hidden md:flex flex-shrink-0 items-center space-x-2 px-6 py-3.5 text-xs font-black text-slate-950 bg-gradient-to-r from-primary via-emerald-400 to-primary rounded-2xl bg-[length:200%_auto] hover:bg-right shadow-[0_0_25px_rgba(var(--primary-rgb),0.4)] hover:shadow-[0_0_35px_rgba(var(--primary-rgb),0.6)] transition-all duration-500 active:scale-95 group uppercase tracking-[0.2em]"
-                  >
-                    <Plus className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
-                    <span>Engage New Project</span>
-                  </button>
+
                 </>
               )}
             </>
@@ -558,14 +559,14 @@ export default function Projects({ projects, inventory, clients, user, transacti
           { label: 'Finalized', value: stats.completed, icon: Save, color: 'text-slate-400', bg: 'bg-slate-500/10' },
           { label: 'SKU Allocation', value: stats.inventoryLinked, icon: Package, color: 'text-primary', bg: 'bg-primary/10' }
         ].map((stat, i) => (
-          <div key={i} className="glass-morphism p-5 md:p-6 rounded-[32px] border border-white/5 space-y-4">
+          <div key={i} className="glass-morphism p-3 md:p-6 rounded-2xl shadow-sm md:rounded-[32px] border border-white/5 space-y-3 md:space-y-4">
             <div className="flex items-center justify-between">
-              <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center border border-white/5", stat.bg)}>
-                <stat.icon className={cn("w-5 h-5", stat.color)} />
+              <div className={cn("w-8 h-8 md:w-10 md:h-10 rounded-xl md:rounded-2xl flex items-center justify-center border border-white/5", stat.bg)}>
+                <stat.icon className={cn("w-4 h-4 md:w-5 md:h-5", stat.color)} />
               </div>
               <div className="text-right">
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">{stat.label}</p>
-                <p className="text-2xl font-black text-white mt-1">{stat.value}</p>
+                <p className="text-[9px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">{stat.label}</p>
+                <p className="text-xl md:text-2xl font-black text-white mt-1">{stat.value}</p>
               </div>
             </div>
             <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
@@ -596,7 +597,7 @@ export default function Projects({ projects, inventory, clients, user, transacti
                   </div>
                   <h3 className="text-xs font-black text-white uppercase tracking-[0.2em]">Refine Project List</h3>
                 </div>
-                {(selectedStatuses.length > 0 || selectedClients.length > 0 || selectedProjects.length > 0 || selectedOutlets.length > 0 || jobSearch || searchTerm) && (
+                {(selectedStatuses.length > 0 || selectedClients.length > 0 || selectedProjectOutlets.length > 0 || selectedWarehouseLocations.length > 0 || jobSearch || searchTerm) && (
                   <button 
                     onClick={clearFilters}
                     className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
@@ -622,17 +623,17 @@ export default function Projects({ projects, inventory, clients, user, transacti
                 />
 
                 <FilterDropdown 
-                  label="Projects" 
-                  options={uniqueValues.projects} 
-                  selected={selectedProjects} 
-                  onChange={setSelectedProjects} 
+                  label="Project Outlet" 
+                  options={uniqueValues.projectOutlets} 
+                  selected={selectedProjectOutlets} 
+                  onChange={setSelectedProjectOutlets} 
                 />
 
                 <FilterDropdown 
-                  label="Project Outlets" 
-                  options={uniqueValues.outlets} 
-                  selected={selectedOutlets} 
-                  onChange={setSelectedOutlets} 
+                  label="Warehouse Location" 
+                  options={uniqueValues.warehouseLocations} 
+                  selected={selectedWarehouseLocations} 
+                  onChange={setSelectedWarehouseLocations} 
                 />
 
                 <div className="space-y-1.5 relative">
@@ -659,7 +660,7 @@ export default function Projects({ projects, inventory, clients, user, transacti
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: 10 }}
-                          className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                          className="absolute top-full left-0 right-0 mt-2 bg-[#1e293b] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
                         >
                           <div className="p-2 space-y-1">
                             {jobSuggestions.map((suggestion, index) => (
@@ -717,7 +718,7 @@ export default function Projects({ projects, inventory, clients, user, transacti
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 10 }}
-                className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                className="absolute top-full left-0 right-0 mt-2 bg-[#1e293b] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
               >
                 <div className="p-2 space-y-1">
                   {searchSuggestions.map((suggestion, index) => (
@@ -1225,7 +1226,7 @@ function ProjectFormModal({
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
-                    className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden"
+                    className="absolute top-full left-0 right-0 mt-2 bg-[#1e293b] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden"
                   >
                     <div className="max-h-48 overflow-y-auto custom-scrollbar">
                       {filteredClients.map((c: any) => (
@@ -1300,9 +1301,9 @@ function ProjectFormModal({
                 value={formData.status}
                 onChange={e => setFormData({ ...formData, status: e.target.value as any })}
               >
-                <option value="Active" className="bg-slate-900">Active</option>
-                <option value="Draft" className="bg-slate-900">Draft</option>
-                <option value="Completed" className="bg-slate-900">Completed</option>
+                <option value="Active" className="bg-[#1e293b]">Active</option>
+                <option value="Draft" className="bg-[#1e293b]">Draft</option>
+                <option value="Completed" className="bg-[#1e293b]">Completed</option>
               </select>
             </div>
           </div>
@@ -1361,7 +1362,7 @@ function ProjectFormModal({
           </div>
         </form>
 
-        <div className="p-6 border-t border-white/5 bg-black/20 flex items-center justify-between">
+        <div className="p-6 border-t border-white/5 bg-[#1e293b]/20 flex items-center justify-between">
           <div className="hidden md:flex items-center space-x-6">
             <div className="flex flex-col">
               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total SKU items</span>
@@ -1400,7 +1401,7 @@ function ProjectFormModal({
         {/* Item Picker Modal Overlay */}
         <AnimatePresence>
           {showItemPicker && (
-            <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-md z-[65] flex flex-col">
+            <div className="absolute inset-0 bg-[#1e293b]/90 backdrop-blur-md z-[65] flex flex-col">
               <div className="p-6 border-b border-white/5 flex items-center justify-between">
                 <h3 className="text-lg font-bold text-white">Full Inventory Lookup</h3>
                 <button onClick={() => setShowItemPicker(false)} className="p-2 hover:bg-white/10 rounded-xl"><X className="w-5 h-5" /></button>
@@ -1562,7 +1563,7 @@ function ProjectItemRow({ item, inventory, onRemove, onUpdate }: { item: Project
                   onChange={e => setSearch(e.target.value)}
                   onBlur={() => setTimeout(() => setShowSearch(false), 200)}
                 />
-                <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-[#1e293b] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden">
                   {filteredInventory.length === 0 ? (
                     <div className="p-4 text-center text-xs text-slate-500">No matching items</div>
                   ) : (
@@ -1990,7 +1991,7 @@ function ProjectDetailModal({ project, inventory, transactions, onClose, onDelet
           </div>
         </div>
 
-        <div className="p-8 border-t border-white/10 bg-black/20">
+        <div className="p-8 border-t border-white/10 bg-[#1e293b]/20">
           <div className="flex items-center justify-between text-[10px] font-black text-slate-500 uppercase tracking-wider">
             <p>Created: {formatDate(project.createdAt)}</p>
             <p>ID: {project.id}</p>

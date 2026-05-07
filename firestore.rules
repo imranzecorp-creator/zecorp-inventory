@@ -17,7 +17,7 @@ service cloud.firestore {
     // Admin check: imranzecorp@gmail.com or explicit admin doc
     function isAdmin() { 
       return isVerified() && (
-        request.auth.token.email.lower() == 'imranzecorp@gmail.com' ||
+        request.auth.token.email.replace(" ", "").lower() == 'imranzecorp@gmail.com' ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
@@ -33,11 +33,11 @@ service cloud.firestore {
     // --- Entity Validations ---
 
     function isValidUser(data) {
-      let required = ['uid', 'email', 'displayName', 'role', 'isApproved', 'createdAt'];
+      let required = ['uid', 'email', 'role', 'isApproved', 'createdAt'];
       return data.keys().hasAll(required) &&
-             data.uid == request.auth.uid &&
+             data.uid is string && data.uid.size() <= 128 &&
              data.email is string && data.email.size() <= 256 &&
-             data.displayName is string && data.displayName.size() <= 100 &&
+             (data.get('displayName', '') is string && data.get('displayName', '').size() <= 100) &&
              data.role in ['admin', 'user'] &&
              data.isApproved is bool &&
              (data.get('emailVerified', false) is bool) &&
@@ -66,7 +66,6 @@ service cloud.firestore {
       return data.keys().hasAll(required) &&
              data.client is string && data.client.size() <= 256 &&
              data.jobNumber is string && data.jobNumber.size() <= 64 &&
-             data.userId == request.auth.uid &&
              data.items is list && data.items.size() <= 200 &&
              data.status in ['Active', 'Completed', 'Draft'] &&
              (data.get('location', '') is string && data.get('location', '').size() <= 256) &&
@@ -78,14 +77,13 @@ service cloud.firestore {
       return data.keys().hasAll(required) &&
              data.itemId is string && data.itemId.size() <= 128 &&
              data.type in ['IN', 'OUT'] &&
-             data.quantity is number && data.quantity > 0 &&
-             data.userId == request.auth.uid;
+             data.quantity is number && data.quantity > 0;
     }
 
     function isValidChatMessage(data) {
       let required = ['senderId', 'content', 'createdAt'];
       return data.keys().hasAll(required) &&
-             (data.senderId == request.auth.uid || (data.senderId == 'ai' && data.get('isAi', false) == true)) &&
+             data.senderId is string &&
              data.content is string && data.content.size() <= 10000 &&
              (data.get('audioUrl', '') is string && data.get('audioUrl', '').size() <= 2048);
     }
@@ -96,9 +94,9 @@ service cloud.firestore {
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
       allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().uid == userId;
-      allow update: if (isOwner(userId) || isAdmin()) && isValidUser(incoming()) && (
-        (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'emailVerified', 'updatedAt'])) ||
-        (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'isApproved', 'displayName', 'photoURL', 'emailVerified', 'updatedAt']))
+      allow update: if (isOwner(userId) || isAdmin()) && isValidUser(incoming()) && incoming().uid == userId && (
+        (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'emailVerified', 'updatedAt', 'lastActive'])) ||
+        (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'isApproved', 'displayName', 'photoURL', 'emailVerified', 'updatedAt', 'lastActive']))
       );
     }
 

@@ -94,13 +94,13 @@ const StockTableRow = React.memo(({ index, style, data }: { index: number, style
           {item.currentQuantity}
         </span>
       </div>
-      <div className="px-4 py-4 flex-1 hidden lg:block truncate text-[10px] text-slate-300 uppercase font-black tracking-tighter">
+      <div className="px-4 py-4 flex-1 hidden md:block truncate text-[10px] text-slate-300 uppercase font-black tracking-tighter">
         {item.client || 'Internal'}
       </div>
       <div className="px-4 py-4 flex-1 hidden lg:block truncate text-[10px] text-slate-400 uppercase font-black tracking-tighter">
         {item.outlet || item.location || '-'}
       </div>
-      <div className="px-4 py-4 w-24 hidden xl:block text-right shrink-0">
+      <div className="px-4 py-4 w-24 hidden lg:block text-right shrink-0">
         <span className="text-[10px] font-mono text-slate-400 bg-white/5 px-2 py-1 rounded-md border border-white/10">
           {item.jobNumber || 'PENDING'}
         </span>
@@ -858,7 +858,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
-                    className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                    className="absolute top-full left-0 right-0 mt-2 bg-[#1e293b] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
                   >
                     <div className="p-2 space-y-1">
                       {stockSuggestions.map((suggestion, index) => (
@@ -950,7 +950,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
                                initial={{ opacity: 0, y: 10 }}
                                animate={{ opacity: 1, y: 0 }}
                                exit={{ opacity: 0, y: 10 }}
-                               className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                               className="absolute top-full left-0 right-0 mt-2 bg-[#1e293b] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
                              >
                                <div className="p-1 space-y-0.5">
                                  {clientSuggestions.map((suggestion, index) => (
@@ -996,7 +996,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
                                initial={{ opacity: 0, y: 10 }}
                                animate={{ opacity: 1, y: 0 }}
                                exit={{ opacity: 0, y: 10 }}
-                               className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                               className="absolute top-full left-0 right-0 mt-2 bg-[#1e293b] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
                              >
                                <div className="p-1 space-y-0.5">
                                  {jobSuggestions.map((suggestion, index) => (
@@ -1042,7 +1042,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
                                initial={{ opacity: 0, y: 10 }}
                                animate={{ opacity: 1, y: 0 }}
                                exit={{ opacity: 0, y: 10 }}
-                               className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                               className="absolute top-full left-0 right-0 mt-2 bg-[#1e293b] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
                              >
                                <div className="p-1 space-y-0.5">
                                  {locationSuggestions.map((suggestion, index) => (
@@ -1136,9 +1136,9 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
           <div className="flex items-center border-b border-white/10 bg-white/[0.03] px-4 py-3">
             <div className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest flex-1">Item Name</div>
             <div className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-24 text-center">Stock</div>
-            <div className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest flex-1 hidden lg:block">Client Name</div>
+            <div className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest flex-1 hidden md:block">Client Name</div>
             <div className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest flex-1 hidden lg:block">Client Outlet</div>
-            <div className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-24 text-right hidden xl:block">Job #</div>
+            <div className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-24 text-right hidden lg:block">Job #</div>
             <div className="px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest flex-1 hidden xl:block">WH Location</div>
           </div>
           

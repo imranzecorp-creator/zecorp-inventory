@@ -3,28 +3,28 @@ import { motion } from 'motion/react';
 
 const BackgroundAnimation: React.FC = React.memo(() => {
   return (
-    <div className="fixed inset-0 pointer-events-none z-[-1] overflow-hidden select-none bg-[#020617]">
+    <div className="fixed inset-0 pointer-events-none z-[-1] overflow-hidden select-none bg-[#0a0f1e]">
       {/* High-Energy Color Orbs */}
       <motion.div
         style={{ willChange: 'transform' }}
         animate={{
           scale: [1, 1.5, 1],
-          opacity: [0.3, 0.5, 0.3],
+          opacity: [0.4, 0.6, 0.4],
           rotate: [0, 90, 0],
         }}
         transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute -top-[10%] -left-[10%] w-[70vw] h-[70vw] bg-cyan-400/30 rounded-full blur-[160px]"
+        className="absolute -top-[10%] -left-[10%] w-[70vw] h-[70vw] bg-cyan-400/40 rounded-full blur-[160px]"
       />
       
       <motion.div
         style={{ willChange: 'transform' }}
         animate={{
           scale: [1, 1.4, 1],
-          opacity: [0.2, 0.4, 0.2],
+          opacity: [0.3, 0.5, 0.3],
           x: [0, -50, 0],
         }}
         transition={{ duration: 18, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-        className="absolute -bottom-[20%] -right-[10%] w-[65vw] h-[65vw] bg-fuchsia-500/30 rounded-full blur-[180px]"
+        className="absolute -bottom-[20%] -right-[10%] w-[65vw] h-[65vw] bg-fuchsia-500/40 rounded-full blur-[180px]"
       />
 
       <motion.div
