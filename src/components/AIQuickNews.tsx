@@ -40,7 +40,7 @@ export default React.memo(function AIQuickNews() {
             <div className="p-1.5 rounded-lg bg-primary/20 text-primary">
               <Sparkles className="w-3 h-3" />
             </div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-primary">Daily Briefing</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-primary">Daily Briefing</span>
           </div>
 
           <p className="text-xs text-slate-200 leading-relaxed font-medium">
@@ -55,7 +55,7 @@ export default React.memo(function AIQuickNews() {
             </div>
             <button 
               onClick={() => setCurrentTip((prev) => (prev + 1) % TIPS.length)}
-              className="text-[10px] font-black text-primary uppercase tracking-tighter flex items-center hover:translate-x-1 transition-transform"
+              className="text-[10px] font-bold text-primary uppercase tracking-tight flex items-center hover:translate-x-1 transition-transform"
             >
               Next Insight <ChevronRight className="w-3 h-3 ml-0.5" />
             </button>

@@ -1,41 +1,32 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { initializeFirestore, doc, getDocFromServer, getDoc } from 'firebase/firestore';
+import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 
-// Robust initializeFirestore call using the latest SDK pattern
-const databaseId = firebaseConfig.firestoreDatabaseId || '(default)';
+// Robust initialization for proxied environments
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
-}, databaseId);
+}, firebaseConfig.firestoreDatabaseId || '(default)');
 
-// Test connection on boot and log status for debugging
+// Test connection on boot
 const testConnection = async () => {
   try {
-    // Attempt a lightweight server read with a timeout to confirm connectivity
+    console.log('[Firestore] Testing connectivity to:', firebaseConfig.firestoreDatabaseId);
     const checkDoc = doc(db, '_system_', 'connectivity_check');
     await getDocFromServer(checkDoc);
-    console.log('[Firestore] Connection verified to database:', databaseId);
+    console.log('[Firestore] Connection SUCCESS');
   } catch (error: any) {
-    // If we get "permission-denied", it actually means we SUCCESSFULLY connected to the backend
-    // but the rules rejected us (which is still proof of connectivity).
     if (error?.code === 'permission-denied') {
-      console.log('[Firestore] Connection verified via server rejection (Permission Denied).');
-      return;
-    }
-
-    if (error?.code === 'unavailable' || error?.message?.includes('offline') || error?.code === 'failed-precondition') {
-      console.warn(`[Firestore] Connectivity warning (${error?.code}): Backend unreachable. check databaseId: ${databaseId}`);
+      console.log('[Firestore] Connection verified (Permission Denied).');
     } else {
-      console.error('[Firestore] Connection error:', error);
+      console.warn('[Firestore] Connectivity failure:', error?.code, error?.message);
     }
   }
 };
 
-// Execute test connection but don't block boot
 testConnection();
 
 export const auth = getAuth(app);
@@ -68,8 +59,9 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const message = error instanceof Error ? error.message : String(error);
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: message,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
@@ -84,6 +76,20 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path
   }
+  
   console.error('Firestore Error: ', JSON.stringify(errInfo));
+  
+  // Do not throw for connectivity issues to avoid crashing the entire app UI
+  // Connectivity issues are often transient or environment-specific (proxies)
+  const isConnectivityIssue = 
+    message.includes('unavailable') || 
+    message.includes('offline') || 
+    message.includes('Could not reach Cloud Firestore backend');
+    
+  if (isConnectivityIssue) {
+    console.warn('[Firestore] Suppressing throw for connectivity issue to prevent crash loop.');
+    return;
+  }
+  
   throw new Error(JSON.stringify(errInfo));
 }

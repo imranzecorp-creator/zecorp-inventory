@@ -16,9 +16,9 @@ service cloud.firestore {
     
     // Admin check: imranzecorp@gmail.com or explicit admin doc
     function isAdmin() { 
-      return isVerified() && (
+      return isSignedIn() && (
         request.auth.token.email.replace(" ", "").lower() == 'imranzecorp@gmail.com' ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        (isVerified() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)))
       );
     }
 

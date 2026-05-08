@@ -450,9 +450,9 @@ const InventoryList = React.forwardRef<HTMLDivElement, InventoryListProps>(({ it
     const item = filteredItems[index];
     if (expandedId === item?.id) {
       const hasDescription = !!item.description;
-      return hasDescription ? 650 : 500;
+      return hasDescription ? 700 : 550;
     }
-    return 130;
+    return 160;
   }, [expandedId, filteredItems]);
 
   const toggleSelectAll = () => {
@@ -739,7 +739,7 @@ const InventoryList = React.forwardRef<HTMLDivElement, InventoryListProps>(({ it
       />
 
       {/* Inventory List - Virtualized for performance */}
-      <div className="flex-1 min-h-0 bg-black/20 rounded-[32px] border border-white/5 shadow-inner overflow-hidden relative">
+      <div className="h-[calc(100vh-280px)] md:h-[calc(100vh-220px)] bg-black/20 rounded-[32px] border border-white/5 shadow-inner overflow-hidden relative">
         <AutoSizer>
           {({ height, width }) => (
             <List
@@ -749,6 +749,7 @@ const InventoryList = React.forwardRef<HTMLDivElement, InventoryListProps>(({ it
               itemSize={getItemSize}
               width={width}
               className="custom-scrollbar"
+              overscanCount={5}
             >
               {({ index, style }) => (
                 <div style={style} className="px-4 md:px-6 py-2">

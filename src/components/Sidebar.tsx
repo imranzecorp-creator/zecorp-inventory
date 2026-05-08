@@ -175,24 +175,24 @@ export default React.memo(function Sidebar({ activeTab, setActiveTab, role }: Si
         <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_12px_rgba(16,185,129,0.8)]" />
-              <span className="text-[9px] font-black text-slate-300 uppercase tracking-[0.15em]">CORE OS</span>
+              <span className="text-[9px] font-bold text-slate-300 uppercase tracking-[0.15em]">CORE OS</span>
             </div>
             <div className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30">
-              <span className="text-[9px] font-black text-emerald-400 uppercase tracking-tighter">{uptime}</span>
+              <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-tight">{uptime}</span>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
              <div className="flex flex-col space-y-1 p-2 rounded-xl bg-white/[0.02] border border-white/5 group hover:bg-primary/5 transition-colors">
                 <div className="flex items-center space-x-1">
                    <Cpu className="w-2.5 h-2.5 text-primary group-hover:animate-spin" />
-                   <span className="text-[8px] font-black text-slate-300 uppercase tracking-tighter">AI Node</span>
+                   <span className="text-[8px] font-bold text-slate-300 uppercase tracking-tight">AI Node</span>
                 </div>
                 <span className="text-[9px] font-bold text-white">Synchronized</span>
              </div>
              <div className="flex flex-col space-y-1 p-2 rounded-xl bg-white/[0.02] border border-white/5 group hover:bg-amber-500/5 transition-colors">
                 <div className="flex items-center space-x-1">
                    <Database className="w-2.5 h-2.5 text-amber-500 group-hover:scale-110 transition-transform" />
-                   <span className="text-[8px] font-black text-slate-300 uppercase tracking-tighter">Vault</span>
+                   <span className="text-[8px] font-bold text-slate-300 uppercase tracking-tight">Vault</span>
                 </div>
                 <span className="text-[9px] font-bold text-white uppercase tracking-tighter">SECURE</span>
              </div>
@@ -202,7 +202,7 @@ export default React.memo(function Sidebar({ activeTab, setActiveTab, role }: Si
         <button
           onClick={() => setActiveTab('profile')}
           className={cn(
-            "flex items-center w-full px-4 py-3 text-xs font-black rounded-xl transition-all duration-300 group overflow-hidden relative",
+            "flex items-center w-full px-4 py-3 text-xs font-bold rounded-xl transition-all duration-300 group overflow-hidden relative",
             activeTab === 'profile' 
               ? "bg-white/10 text-white shadow-[0_0_20px_rgba(255,255,255,0.05)] border border-white/20" 
               : "text-slate-400 hover:text-white hover:bg-white/5"

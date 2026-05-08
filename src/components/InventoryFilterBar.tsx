@@ -340,7 +340,7 @@ export const InventoryFilterBar = React.memo(({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Stock Type</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Stock Type</label>
                 <select
                   value={inventoryTypeFilter}
                   onChange={(e) => setInventoryTypeFilter(e.target.value as any)}
@@ -353,7 +353,7 @@ export const InventoryFilterBar = React.memo(({
               </div>
 
               <div className="space-y-1.5 relative">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Project Outlet</label>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Project Outlet</label>
                 <div className="relative">
                   <input 
                     type="text"

@@ -78,7 +78,7 @@ const StockTableRow = React.memo(({ index, style, data }: { index: number, style
         <div className="flex flex-col truncate">
           <span className="text-xs md:text-sm font-bold text-white group-hover:text-primary transition-colors truncate">{item.name}</span>
           {(item.brand || item.modelNumber) && (
-            <span className="text-[8px] md:text-[9px] text-primary font-black uppercase tracking-tighter truncate">
+            <span className="text-[8px] md:text-[9px] text-primary font-bold uppercase tracking-tight truncate">
               {item.brand} {item.modelNumber}
             </span>
           )}
@@ -86,7 +86,7 @@ const StockTableRow = React.memo(({ index, style, data }: { index: number, style
       </div>
       <div className="px-2 md:px-4 py-4 w-16 md:w-24 text-center shrink-0">
         <span className={cn(
-          "text-[10px] md:text-xs font-black px-2 md:px-3 py-0.5 md:py-1 rounded-lg border shadow-sm",
+          "text-[10px] md:text-xs font-bold px-2 md:px-3 py-0.5 md:py-1 rounded-lg border shadow-sm",
           item.currentQuantity <= item.minStock 
             ? "bg-amber-500 text-white border-white/20" 
             : "bg-primary text-white border-white/20"
@@ -94,10 +94,10 @@ const StockTableRow = React.memo(({ index, style, data }: { index: number, style
           {item.currentQuantity}
         </span>
       </div>
-      <div className="px-4 py-4 flex-1 hidden md:block truncate text-[10px] text-slate-200 uppercase font-black tracking-tighter">
+      <div className="px-4 py-4 flex-1 hidden md:block truncate text-[10px] text-slate-200 uppercase font-bold tracking-tight">
         {item.client || 'Internal'}
       </div>
-      <div className="px-4 py-4 flex-1 hidden lg:block truncate text-[10px] text-slate-300 uppercase font-black tracking-tighter">
+      <div className="px-4 py-4 flex-1 hidden lg:block truncate text-[10px] text-slate-300 uppercase font-bold tracking-tight">
         {item.outlet || item.location || '-'}
       </div>
       <div className="px-4 py-4 w-24 hidden lg:block text-right shrink-0">

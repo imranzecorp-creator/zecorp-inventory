@@ -612,7 +612,8 @@ const TransactionHistory = React.forwardRef<HTMLDivElement, TransactionHistoryPr
               itemCount={filtered.length}
               itemSize={getItemSize}
               itemData={itemData}
-              className="scrollbar-hide py-4"
+              className="custom-scrollbar py-4"
+              overscanCount={8}
             >
               {TransactionRow}
             </List>

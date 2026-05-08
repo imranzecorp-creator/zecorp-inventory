@@ -52,8 +52,8 @@ export default React.memo(function AIPoweredNews() {
               <Sparkles className="w-4 h-4" />
             </div>
             <div>
-              <h4 className="text-xs font-black text-white uppercase tracking-widest">Industry Insights</h4>
-              <p className="text-[9px] text-slate-300 font-black uppercase tracking-[0.2em]">AI-Curated Intelligence</p>
+              <h4 className="text-xs font-bold text-white uppercase tracking-widest">Industry Insights</h4>
+              <p className="text-[9px] text-slate-300 font-bold uppercase tracking-[0.2em]">AI-Curated Intelligence</p>
             </div>
           </div>
           <button 
@@ -75,7 +75,7 @@ export default React.memo(function AIPoweredNews() {
           >
             <div className="flex items-center space-x-2">
               <span className={cn(
-                "px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border",
+                "px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest border",
                 current?.category === 'UAE' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
                 current?.category === 'Global' ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20" :
                 "bg-amber-500/10 text-amber-400 border-amber-500/20"
@@ -85,7 +85,7 @@ export default React.memo(function AIPoweredNews() {
                 {current?.category === 'Trend' && <Zap className="w-2 h-2 inline mr-1 -mt-0.5" />}
                 {current?.category}
               </span>
-              <span className="text-[10px] text-slate-300 font-black font-mono tracking-widest uppercase">Source: {current?.source}</span>
+              <span className="text-[10px] text-slate-300 font-bold font-mono tracking-widest uppercase">Source: {current?.source}</span>
             </div>
 
             <h5 className="text-sm font-bold text-slate-100 line-clamp-1">{current?.title}</h5>

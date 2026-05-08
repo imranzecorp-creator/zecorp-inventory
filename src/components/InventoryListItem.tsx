@@ -14,7 +14,8 @@ import {
   Tag,
   MapPin,
   Plus,
-  Minus
+  Minus,
+  Warehouse
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { InventoryItem } from '../types';
@@ -57,7 +58,7 @@ export const InventoryListItem = React.memo(({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: Math.min(idx * 0.03, 0.5) }}
       className={cn(
-        "group mb-4 rounded-[32px] overflow-hidden border transition-all duration-500",
+        "group rounded-[32px] overflow-hidden border transition-all duration-500",
         isSelected ? "border-primary bg-primary/5 shadow-[0_0_40px_rgba(var(--primary-rgb),0.1)]" : "border-white/5 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/10 shadow-xl",
         isExpanded && "border-primary/30 ring-1 ring-primary/10 shadow-2xl scale-[1.01]"
       )}
@@ -89,38 +90,51 @@ export const InventoryListItem = React.memo(({
             </div>
           </div>
 
-          <div className="flex-1 min-w-0 space-y-1.5">
+          <div className="flex-1 min-w-0 space-y-2">
             <div className="flex items-center space-x-3">
-              <h3 className="text-sm md:text-xl font-black text-white italic uppercase tracking-tighter truncate group-hover:text-primary transition-colors">
+              <h3 className="text-sm md:text-xl font-bold text-white uppercase tracking-tight truncate group-hover:text-primary transition-colors">
                 {item.name}
               </h3>
               {item.inventoryType === 'Client Stock' && (
-                <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 text-[7px] md:text-[8px] font-black uppercase tracking-widest border border-amber-500/20">
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 text-[7px] md:text-[8px] font-bold uppercase tracking-widest border border-amber-500/20">
                   Client
                 </span>
               )}
             </div>
             
-            <div className="flex flex-wrap gap-2 md:gap-4">
-              <div className="flex items-center space-x-2 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">
-                <Tag className="w-3 h-3 text-slate-500" />
-                <span className="text-[9px] md:text-xs font-black text-slate-400 uppercase tracking-widest leading-none">{item.brand || 'No Brand'}</span>
+            <div className="flex flex-col space-y-1 md:space-y-1.5 mt-2">
+              <div className="flex items-center space-x-2 bg-white/5 px-2 py-0.5 rounded-full border border-white/5 w-fit">
+                <Tag className="w-2.5 h-2.5 text-slate-500" />
+                <span className="text-[8px] md:text-[10px] font-bold text-slate-300 uppercase tracking-widest leading-none">{item.brand || 'No Brand'}</span>
+                <span className="w-1 h-1 rounded-full bg-slate-700 mx-1 md:mx-2" />
+                <Hash className="w-2.5 h-2.5 text-primary" />
+                <span className="text-[8px] md:text-[10px] font-bold text-primary font-mono leading-none">#{item.modelNumber || 'N/A'}</span>
               </div>
-              <div className="flex items-center space-x-2 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">
-                <Hash className="w-3 h-3 text-primary" />
-                <span className="text-[9px] md:text-xs font-bold text-primary font-mono leading-none">#{item.modelNumber || 'N/A'}</span>
+              <div className="flex flex-wrap gap-2">
+                <div className="flex items-center space-x-2 bg-white/5 px-2 py-0.5 rounded-full border border-white/5 w-fit shrink-0">
+                  <MapPin className="w-2.5 h-2.5 text-emerald-500" />
+                  <span className="text-[8px] md:text-[10px] font-bold text-emerald-400 uppercase tracking-wider leading-none">{item.warehouseLocation || 'OFF-SITE'}</span>
+                </div>
+                <div className="flex items-center space-x-2 bg-white/5 px-2 py-0.5 rounded-full border border-white/5 w-fit shrink-0">
+                  <Building className="w-2.5 h-2.5 text-amber-500" />
+                  <span className="text-[8px] md:text-[10px] font-bold text-amber-400 uppercase tracking-wider leading-none">{item.client || 'INTERNAL'}</span>
+                </div>
+                <div className="flex items-center space-x-2 bg-white/5 px-2 py-0.5 rounded-full border border-white/5 w-fit shrink-0">
+                  <Warehouse className="w-2.5 h-2.5 text-blue-500" />
+                  <span className="text-[8px] md:text-[10px] font-bold text-blue-400 uppercase tracking-wider leading-none">{item.outlet || 'GEN-01'}</span>
+                </div>
               </div>
             </div>
           </div>
 
           <div className="hidden lg:flex flex-col items-center justify-center px-10 border-x border-white/5 h-16">
             <span className={cn(
-              "text-2xl md:text-3xl font-black italic tracking-tighter leading-none",
+              "text-2xl md:text-3xl font-bold tracking-tight leading-none",
               item.currentQuantity > (item.minStock || 0) ? "text-white" : "text-red-500 animate-pulse"
             )}>
               {item.currentQuantity}
             </span>
-            <span className="text-[8px] font-black text-slate-600 uppercase tracking-[0.3em] mt-1">Units</span>
+            <span className="text-[8px] font-bold text-slate-600 uppercase tracking-[0.3em] mt-1">Units</span>
           </div>
 
           <div className="flex items-center space-x-2 md:space-x-4 pr-2">
@@ -162,11 +176,11 @@ export const InventoryListItem = React.memo(({
           >
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 md:gap-12 text-left">
                 <div className="space-y-5">
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2 mb-2 leading-none"><Info className="w-4 h-4 text-primary" />Metadata</p>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2 mb-2 leading-none"><Info className="w-4 h-4 text-primary" />Metadata</p>
                    <div className="space-y-4">
                       <div className="flex flex-col">
                          <span className="text-[8px] text-slate-600 uppercase font-black tracking-widest mb-1.5 leading-none">Category</span>
-                         <span className="text-sm text-white font-black uppercase italic drop-shadow-sm">{item.category || 'Standard Asset'}</span>
+                         <span className="text-sm text-white font-bold uppercase drop-shadow-sm">{item.category || 'Standard Asset'}</span>
                       </div>
                       <div className="flex flex-col">
                          <span className="text-[8px] text-slate-600 uppercase font-black tracking-widest mb-1.5 leading-none">Supplier Source</span>
@@ -179,11 +193,11 @@ export const InventoryListItem = React.memo(({
                    </div>
                 </div>
                 <div className="space-y-5">
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2 mb-2 leading-none"><Building className="w-4 h-4 text-amber-500" />Job Specs</p>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2 mb-2 leading-none"><Building className="w-4 h-4 text-amber-500" />Job Specs</p>
                    <div className="space-y-4">
                       <div className="flex flex-col">
                          <span className="text-[8px] text-slate-600 uppercase font-black tracking-widest mb-1.5 leading-none">Client Identity</span>
-                         <span className="text-sm text-white font-black uppercase italic drop-shadow-sm">{item.client || 'INTERNAL USE'}</span>
+                         <span className="text-sm text-white font-bold uppercase drop-shadow-sm">{item.client || 'INTERNAL USE'}</span>
                       </div>
                       <div className="flex flex-col">
                          <span className="text-[8px] text-slate-600 uppercase font-black tracking-widest mb-1.5 leading-none">Job Control #</span>
@@ -196,11 +210,11 @@ export const InventoryListItem = React.memo(({
                    </div>
                 </div>
                 <div className="space-y-5">
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2 mb-2 leading-none"><Hash className="w-4 h-4 text-blue-500" />Technical ID</p>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2 mb-2 leading-none"><Hash className="w-4 h-4 text-blue-500" />Technical ID</p>
                    <div className="space-y-4">
                       <div className="flex flex-col">
                          <span className="text-[8px] text-slate-600 uppercase font-black tracking-widest mb-1.5 leading-none">Position Slot</span>
-                         <span className="text-sm font-black italic font-mono text-blue-400">POS-{item.posNo || 'N/A'}</span>
+                         <span className="text-sm font-bold font-mono text-blue-400">POS-{item.posNo || 'N/A'}</span>
                       </div>
                       <div className="flex flex-col pt-2">
                          <span className="text-[8px] text-slate-600 uppercase font-black tracking-widest mb-1.5 leading-none">System DocRef</span>
@@ -209,11 +223,11 @@ export const InventoryListItem = React.memo(({
                    </div>
                 </div>
                 <div className="space-y-5">
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2 mb-2 leading-none"><FileText className="w-4 h-4 text-emerald-500" />Blueprint</p>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2 mb-2 leading-none"><FileText className="w-4 h-4 text-emerald-500" />Blueprint</p>
                    <div className="space-y-4">
                       <div className="flex flex-col">
                          <span className="text-[8px] text-slate-600 uppercase font-black tracking-widest mb-1.5 leading-none">Dimensions</span>
-                         <span className="text-sm text-emerald-400 font-black font-mono italic">{item.dimensions || 'NOT QUANTIFIED'}</span>
+                         <span className="text-sm text-emerald-400 font-bold font-mono">{item.dimensions || 'NOT QUANTIFIED'}</span>
                       </div>
                       <div className="flex flex-col">
                          <span className="text-[8px] text-slate-600 uppercase font-black tracking-widest mb-1.5 leading-none">Manufacturing</span>
@@ -222,16 +236,16 @@ export const InventoryListItem = React.memo(({
                    </div>
                 </div>
                 <div className="space-y-5">
-                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2 mb-2 leading-none"><Sparkles className="w-4 h-4 text-purple-500" />Operations</p>
+                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2 mb-2 leading-none"><Sparkles className="w-4 h-4 text-purple-500" />Operations</p>
                    <div className="space-y-4">
                       <div className="flex flex-col">
                          <span className="text-[8px] text-slate-600 uppercase font-black tracking-widest mb-1.5 leading-none">Lifecycle State</span>
-                         <span className="text-sm text-purple-400 font-black uppercase italic drop-shadow-sm">{item.logistics || 'OPERATIONAL'}</span>
+                         <span className="text-sm text-purple-400 font-bold uppercase drop-shadow-sm">{item.logistics || 'OPERATIONAL'}</span>
                       </div>
                       <div className="flex gap-3 pt-6">
                         <button 
                           onClick={() => onEdit(item)}
-                          className="flex-1 py-3 bg-white/5 hover:bg-primary/20 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-primary border border-white/10 hover:border-primary/30 transition-all flex items-center justify-center gap-2 shadow-xl group/editBtn"
+                          className="flex-1 py-3 bg-white/5 hover:bg-primary/20 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 hover:text-primary border border-white/10 hover:border-primary/30 transition-all flex items-center justify-center gap-2 shadow-xl group/editBtn"
                         >
                           <Edit className="w-4 h-4 group-hover/editBtn:rotate-12 transition-transform" /> Modify
                         </button>
@@ -248,8 +262,8 @@ export const InventoryListItem = React.memo(({
               
               {item.description && (
                 <div className="mt-10 pt-8 border-t border-white/5 text-left">
-                  <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.3em] mb-3 leading-none italic">Asset Description / Narrative</p>
-                  <p className="text-xs md:text-sm text-slate-400 italic leading-relaxed max-w-5xl pl-4 border-l-2 border-primary/20">
+                  <p className="text-[10px] font-bold text-slate-600 uppercase tracking-[0.3em] mb-3 leading-none opacity-80">Asset Description / Narrative</p>
+                  <p className="text-xs md:text-sm text-slate-400 leading-relaxed max-w-5xl pl-4 border-l-2 border-primary/20">
                     {item.description}
                   </p>
                 </div>

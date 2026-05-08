@@ -155,9 +155,19 @@ export default function App() {
         setLoadingMessageIndex(prev => (prev + 1) % loadingMessages.length);
       }, 1000);
 
+      // Safety timeout: If still loading after 10 seconds, force move past loading screen
+      const safetyTimeout = setTimeout(() => {
+        if (loading) {
+          console.warn('[App] Loading safety timeout reached. Forcing UI display.');
+          setLoading(false);
+          setIsOnline(false); // Assume offline if we can't load in 10s
+        }
+      }, 10000);
+
       return () => {
         clearInterval(progressInterval);
         clearInterval(messageInterval);
+        clearTimeout(safetyTimeout);
       };
     }
   }, [loading]);
@@ -241,14 +251,14 @@ export default function App() {
               const isAdmin = email === 'imranzecorp@gmail.com';
               let isApproved = isAdmin;
               
-              if (!isAdmin) {
-                try {
+              try {
+                if (!isAdmin) {
                   const approvedQuery = query(collection(db, 'approved_emails'), where('email', '==', email));
                   const approvedSnap = await getDocs(approvedQuery);
                   isApproved = !approvedSnap.empty;
-                } catch (err) {
-                  handleFirestoreError(err, OperationType.GET, 'approved_emails');
                 }
+              } catch (err) {
+                console.warn('[App] Error checking approved_emails, proceeding with default approval status');
               }
 
               const newUser: UserProfile = {
@@ -268,7 +278,7 @@ export default function App() {
                   createdAt: serverTimestamp()
                 });
               } catch (err) {
-                handleFirestoreError(err, OperationType.WRITE, `users/${idUser.uid}`);
+                console.warn('[App] Error creating new user doc');
               }
               
               // Set initial user state to move past loading screen immediately
@@ -276,12 +286,12 @@ export default function App() {
               setLoading(false);
             }
           } catch (err) {
-            handleFirestoreError(err, OperationType.GET, `users/${idUser.uid}`);
             setLoading(false);
+            handleFirestoreError(err, OperationType.GET, `users/${idUser.uid}`);
           }
         }, (err) => {
-          handleFirestoreError(err, OperationType.GET, 'users');
           setLoading(false);
+          handleFirestoreError(err, OperationType.GET, 'users');
         });
       } else {
         if (profileUnsub) profileUnsub();
@@ -444,7 +454,7 @@ export default function App() {
              transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
              className="flex flex-col items-center mb-10 text-center w-full"
           >
-            <h1 className="text-7xl md:text-8xl font-black text-[#e11d48] tracking-[-0.05em] leading-none drop-shadow-[0_0_35px_rgba(225,29,72,0.5)] italic uppercase">
+            <h1 className="text-7xl md:text-8xl font-bold text-[#e11d48] tracking-[-0.05em] leading-none drop-shadow-[0_0_35px_rgba(225,29,72,0.5)] uppercase">
               ZECORP
             </h1>
             
@@ -471,7 +481,7 @@ export default function App() {
               >
                  <Zap className="w-7 h-7 text-[#818cf8] fill-[#818cf8]/20" />
               </motion.div>
-              <p className="text-[10px] md:text-xs font-black text-white/30 tracking-[0.4em] uppercase">
+              <p className="text-[10px] md:text-xs font-bold text-white/30 tracking-[0.4em] uppercase">
                 Power by <span className="bg-gradient-to-r from-blue-400 via-fuchsia-400 to-rose-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]">ZEC AI</span>
               </p>
             </div>
@@ -516,7 +526,7 @@ export default function App() {
               transition={{ delay: 0.8 }}
               className="text-center mt-10"
             >
-              <p className="text-[10px] md:text-xs font-black text-slate-400 tracking-[0.6em] uppercase opacity-60 leading-relaxed max-w-[320px] mx-auto whitespace-nowrap">
+              <p className="text-[10px] md:text-xs font-bold text-slate-400 tracking-[0.6em] uppercase opacity-60 leading-relaxed max-w-[320px] mx-auto whitespace-nowrap">
                 SYNTHESIZING GLOBAL INVENTORY
               </p>
             </motion.div>
@@ -525,7 +535,7 @@ export default function App() {
 
         {/* Technical Detail Footer */}
         <div className="absolute bottom-8 left-0 right-0 text-center opacity-20">
-          <p className="text-[8px] font-black font-mono text-white tracking-[0.5em] uppercase">
+          <p className="text-[8px] font-bold font-mono text-white tracking-[0.5em] uppercase">
             OS TIER 4 // V4.2.0 // KERNEL OPERATIONAL
           </p>
         </div>
@@ -560,7 +570,7 @@ export default function App() {
         {!isOnline && (
           <div className="bg-rose-500/20 border-y border-rose-500/30 px-4 py-1.5 flex items-center justify-center space-x-2 backdrop-blur-md">
             <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-            <p className="text-[10px] md:text-xs font-black text-rose-500 uppercase tracking-[0.2em]">
+            <p className="text-[10px] md:text-xs font-bold text-rose-500 uppercase tracking-[0.2em]">
               Network Disconnected • Operating in Offline Mode
             </p>
           </div>
@@ -569,7 +579,7 @@ export default function App() {
         {!isApproved && (
           <div className="bg-amber-500/10 border-y border-amber-500/20 px-4 py-2 flex items-center justify-center space-x-3 backdrop-blur-md">
             <AlertCircle className="w-4 h-4 text-amber-500 animate-pulse" />
-            <p className="text-[10px] md:text-xs font-black text-amber-500 uppercase tracking-[0.2em]">
+            <p className="text-[10px] md:text-xs font-bold text-amber-500 uppercase tracking-[0.2em]">
               Guest Mode / Awaiting Admin Verification • Some features are restricted
             </p>
             <button 
@@ -775,7 +785,7 @@ function MobileNavButton({ active, onClick, icon: Icon, label }: any) {
         <Icon className={cn("w-5 h-5 transition-all", active ? "stroke-[2.5px] scale-110" : "stroke-[1.5px]")} />
       </motion.div>
       <span className={cn(
-        "text-[9px] font-black uppercase tracking-widest transition-all duration-300",
+        "text-[9px] font-bold uppercase tracking-widest transition-all duration-300",
         active ? "opacity-100 translate-y-0 text-primary" : "opacity-40 translate-y-1"
       )}>
         {label}

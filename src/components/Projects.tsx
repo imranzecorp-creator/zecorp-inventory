@@ -64,34 +64,37 @@ const ManifestRow = React.memo(({ index, style, data }: { index: number, style: 
     const qIn = item.quantityIn || 0;
     const req = item.quantity || 0;
     
-    if (qOut >= req && req > 0) return { label: 'FULFILLED', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' };
-    if (qIn > 0) return { label: 'INBOUND', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' };
-    return { label: 'PENDING', color: 'bg-amber-500/10 text-amber-500 border-amber-500/20' };
+    if (qOut >= req && req > 0) return { label: 'FULFILLED', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' };
+    if (qIn > 0) return { label: 'INBOUND', color: 'bg-blue-500/10 text-blue-400 border-blue-500/30' };
+    return { label: 'PENDING', color: 'bg-amber-500/10 text-amber-500 border-amber-500/30' };
   }, [item.quantity, item.quantityIn, item.quantityOut]);
 
   return (
-    <div style={style} className="px-2 md:px-6 pb-2 focus:outline-none">
-      <div className="bg-slate-800/40 p-3 md:p-4 rounded-[24px] border border-white/10 flex flex-col md:flex-row items-center justify-between gap-4 group hover:bg-slate-800/60 hover:border-primary/40 transition-all overflow-hidden relative min-h-[90px] shadow-xl backdrop-blur-md">
-        <div className="absolute top-0 left-0 w-1 h-full bg-primary/20 group-hover:bg-primary transition-all duration-500 shrink-0 shadow-[0_0_15px_rgba(var(--primary),0.3)]" />
+    <div style={style} className="px-3 md:px-8 pb-3 focus:outline-none">
+      <div className="bg-slate-800/60 p-4 md:p-6 rounded-[32px] border border-white/10 flex flex-col md:flex-row items-center justify-between gap-6 group hover:bg-slate-800/80 hover:border-primary/50 transition-all overflow-hidden relative min-h-[110px] shadow-2xl backdrop-blur-xl">
+        <div className="absolute top-0 left-0 w-1.5 h-full bg-primary/30 group-hover:bg-primary transition-all duration-500 shrink-0 shadow-[0_0_20px_rgba(var(--primary),0.4)]" />
         
         <div className="flex-1 min-w-0 w-full md:w-auto">
-          <div className="flex items-center justify-between mb-2 md:mb-1">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0 border border-primary/20 shadow-inner group-hover:scale-105 transition-transform duration-300">
-                <Package className="w-5 h-5" />
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0 border border-primary/20 shadow-inner group-hover:scale-105 transition-transform duration-300">
+                <Package className="w-6 h-6" />
               </div>
               <div className="min-w-0">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h4 className="text-sm md:text-base font-black text-white truncate tracking-tight uppercase italic drop-shadow-sm leading-none">{item.name}</h4>
-                  <span className={cn("text-[7px] font-black px-1.5 py-0.5 rounded-full border tracking-[0.2em] shadow-sm", status.color)}>
+                <div className="flex items-center gap-4 flex-wrap">
+                  <h4 className="text-base md:text-lg font-black text-white truncate tracking-tight uppercase leading-tight">{item.name}</h4>
+                  <span className={cn("text-[8px] md:text-[10px] font-black px-3 py-1 rounded-full border tracking-[0.25em] shadow-sm", status.color)}>
                     {status.label}
                   </span>
                 </div>
-                <div className="flex items-center space-x-3 mt-0.5">
-                  <div className="flex items-center space-x-1 text-slate-500">
-                    <span className="text-[9px] font-bold">{item.brand || 'No Brand'}</span>
-                    <span className="w-0.5 h-0.5 rounded-full bg-slate-700" />
-                    <span className="text-[9px] font-black text-primary tracking-wider">#{item.posNo || 'N/A'}</span>
+                <div className="flex items-center space-x-4 mt-1.5">
+                  <div className="flex items-center space-x-2 text-slate-400">
+                    <span className="text-[11px] md:text-sm font-bold uppercase tracking-wider">{item.brand || 'No Brand'}</span>
+                    <span className="w-1 h-1 rounded-full bg-slate-700" />
+                    <div className="flex items-center space-x-1">
+                      <Hash className="w-3 h-3 text-primary/60" />
+                      <span className="text-[11px] md:text-sm font-black text-primary tracking-widest">{item.posNo || 'N/A'}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -132,8 +135,8 @@ const ManifestRow = React.memo(({ index, style, data }: { index: number, style: 
         <div className="flex items-center justify-between md:justify-center gap-4 bg-black/30 px-4 py-2 md:py-3 rounded-[20px] border border-white/5 min-w-[110px] md:min-w-[180px] shadow-lg group-hover:bg-black/50 transition-all w-full md:w-auto">
           <div className="flex items-center space-x-6 md:space-x-8">
             <div className="text-center group-hover:scale-110 transition-transform">
-              <p className="text-[7px] font-black text-slate-500 mb-0.5 tracking-tighter uppercase">REQ</p>
-              <span className="text-xl md:text-2xl font-black text-white leading-none tracking-tighter italic">{item.quantity}</span>
+              <p className="text-[7px] font-bold text-slate-500 mb-0.5 tracking-tighter uppercase">REQ</p>
+              <span className="text-xl md:text-2xl font-bold text-white leading-none tracking-tight">{item.quantity}</span>
             </div>
             <div className="w-px h-8 bg-white/10" />
             <div className="flex items-center space-x-4">
@@ -489,8 +492,8 @@ const Projects = React.forwardRef<HTMLDivElement, ProjectsProps>(({
     >
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black text-white tracking-tighter">Project Control</h1>
-          <p className="text-[10px] md:text-xs text-slate-300 uppercase font-black tracking-[0.2em] mt-1">Enterprise Asset Management & Logistics</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Project Control</h1>
+          <p className="text-[10px] md:text-xs text-slate-300 uppercase font-bold tracking-[0.2em] mt-1">Enterprise Asset Management & Logistics</p>
         </div>
         <div className="flex items-center space-x-1.5 md:space-x-3 overflow-x-auto pb-2 md:pb-0 custom-scrollbar-hide max-w-full">
           {isDeleteMode ? (
@@ -515,7 +518,7 @@ const Projects = React.forwardRef<HTMLDivElement, ProjectsProps>(({
             <>
               <button 
                 onClick={() => setShowAddModal(true)}
-                className="hidden md:flex flex-shrink-0 items-center space-x-2 px-4 md:px-6 py-2.5 md:py-3.5 text-xs font-black text-slate-950 bg-gradient-to-r from-primary via-emerald-400 to-primary rounded-xl md:rounded-2xl bg-[length:200%_auto] hover:bg-right shadow-[0_0_25px_rgba(var(--primary-rgb),0.4)] hover:shadow-[0_0_35px_rgba(var(--primary-rgb),0.6)] transition-all duration-500 active:scale-95 group uppercase tracking-[0.2em]"
+                className="hidden md:flex flex-shrink-0 items-center space-x-2 px-4 md:px-6 py-2.5 md:py-3.5 text-xs font-bold text-slate-950 bg-gradient-to-r from-primary via-emerald-400 to-primary rounded-xl md:rounded-2xl bg-[length:200%_auto] hover:bg-right shadow-[0_0_25px_rgba(var(--primary-rgb),0.4)] hover:shadow-[0_0_35px_rgba(var(--primary-rgb),0.6)] transition-all duration-500 active:scale-95 group uppercase tracking-[0.2em]"
               >
                 <Plus className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
                 <span>Engage</span>
@@ -567,7 +570,7 @@ const Projects = React.forwardRef<HTMLDivElement, ProjectsProps>(({
                   <button 
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isImporting}
-                    className="flex-shrink-0 flex items-center space-x-1.5 md:space-x-2 px-3 md:px-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl border border-blue-500/20 bg-blue-500/10 text-blue-400 hover:text-white hover:bg-blue-500/20 transition-all text-[9px] md:text-xs font-black uppercase tracking-widest active:scale-95 shadow-lg shadow-blue-500/10 group"
+                    className="flex-shrink-0 flex items-center space-x-1.5 md:space-x-2 px-3 md:px-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl border border-blue-500/20 bg-blue-500/10 text-blue-400 hover:text-white hover:bg-blue-500/20 transition-all text-[9px] md:text-xs font-bold uppercase tracking-widest active:scale-95 shadow-lg shadow-blue-500/10 group"
                   >
                     {isImporting ? <Loader2 className="w-3.5 h-3.5 md:w-4 md:h-4 animate-spin" /> : <Zap className="w-3.5 h-3.5 md:w-4 md:h-4 text-primary group-hover:animate-pulse" />}
                     <span>{isImporting ? 'IMPORTING...' : 'AI BULK IMPORT'}</span>
@@ -635,8 +638,8 @@ const Projects = React.forwardRef<HTMLDivElement, ProjectsProps>(({
                 <stat.icon className={cn("w-4 h-4 md:w-5 md:h-5", stat.color)} />
               </div>
               <div className="text-right">
-                <p className="text-[9px] md:text-[10px] font-black text-slate-300 uppercase tracking-widest leading-none">{stat.label}</p>
-                <p className="text-xl md:text-2xl font-black text-white mt-1">{stat.value}</p>
+                <p className="text-[9px] md:text-[10px] font-bold text-slate-300 uppercase tracking-widest leading-none">{stat.label}</p>
+                <p className="text-xl md:text-2xl font-bold text-white mt-1">{stat.value}</p>
               </div>
             </div>
             <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-3 md:mt-4">
@@ -665,12 +668,12 @@ const Projects = React.forwardRef<HTMLDivElement, ProjectsProps>(({
                   <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
                     <Filter className="w-4 h-4" />
                   </div>
-                  <h3 className="text-xs font-black text-white uppercase tracking-[0.2em]">Refine Project List</h3>
+                  <h3 className="text-xs font-bold text-white uppercase tracking-[0.2em]">Refine Project List</h3>
                 </div>
                 {(selectedStatuses.length > 0 || selectedClients.length > 0 || selectedProjectOutlets.length > 0 || selectedWarehouseLocations.length > 0 || jobSearch || searchTerm) && (
                   <button 
                     onClick={clearFilters}
-                    className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
+                    className="text-[10px] font-bold text-primary uppercase tracking-widest hover:underline"
                   >
                     Reset All Filters
                   </button>
@@ -707,7 +710,7 @@ const Projects = React.forwardRef<HTMLDivElement, ProjectsProps>(({
                 />
 
                 <div className="space-y-1.5 relative">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Job # Filter</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Job # Filter</label>
                   <div className="relative">
                     <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                     <input 
@@ -812,15 +815,15 @@ const Projects = React.forwardRef<HTMLDivElement, ProjectsProps>(({
         </AnimatePresence>
       </div>
 
-      <div className="space-y-6 flex-1 min-h-[600px] relative">
+      <div className="h-[calc(100vh-320px)] md:h-[calc(100vh-260px)] relative">
         <div className="absolute inset-0">
           <AutoSizer>
             {({ height, width }) => {
+              const rowHeight = viewMode === 'grid' ? 420 : 200;
               const gutter = 24;
               const columns = viewMode === 'grid' ? (width > 1024 ? 3 : width > 768 ? 2 : 1) : 1;
               const columnWidth = (width - (columns - 1) * gutter) / columns;
               const rowCount = Math.ceil(filteredProjects.length / columns);
-              const rowHeight = viewMode === 'grid' ? 420 : 130;
 
               return (
                 <List
@@ -829,6 +832,7 @@ const Projects = React.forwardRef<HTMLDivElement, ProjectsProps>(({
                   itemSize={() => rowHeight}
                   width={width}
                   className="custom-scrollbar"
+                  overscanCount={5}
                 >
                   {({ index, style }) => (
                     <div style={{ ...style, display: 'flex', gap: gutter }} className="pb-6">
@@ -947,71 +951,75 @@ const ProjectRow = React.memo(({ project, onClick, onStatusClick, onEdit, onDele
       animate={{ opacity: 1, x: 0 }}
       onClick={onClick}
       className={cn(
-        "glass-morphism p-4 md:px-6 md:py-4 rounded-2xl md:rounded-3xl border group cursor-pointer transition-all relative overflow-hidden",
+        "glass-morphism p-5 md:px-8 md:py-6 rounded-2xl md:rounded-[40px] border group cursor-pointer transition-all relative overflow-hidden",
         isSelected ? "border-primary/50 bg-primary/5 shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)]" : "border-white/5 hover:bg-white/[0.05]"
       )}
     >
-      <div className="md:grid md:grid-cols-12 md:gap-4 items-center">
-        <div className="col-span-3 flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
-            <Layout className="w-4 h-4 text-primary" />
+      <div className="md:grid md:grid-cols-12 md:gap-6 items-center">
+        <div className="col-span-4 flex items-center space-x-5">
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
+            <Layout className="w-7 h-7 text-primary" />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-bold text-white group-hover:text-primary transition-colors truncate">{project.client}</p>
-            <div className="flex items-center space-x-2">
-              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">JN-#{project.jobNumber}</p>
-              <div className="flex items-center space-x-1.5 bg-primary/10 px-2 py-0.5 rounded-lg border border-primary/20">
-                <span className="text-[9px] font-black text-primary uppercase tracking-tighter">Units</span>
-                <span className="text-[10px] font-black text-white font-mono">{itemCount}</span>
+            <p className="text-xl md:text-2xl font-black text-white group-hover:text-primary transition-colors truncate">{project.client}</p>
+            <div className="flex items-center space-x-3 mt-1.5">
+              <p className="text-xs md:text-sm font-black text-slate-400 capitalize tracking-widest">JN-#{project.jobNumber}</p>
+              <div className="flex items-center space-x-2 bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
+                <span className="text-[10px] font-black text-primary uppercase tracking-tighter">Units</span>
+                <span className="text-xs font-black text-white font-mono">{itemCount}</span>
               </div>
             </div>
           </div>
         </div>
         
         <div className="hidden md:block col-span-2 text-center">
-          <p className="text-[10px] font-bold text-slate-300 truncate">{project.location || 'Local'}</p>
-          <p className="text-[9px] font-medium text-slate-500 truncate">{project.outlet || 'General'}</p>
+          <p className="text-[11px] font-black text-slate-300 uppercase tracking-[0.2em]">{project.location || 'Local'}</p>
+          <p className="text-xs font-medium text-slate-500 truncate mt-1">{project.outlet || 'General'}</p>
         </div>
         
-        <div className="col-span-2 text-center mt-3 md:mt-0">
-          <span 
+        <div className="col-span-2 text-center mt-4 md:mt-0">
+          <button 
             onClick={onStatusClick}
             className={cn(
-            "px-2.5 py-1 rounded-xl text-[8px] md:text-[9px] font-black uppercase tracking-[0.2em] border shadow-sm transition-all",
+            "px-6 py-3 rounded-2xl text-[10px] md:text-xs font-black uppercase tracking-[0.25em] border shadow-sm transition-all inline-flex items-center space-x-3",
             project.status === 'Active' 
               ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 animate-pulse hover:bg-emerald-500/20 active:scale-95" 
               : "bg-slate-500/10 text-slate-400 border-white/10"
           )}>
-            {project.status === 'Active' ? 'Deployment Active' : project.status}
-          </span>
+            <div className={cn("w-2.5 h-2.5 rounded-full", project.status === 'Active' ? 'bg-emerald-400 animate-ping' : 'bg-slate-500')} />
+            <span>{project.status === 'Active' ? 'Deployment Active' : project.status}</span>
+          </button>
         </div>
         
-        <div className="hidden md:block col-span-1 text-center font-bold text-white font-mono">
-          {itemCount}
+        <div className="hidden md:flex flex-col items-center col-span-1">
+            <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-1.5">TOTAL</span>
+            <span className="text-xl font-bold text-white font-mono leading-none">{itemCount}</span>
         </div>
         
-        <div className="hidden md:block col-span-1 text-center font-bold text-green-400 font-mono">
-          {project.totalQuantityIn || 0}
+        <div className="hidden md:flex flex-col items-center col-span-1">
+            <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-1.5">IN</span>
+            <span className="text-xl font-bold text-green-400 font-mono leading-none">{project.totalQuantityIn || 0}</span>
         </div>
         
-        <div className="hidden md:block col-span-1 text-center font-bold text-red-400 font-mono">
-          {project.totalQuantityOut || 0}
+        <div className="hidden md:flex flex-col items-center col-span-1">
+            <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-1.5">OUT</span>
+            <span className="text-xl font-bold text-red-400 font-mono leading-none">{project.totalQuantityOut || 0}</span>
         </div>
         
-        <div className="col-span-2 flex items-center justify-end space-x-2 mt-4 md:mt-0">
+        <div className="col-span-1 flex items-center justify-end space-x-3 mt-4 md:mt-0">
            <button 
               onClick={onEdit}
-              className="p-2 bg-white/5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-primary transition-all"
+              className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl text-slate-400 hover:text-primary transition-all border border-white/5"
             >
-              <Edit className="w-3.5 h-3.5" />
+              <Edit2 className="w-5 h-5" />
             </button>
             <button 
               onClick={onDelete}
-              className="p-2 bg-white/5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-red-400 transition-all"
+              className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl text-slate-400 hover:text-red-400 transition-all border border-white/5"
             >
-              <Trash className="w-3.5 h-3.5" />
+              <Trash className="w-5 h-5" />
             </button>
-            <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-primary group-hover:translate-x-1 transition-all" />
+            <ChevronRight className="hidden md:block w-5 h-5 text-slate-600 group-hover:text-primary group-hover:translate-x-1 transition-all" />
         </div>
       </div>
       
@@ -1122,46 +1130,45 @@ const ProjectCard = React.memo(React.forwardRef<HTMLDivElement, {
         </div>
 
         <div>
-          <h3 className="text-lg md:text-xl font-bold text-white md:group-hover:text-primary transition-colors leading-tight truncate">{project.client}</h3>
-          <p className="text-[11px] md:text-sm text-slate-500 font-black uppercase tracking-widest mt-1">JN-#{project.jobNumber}</p>
+          <h3 className="text-xl md:text-2xl font-black text-white md:group-hover:text-primary transition-colors leading-tight truncate">{project.client}</h3>
+          <p className="text-[12px] md:text-sm text-slate-400 font-black uppercase tracking-[0.2em] mt-1.5">JN-#{project.jobNumber}</p>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-2 gap-x-4 gap-y-4 pb-2 border-t border-white/5 pt-4">
-          <div className="space-y-1">
-            <div className="flex items-center space-x-1.5 text-[8px] md:text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">
-              <Store className="w-3 h-3" />
+        <div className="grid grid-cols-2 gap-x-6 gap-y-5 pb-3 border-t border-white/5 pt-5">
+          <div className="space-y-1.5">
+            <div className="flex items-center space-x-2 text-[9px] md:text-[11px] font-black text-slate-500 uppercase tracking-[0.2em]">
+              <Store className="w-3.5 h-3.5" />
               <span>Project</span>
             </div>
-            <p className="text-xs md:text-sm font-bold text-slate-300 truncate">{project.outlet || 'General'}</p>
+            <p className="text-sm md:text-base font-bold text-slate-200 truncate">{project.outlet || 'General'}</p>
           </div>
-          <div className="space-y-1">
-            <div className="flex items-center space-x-1.5 text-[8px] md:text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">
-              <MapPin className="w-3 h-3" />
+          <div className="space-y-1.5">
+            <div className="flex items-center space-x-2 text-[9px] md:text-[11px] font-black text-slate-500 uppercase tracking-[0.2em]">
+              <MapPin className="w-3.5 h-3.5" />
               <span>Project Outlet</span>
             </div>
-            <p className="text-xs md:text-sm font-bold text-slate-300 truncate">{project.location || 'Local Site'}</p>
+            <p className="text-sm md:text-base font-bold text-slate-200 truncate">{project.location || 'Local Site'}</p>
           </div>
-          <div className="space-y-1">
-            <div className="flex items-center space-x-1.5 text-[8px] md:text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">
-              <Package className="w-3 h-3 text-primary" />
+          <div className="space-y-1.5">
+            <div className="flex items-center space-x-2 text-[9px] md:text-[11px] font-black text-slate-500 uppercase tracking-[0.2em]">
+              <Package className="w-3.5 h-3.5 text-primary" />
               <span>Total Units</span>
             </div>
-            <p className="text-xs md:text-sm font-bold text-white">{itemCount}</p>
+            <p className="text-sm md:text-base font-bold text-white font-mono">{itemCount}</p>
           </div>
-          <div className="space-y-0 opacity-0 pointer-events-none md:hidden lg:block h-0" />
-          <div className="space-y-1">
-            <div className="flex items-center space-x-1.5 text-[8px] md:text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">
-              <ArrowDownLeft className="w-3 h-3 text-green-500" />
+          <div className="space-y-1.5">
+            <div className="flex items-center space-x-2 text-[9px] md:text-[11px] font-black text-slate-500 uppercase tracking-[0.2em]">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
               <span>Inbound</span>
             </div>
-            <p className="text-xs md:text-sm font-bold text-green-400">{project.totalQuantityIn || 0}</p>
+            <p className="text-sm md:text-base font-bold text-green-400 font-mono">{project.totalQuantityIn || 0}</p>
           </div>
-          <div className="space-y-1">
-            <div className="flex items-center space-x-1.5 text-[8px] md:text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">
-              <ArrowUpRight className="w-3 h-3 text-red-500" />
+          <div className="space-y-1.5">
+            <div className="flex items-center space-x-2 text-[9px] md:text-[11px] font-black text-slate-500 uppercase tracking-[0.2em]">
+              <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
               <span>Outbound</span>
             </div>
-            <p className="text-xs md:text-sm font-bold text-red-400">{project.totalQuantityOut || 0}</p>
+            <p className="text-sm md:text-base font-bold text-red-400 font-mono">{project.totalQuantityOut || 0}</p>
           </div>
         </div>
 
@@ -2006,18 +2013,18 @@ function ProjectItemRow({ item, inventory, onRemove, onUpdate }: { item: Project
 
 function ProjectStatsGrid({ stats }: { stats: { totalRequired: number, fulfillment: number, totalIn: number, totalOut: number } }) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 py-2 md:py-0">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5 py-4">
       {[
         { label: 'MANIFEST', value: stats.totalRequired, color: 'text-white', sub: 'Required' },
         { label: 'FILL RATE', value: `${stats.fulfillment}%`, color: 'text-primary', sub: 'Volume' },
         { label: 'VERIFIED IN', value: stats.totalIn, color: 'text-green-400', sub: 'Inbound' },
         { label: 'VERIFIED OUT', value: stats.totalOut, color: 'text-red-400', sub: 'Release' }
       ].map((m, i) => (
-        <div key={i} className="bg-black/40 border border-white/5 rounded-xl md:rounded-2xl p-2.5 md:px-5 md:py-4 min-w-[80px] md:min-w-[120px] text-left group hover:border-primary/30 transition-all hover:bg-black/60 shadow-xl overflow-hidden relative">
-          <div className={cn("absolute top-0 right-0 w-64 h-64 md:w-8 md:h-8 rounded-full blur-[10px] md:blur-[15px] -mr-3 -mt-3 md:-mr-4 md:-mt-4 opacity-50", m.color.replace('text-', 'bg-'))} />
-          <p className={cn("text-[6px] md:text-[8px] font-black uppercase tracking-[0.2em] mb-0.5 md:mb-1.5 opacity-80", m.color)}>{m.label}</p>
-          <p className="text-sm md:text-3xl font-black text-white tracking-tighter leading-none group-hover:text-primary transition-colors">{m.value}</p>
-          <p className="text-[5px] md:text-[7px] font-bold text-slate-500 uppercase tracking-widest mt-0.5 md:mt-1 opacity-60">{m.sub}</p>
+        <div key={i} className="bg-black/40 border border-white/10 rounded-2xl md:rounded-[32px] p-4 md:px-7 md:py-6 min-w-[100px] md:min-w-[150px] text-left group hover:border-primary/40 transition-all hover:bg-black/60 shadow-2xl overflow-hidden relative">
+          <div className={cn("absolute top-0 right-0 w-8 h-8 rounded-full blur-[20px] -mr-4 -mt-4 opacity-40", m.color.replace('text-', 'bg-'))} />
+          <p className={cn("text-[10px] md:text-xs font-black uppercase tracking-[0.25em] mb-2 md:mb-3 opacity-90", m.color)}>{m.label}</p>
+          <p className="text-xl md:text-4xl font-black text-white tracking-tighter leading-none group-hover:text-primary transition-colors">{m.value}</p>
+          <p className="text-[8px] md:text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 md:mt-3 opacity-70">{m.sub}</p>
         </div>
       ))}
     </div>
@@ -2063,30 +2070,30 @@ function ProjectManifestTab({
     <div className="flex-1 overflow-hidden flex flex-col p-4 md:p-6 bg-slate-950/40">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between bg-slate-900/60 p-4 md:p-6 rounded-[32px] border border-white/10 gap-6 mb-6 shadow-2xl backdrop-blur-3xl shrink-0">
          <div className="flex items-center space-x-5">
-            <div className="w-14 h-14 rounded-[24px] bg-primary/10 flex items-center justify-center border border-primary/20 shadow-inner">
-              <Package className="w-7 h-7 text-primary" />
+            <div className="w-16 h-16 rounded-[30px] bg-primary/10 flex items-center justify-center border border-primary/20 shadow-inner">
+              <Package className="w-8 h-8 text-primary" />
             </div>
             <div>
-              <h3 className="text-lg font-black text-white tracking-widest uppercase italic leading-none mb-1.5">Project Manifest</h3>
-              <div className="flex items-center space-x-3">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Digital Specification Table</p>
-                <span className="w-1 h-1 rounded-full bg-slate-700" />
-                <span className="text-[10px] font-black text-white uppercase tracking-widest">{manifestItems.length} Unique Units</span>
+              <h3 className="text-2xl font-black text-white tracking-widest uppercase italic leading-none mb-2">Project Manifest</h3>
+              <div className="flex items-center space-x-4">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Digital Specification Table</p>
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-700" />
+                <span className="text-xs font-black text-white uppercase tracking-widest">{manifestItems.length} Unique Units</span>
               </div>
             </div>
          </div>
          
          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-            <div className="flex items-center space-x-1 bg-black/40 p-1.5 rounded-2xl border border-white/5">
+             <div className="flex items-center space-x-2 bg-black/40 p-2 rounded-[24px] border border-white/10 shadow-inner">
               {(['all', 'full', 'partial', 'missing'] as const).map((f) => (
                 <button
                   key={f}
                   onClick={() => setStatusFilter(f)}
                   className={cn(
-                    "px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
+                    "px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-[0.15em] transition-all",
                     statusFilter === f 
-                      ? "bg-primary text-white shadow-xl shadow-primary/20" 
-                      : "text-slate-500 hover:text-slate-300"
+                      ? "bg-primary text-white shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)]" 
+                      : "text-slate-500 hover:text-slate-200"
                   )}
                 >
                   {f}
@@ -2094,15 +2101,15 @@ function ProjectManifestTab({
               ))}
             </div>
 
-            <div className="h-10 w-px bg-white/10 hidden lg:block" />
+            <div className="h-12 w-px bg-white/10 hidden lg:block" />
 
-            <div className="flex items-center gap-3">
-              <div className="relative group">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-primary transition-colors" />
+            <div className="flex items-center gap-4">
+              <div className="relative group flex-1 sm:flex-none">
+                <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-primary transition-colors" />
                 <input 
                   type="text" 
-                  placeholder="Search SKU..."
-                  className="bg-black/40 border border-white/10 rounded-2xl py-3 pl-12 pr-6 text-xs font-black text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/5 transition-all w-full sm:w-[200px] uppercase tracking-widest"
+                  placeholder="SEARCH MANIFEST..."
+                  className="bg-black/50 border border-white/10 rounded-[24px] py-4 pl-14 pr-8 text-sm font-black text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/5 transition-all w-full sm:min-w-[280px] uppercase tracking-widest shadow-inner"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -2111,21 +2118,21 @@ function ProjectManifestTab({
               <button 
                 onClick={() => setShowFilters(!showFilters)}
                 className={cn(
-                  "p-3 rounded-2xl border transition-all relative",
+                  "p-4 rounded-[24px] border transition-all relative shadow-lg",
                   showFilters 
                     ? "bg-primary border-primary text-white shadow-[0_0_20px_rgba(var(--primary),0.3)]" 
-                    : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
+                    : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10 hover:text-white"
                 )}
               >
-                <Filter className="w-5 h-5" />
+                <Filter className="w-6 h-6" />
               </button>
 
               {isAdmin && (
                 <button 
                   onClick={onAddItem}
-                  className="p-3 bg-primary/20 hover:bg-primary text-primary hover:text-white rounded-2xl border border-primary/30 transition-all group shadow-xl"
+                  className="p-4 bg-primary/20 hover:bg-primary text-primary hover:text-white rounded-[24px] border border-primary/30 transition-all group shadow-2xl active:scale-95"
                 >
-                  <Plus className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                  <Plus className="w-7 h-7 group-hover:scale-110 transition-transform" />
                 </button>
               )}
             </div>
@@ -2179,8 +2186,8 @@ function ProjectManifestTab({
         )}
       </AnimatePresence>
       
-              <div className="flex-1 min-h-0 bg-white/[0.03] rounded-[32px] md:rounded-[48px] overflow-hidden border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.3)] backdrop-blur-3xl">
-                <AutoSizer>
+      <div className="h-[calc(100vh-350px)] md:h-[calc(100vh-300px)] bg-white/[0.03] rounded-[32px] md:rounded-[48px] overflow-hidden border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.3)] backdrop-blur-3xl relative">
+        <AutoSizer>
                   {({ height, width }) => (
                     <List
                       height={height}
@@ -2188,6 +2195,7 @@ function ProjectManifestTab({
                       itemSize={(index) => 400} // ProjectItemCard is roughly 400px tall
                       width={width}
                       className="custom-scrollbar"
+                      overscanCount={5}
                     >
                       {({ index, style }) => (
                         <div style={style} className="px-4 md:px-8 py-4">
@@ -2226,8 +2234,8 @@ const ProjectItemCard = React.memo(({ item, onEdit }: { item: any, onEdit: () =>
               <Package className="w-6 h-6" />
             </div>
             <div className="min-w-0">
-               <h4 className="text-base font-black text-white truncate tracking-tight uppercase italic drop-shadow-sm leading-none mb-1.5">{item.name}</h4>
-               <span className={cn("text-[7px] font-black px-2 py-0.5 rounded-full border tracking-[0.2em] shadow-sm uppercase inline-block", statusColor)}>
+              <h4 className="text-lg md:text-xl font-black text-white truncate tracking-tight uppercase italic drop-shadow-sm leading-none mb-2">{item.name}</h4>
+               <span className={cn("text-[9px] md:text-xs font-black px-4 py-1 rounded-full border tracking-[0.25em] shadow-sm uppercase inline-block", statusColor)}>
                   {fulfillment}
                </span>
             </div>
@@ -2235,55 +2243,55 @@ const ProjectItemCard = React.memo(({ item, onEdit }: { item: any, onEdit: () =>
           
           <button 
             onClick={onEdit}
-            className="p-2.5 bg-white/5 hover:bg-primary hover:text-white rounded-xl text-slate-400 transition-all shadow-lg border border-white/10 active:scale-90"
+            className="p-3.5 bg-white/5 hover:bg-primary hover:text-white rounded-2xl text-slate-400 transition-all shadow-lg border border-white/10 active:scale-95"
           >
-            <Edit className="w-4 h-4" />
+            <Edit className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="flex-1 space-y-4 mb-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-black/20 p-3 rounded-2xl border border-white/5">
-              <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mb-1 opacity-50">Brand</p>
-              <p className="text-[10px] font-bold text-slate-400 truncate uppercase">{item.brand || 'No Brand'}</p>
+        <div className="flex-1 space-y-5 mb-8">
+          <div className="grid grid-cols-2 gap-5">
+            <div className="bg-black/30 p-4 rounded-2xl border border-white/5">
+              <p className="text-[9px] md:text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2 opacity-70">Brand</p>
+              <p className="text-xs md:text-sm font-bold text-slate-300 truncate uppercase">{item.brand || 'No Brand'}</p>
             </div>
-            <div className="bg-black/20 p-3 rounded-2xl border border-white/5">
-              <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mb-1 opacity-50">POS ID</p>
-              <p className="text-[10px] font-black text-primary truncate">#{item.posNo || 'N/A'}</p>
+            <div className="bg-black/30 p-4 rounded-2xl border border-white/5">
+              <p className="text-[9px] md:text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2 opacity-70">POS ID</p>
+              <p className="text-xs md:text-sm font-black text-primary truncate">#{item.posNo || 'N/A'}</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-5">
             <div>
-              <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mb-1 opacity-50">Location</p>
-              <p className="text-[10px] font-bold text-blue-400 truncate uppercase">{item.unitLocation || 'STANDBY'}</p>
+              <p className="text-[9px] md:text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2 opacity-70">Location</p>
+              <p className="text-xs md:text-sm font-bold text-blue-400 truncate uppercase">{item.unitLocation || 'STANDBY'}</p>
             </div>
             <div>
-              <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mb-1 opacity-50">ETA</p>
-              <p className="text-[10px] font-bold text-amber-500 truncate uppercase">{item.eta || 'NOT SET'}</p>
+              <p className="text-[9px] md:text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2 opacity-70">ETA</p>
+              <p className="text-xs md:text-sm font-bold text-amber-500 truncate uppercase">{item.eta || 'NOT SET'}</p>
             </div>
           </div>
 
           <div>
-            <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mb-1 opacity-50">Dimensions / Spec</p>
-            <p className="text-[9px] font-bold text-emerald-400 font-mono tracking-tighter truncate">{item.dimensions || 'NOT QUANTIFIED'}</p>
+            <p className="text-[9px] md:text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2 opacity-70">Dimensions / Spec</p>
+            <p className="text-xs md:text-base font-bold text-emerald-400 font-mono tracking-tighter truncate">{item.dimensions || 'NOT QUANTIFIED'}</p>
           </div>
         </div>
 
-        <div className="bg-black/40 px-5 py-4 rounded-[28px] border border-white/10 shadow-inner flex items-center justify-between">
+        <div className="bg-black/50 px-6 py-5 rounded-[32px] border border-white/10 shadow-inner flex items-center justify-between">
           <div className="text-center group-hover:scale-110 transition-transform">
-            <p className="text-[8px] font-black text-slate-600 mb-0.5 uppercase tracking-tighter">Required</p>
-            <span className="text-2xl font-black text-white italic tracking-tighter leading-none">{item.quantity}</span>
+            <p className="text-[10px] md:text-xs font-black text-slate-600 mb-1 uppercase tracking-tighter">Required</p>
+            <span className="text-3xl font-black text-white italic tracking-tighter leading-none">{item.quantity}</span>
           </div>
-          <div className="w-px h-8 bg-white/10" />
-          <div className="flex items-center space-x-4">
+          <div className="w-px h-12 bg-white/10" />
+          <div className="flex items-center space-x-6">
             <div className="text-center">
-              <p className="text-[8px] font-black text-emerald-500 mb-0.5 uppercase tracking-tighter">IN</p>
-              <span className="text-xl font-black text-emerald-400 leading-none">{item.quantityIn || 0}</span>
+              <p className="text-[10px] md:text-xs font-black text-emerald-500 mb-1 uppercase tracking-tighter">IN</p>
+              <span className="text-2xl font-black text-emerald-400 leading-none">{item.quantityIn || 0}</span>
             </div>
             <div className="text-center">
-              <p className="text-[8px] font-black text-red-500 mb-0.5 uppercase tracking-tighter">OUT</p>
-              <span className="text-xl font-black text-red-400 leading-none">{item.quantityOut || 0}</span>
+              <p className="text-[10px] md:text-xs font-black text-red-500 mb-1 uppercase tracking-tighter">OUT</p>
+              <span className="text-2xl font-black text-red-400 leading-none">{item.quantityOut || 0}</span>
             </div>
           </div>
         </div>
