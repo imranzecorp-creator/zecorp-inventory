@@ -7,7 +7,7 @@ interface PermissionListProps {
   className?: string;
 }
 
-export default function PermissionList({ className }: PermissionListProps) {
+const PermissionList = React.forwardRef<HTMLDivElement, PermissionListProps>(({ className }, ref) => {
   const permissions = [
     {
       action: "View Inventory Catalog",
@@ -76,6 +76,7 @@ export default function PermissionList({ className }: PermissionListProps) {
 
   return (
     <motion.div 
+      ref={ref}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className={cn("glass-morphism p-8 rounded-[40px] border border-white/5 shadow-2xl", className)}
@@ -137,7 +138,9 @@ export default function PermissionList({ className }: PermissionListProps) {
       </div>
     </motion.div>
   );
-}
+});
+
+export default PermissionList;
 
 function StatusIcon({ allowed }: { allowed: boolean }) {
   return (

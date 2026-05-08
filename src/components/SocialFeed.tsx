@@ -34,7 +34,7 @@ interface SocialFeedProps {
   user: UserProfile;
 }
 
-export default function SocialFeed({ user }: SocialFeedProps) {
+const SocialFeed = React.forwardRef<HTMLDivElement, SocialFeedProps>(({ user }, ref) => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [newPost, setNewPost] = useState('');
   const [imageUrl, setImageUrl] = useState('');
@@ -72,6 +72,7 @@ export default function SocialFeed({ user }: SocialFeedProps) {
 
   return (
     <motion.div 
+      ref={ref}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="max-w-2xl mx-auto space-y-6 pb-24 md:pb-8"
@@ -142,7 +143,9 @@ export default function SocialFeed({ user }: SocialFeedProps) {
       </div>
     </motion.div>
   );
-}
+});
+
+export default SocialFeed;
 
 const PostCard = React.memo(({ post, currentUser }: { post: Post, currentUser: UserProfile }) => {
   const [likes, setLikes] = useState(post.likes || []);

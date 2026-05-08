@@ -189,7 +189,7 @@ const TransactionRow = React.memo(({ index, style, data }: { index: number, styl
   );
 });
 
-const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions }) => {
+const TransactionHistory = React.forwardRef<HTMLDivElement, TransactionHistoryProps>(({ transactions }, ref) => {
   const [searchTerm, setSearchTerm] = useState('');
   const deferredSearchTerm = useDeferredValue(searchTerm);
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
@@ -320,6 +320,7 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
 
   return (
     <motion.div 
+      ref={ref}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="space-y-6"
@@ -651,6 +652,6 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({ transactions })
       </div>
     </motion.div>
   );
-};
+});
 
 export default TransactionHistory;

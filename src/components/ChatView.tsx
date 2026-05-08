@@ -39,7 +39,7 @@ interface ChatViewProps {
   user: UserProfile;
 }
 
-export default function ChatView({ user }: ChatViewProps) {
+const ChatView = React.forwardRef<HTMLDivElement, ChatViewProps>(({ user }, ref) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isAiMode, setIsAiMode] = useState(true);
@@ -225,7 +225,7 @@ export default function ChatView({ user }: ChatViewProps) {
   };
 
   return (
-    <div className="h-full flex overflow-hidden glass-morphism rounded-3xl border border-white/5 shadow-sm relative">
+    <div ref={ref} className="h-full flex overflow-hidden glass-morphism rounded-3xl border border-white/5 shadow-sm relative">
       {/* Sidebar - Contacts */}
       <div className={cn(
         "w-full md:w-80 border-r border-white/5 flex flex-col bg-white/[0.02] transition-transform md:translate-x-0 absolute md:relative z-20 inset-0 md:inset-auto h-full",
@@ -581,4 +581,6 @@ export default function ChatView({ user }: ChatViewProps) {
       </div>
     </div>
   );
-}
+});
+
+export default ChatView;

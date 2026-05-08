@@ -34,7 +34,7 @@ interface AdminPanelProps {
   clients?: any[];
 }
 
-export default function AdminPanel({ user, clients = [] }: AdminPanelProps) {
+const AdminPanel = React.forwardRef<HTMLDivElement, AdminPanelProps>(({ user, clients = [] }, ref) => {
   const [activeSubTab, setActiveSubTab] = useState('users');
 
   const menu = [
@@ -47,7 +47,7 @@ export default function AdminPanel({ user, clients = [] }: AdminPanelProps) {
   ];
 
   return (
-    <div className="flex flex-col space-y-8">
+    <div ref={ref} className="flex flex-col space-y-8">
       <div className="bg-gradient-to-r from-primary/20 via-indigo-900/40 to-slate-900 p-8 rounded-3xl text-white shadow-2xl relative overflow-hidden glass-morphism border border-white/10">
         <div className="relative z-10">
           <div className="flex items-center space-x-3 mb-4">
@@ -105,7 +105,9 @@ export default function AdminPanel({ user, clients = [] }: AdminPanelProps) {
       </div>
     </div>
   );
-}
+});
+
+export default AdminPanel;
 
 function ClientManagement({ clients }: { clients: any[] }) {
   const [newClient, setNewClient] = useState('');

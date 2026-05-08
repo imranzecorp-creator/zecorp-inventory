@@ -25,7 +25,7 @@ interface AIReportsProps {
   transactions: StockTransaction[];
 }
 
-export function AIReports({ inventory, transactions }: AIReportsProps) {
+export const AIReports = React.forwardRef<HTMLDivElement, AIReportsProps>(({ inventory, transactions }, ref) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [report, setReport] = useState<string | null>(null);
   
@@ -94,7 +94,7 @@ export function AIReports({ inventory, transactions }: AIReportsProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <div ref={ref} className="space-y-6">
       {/* Strategic Platform Overview - Mini Help */}
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
@@ -403,4 +403,4 @@ export function AIReports({ inventory, transactions }: AIReportsProps) {
       </div>
     </div>
   );
-}
+});

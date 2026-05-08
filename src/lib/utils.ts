@@ -64,3 +64,46 @@ export function getDateObject(date: any): Date | null {
 
   return isNaN(d.getTime()) ? null : d;
 }
+
+export function safeJsonParse(text: string | null | undefined, fallback: any = []): any {
+  if (!text) return fallback;
+  
+  try {
+    // 1. First attempt: Direct parse after cleaning common markdown markers
+    const cleaned = text.trim()
+      .replace(/^```json\n?/, '')
+      .replace(/\n?```$/, '')
+      .trim();
+      
+    try {
+      return JSON.parse(cleaned);
+    } catch (e) {
+      // 2. Second attempt: Extract JSON block using regex (greedy)
+      const match = cleaned.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
+      if (match) {
+        let candidate = match[0];
+        
+        try {
+          return JSON.parse(candidate);
+        } catch (innerE) {
+          // 3. Third attempt: Handle trailing junk/extra brackets (common with some models)
+          // Iteratively trim from the end until it parses or string is exhausted
+          let tempCandidate = candidate;
+          while (tempCandidate.length > 2) {
+            tempCandidate = tempCandidate.slice(0, -1).trim();
+            // Only try parsing if it ends with a valid JSON closure
+            if (tempCandidate.endsWith(']') || tempCandidate.endsWith('}')) {
+              try {
+                return JSON.parse(tempCandidate);
+              } catch (ignore) {}
+            }
+          }
+        }
+      }
+      throw e; // Re-throw to be caught by the outer block
+    }
+  } catch (err) {
+    console.error("AI JSON Parse Error:", err, "Raw Text:", text);
+    return fallback;
+  }
+}

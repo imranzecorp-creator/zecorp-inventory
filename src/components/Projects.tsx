@@ -7,6 +7,8 @@ import {
   Search, 
   Trash, 
   Layout, 
+  LayoutGrid,
+  List as LucideList,
   Briefcase, 
   User, 
   Hash, 
@@ -27,7 +29,14 @@ import {
   Building,
   FileUp,
   Zap,
-  CheckSquare
+  CheckSquare,
+  Database,
+  QrCode,
+  Truck,
+  Maximize,
+  CheckCircle2,
+  Download,
+  Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -46,102 +55,109 @@ import { FilterDropdown } from './ui/FilterDropdown';
 import { Clock, History as LucideHistory } from 'lucide-react';
 import { analyzeInventory, processAiSearch, mapExcelItems, mapExcelProjects, getExcelMapping, getProjectExcelMapping, findInventoryMatches } from '../services/geminiService';
 
-const ManifestRow = React.memo(({ index, style, data }: { index: number, style: React.CSSProperties, data: { items: ProjectItem[] } }) => {
+const ManifestRow = React.memo(({ index, style, data }: { index: number, style: React.CSSProperties, data: { items: ProjectItem[], onEdit?: (item: ProjectItem) => void } }) => {
   const item = data.items[index];
   if (!item) return null;
 
+  const status = React.useMemo(() => {
+    const qOut = item.quantityOut || 0;
+    const qIn = item.quantityIn || 0;
+    const req = item.quantity || 0;
+    
+    if (qOut >= req && req > 0) return { label: 'FULFILLED', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' };
+    if (qIn > 0) return { label: 'INBOUND', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' };
+    return { label: 'PENDING', color: 'bg-amber-500/10 text-amber-500 border-amber-500/20' };
+  }, [item.quantity, item.quantityIn, item.quantityOut]);
+
   return (
-    <div style={style} className="px-1 pb-4">
-      <div className="bg-white/[0.03] p-5 rounded-3xl border border-white/5 flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:bg-white/[0.05] transition-all overflow-hidden relative">
-        <div className="absolute top-0 left-0 w-1 h-full bg-primary/20 group-hover:bg-primary transition-colors" />
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center text-white shrink-0 shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform">
-            <Package className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="text-sm font-bold text-white group-hover:text-primary transition-colors">{item.name}</p>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-300 font-medium tracking-wide mt-1">
-              <span className="flex items-center space-x-1">
-                 <span className="text-slate-400 font-black">BRAND:</span>
-                 <span className="text-slate-200">{item.brand || 'Generic'}</span>
-              </span>
-              <span className="w-1 h-1 rounded-full bg-slate-700" />
-              <span className="flex items-center space-x-1">
-                 <span className="text-slate-400 font-black">CAT:</span>
-                 <span className="text-slate-200">{item.category || 'Unset'}</span>
-              </span>
-              {item.posNo && (
-                <>
-                  <span className="w-1 h-1 rounded-full bg-slate-700" />
-                  <span className="flex items-center space-x-1">
-                     <span className="text-slate-400 font-black">POS:</span>
-                     <span className="text-slate-200">{item.posNo}</span>
+    <div style={style} className="px-2 md:px-6 pb-2 focus:outline-none">
+      <div className="bg-slate-800/40 p-3 md:p-4 rounded-[24px] border border-white/10 flex flex-col md:flex-row items-center justify-between gap-4 group hover:bg-slate-800/60 hover:border-primary/40 transition-all overflow-hidden relative min-h-[90px] shadow-xl backdrop-blur-md">
+        <div className="absolute top-0 left-0 w-1 h-full bg-primary/20 group-hover:bg-primary transition-all duration-500 shrink-0 shadow-[0_0_15px_rgba(var(--primary),0.3)]" />
+        
+        <div className="flex-1 min-w-0 w-full md:w-auto">
+          <div className="flex items-center justify-between mb-2 md:mb-1">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0 border border-primary/20 shadow-inner group-hover:scale-105 transition-transform duration-300">
+                <Package className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h4 className="text-sm md:text-base font-black text-white truncate tracking-tight uppercase italic drop-shadow-sm leading-none">{item.name}</h4>
+                  <span className={cn("text-[7px] font-black px-1.5 py-0.5 rounded-full border tracking-[0.2em] shadow-sm", status.color)}>
+                    {status.label}
                   </span>
-                </>
-              )}
-              {item.dimensions && (
-                <>
-                  <span className="w-1 h-1 rounded-full bg-slate-700" />
-                  <span className="flex items-center space-x-1">
-                     <span className="text-slate-400 font-black">DIM:</span>
-                     <span className="text-slate-200">{item.dimensions}</span>
-                  </span>
-                </>
-              )}
-              {item.origin && (
-                <>
-                  <span className="w-1 h-1 rounded-full bg-slate-700" />
-                  <span className="flex items-center space-x-1">
-                     <span className="text-slate-400 font-black">ORG:</span>
-                     <span className="text-slate-200">{item.origin}</span>
-                  </span>
-                </>
-              )}
-              {item.logistics && (
-                <>
-                  <span className="w-1 h-1 rounded-full bg-slate-700" />
-                  <span className="flex items-center space-x-1">
-                     <span className="text-slate-600 font-black">LOG:</span>
-                     <span className="text-slate-300">{item.logistics}</span>
-                  </span>
-                </>
-              )}
-              {item.eta && (
-                <>
-                  <span className="w-1 h-1 rounded-full bg-slate-700" />
-                  <span className="flex items-center space-x-1">
-                     <span className="text-primary font-black uppercase">ETA:</span>
-                     <span className="text-primary/80">{item.eta}</span>
-                  </span>
-                </>
-              )}
-              {item.unitLocation && (
-                <>
-                  <span className="w-1 h-1 rounded-full bg-slate-700" />
-                  <span className="flex items-center space-x-1">
-                     <span className="text-slate-600 font-black">LOCATION:</span>
-                     <span className="text-slate-300">{item.unitLocation}</span>
-                  </span>
-                </>
+                </div>
+                <div className="flex items-center space-x-3 mt-0.5">
+                  <div className="flex items-center space-x-1 text-slate-500">
+                    <span className="text-[9px] font-bold">{item.brand || 'No Brand'}</span>
+                    <span className="w-0.5 h-0.5 rounded-full bg-slate-700" />
+                    <span className="text-[9px] font-black text-primary tracking-wider">#{item.posNo || 'N/A'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="md:hidden">
+               {data.onEdit && (
+                <button 
+                  onClick={() => data.onEdit!(item)}
+                  className="p-2 bg-white/5 hover:bg-primary hover:text-white rounded-lg text-slate-400 transition-all shadow-sm border border-white/5 active:scale-95"
+                >
+                  <Edit className="w-3.5 h-3.5" />
+                </button>
               )}
             </div>
           </div>
+ 
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 px-1">
+            <div className="flex flex-col">
+              <p className="text-[6px] font-black text-slate-500 uppercase tracking-widest mb-0.5 opacity-70">Location</p>
+              <p className="text-[10px] font-bold text-blue-400 truncate uppercase">{item.unitLocation || 'STANDBY'}</p>
+            </div>
+            <div className="flex flex-col">
+              <p className="text-[6px] font-black text-slate-500 uppercase tracking-widest mb-0.5 opacity-70">Delivery</p>
+              <p className="text-[10px] font-bold text-amber-500 truncate uppercase">{item.eta || 'NOT SET'}</p>
+            </div>
+            <div className="flex flex-col">
+              <p className="text-[6px] font-black text-slate-500 uppercase tracking-widest mb-0.5 opacity-70">Category</p>
+              <p className="text-[10px] font-bold text-slate-300 truncate uppercase">{item.category || 'GENERAL'}</p>
+            </div>
+            <div className="flex flex-col">
+              <p className="text-[6px] font-black text-slate-500 uppercase tracking-widest mb-0.5 opacity-70">Spec</p>
+              <p className="text-[10px] font-bold text-emerald-400 truncate font-mono">{item.dimensions || 'N/A'}</p>
+            </div>
+          </div>
         </div>
-        
-        <div className="flex items-center gap-6 md:gap-8 bg-[#030712]/40 p-4 rounded-2xl border border-white/5 shadow-inner">
-          <div className="text-center min-w-[40px]">
-            <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Req</p>
-            <span className="text-lg font-black text-white">{item.quantity}</span>
+ 
+        <div className="flex items-center justify-between md:justify-center gap-4 bg-black/30 px-4 py-2 md:py-3 rounded-[20px] border border-white/5 min-w-[110px] md:min-w-[180px] shadow-lg group-hover:bg-black/50 transition-all w-full md:w-auto">
+          <div className="flex items-center space-x-6 md:space-x-8">
+            <div className="text-center group-hover:scale-110 transition-transform">
+              <p className="text-[7px] font-black text-slate-500 mb-0.5 tracking-tighter uppercase">REQ</p>
+              <span className="text-xl md:text-2xl font-black text-white leading-none tracking-tighter italic">{item.quantity}</span>
+            </div>
+            <div className="w-px h-8 bg-white/10" />
+            <div className="flex items-center space-x-4">
+              <div className="text-center">
+                <p className="text-[7px] font-black text-emerald-500 mb-0.5 tracking-tighter">IN</p>
+                <span className="text-lg font-black text-emerald-400 leading-none tracking-tighter">{item.quantityIn || 0}</span>
+              </div>
+              <div className="text-center">
+                <p className="text-[7px] font-black text-red-500 mb-0.5 tracking-tighter">OUT</p>
+                <span className="text-lg font-black text-red-400 leading-none tracking-tighter">{item.quantityOut || 0}</span>
+              </div>
+            </div>
           </div>
-          <div className="w-px h-6 bg-white/10" />
-          <div className="text-center min-w-[40px]">
-            <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mb-1">In</p>
-            <span className="text-lg font-black text-emerald-400">{item.quantityIn || 0}</span>
-          </div>
-          <div className="w-px h-6 bg-white/10" />
-          <div className="text-center min-w-[40px]">
-            <p className="text-[8px] font-black text-red-500 uppercase tracking-widest mb-1">Out</p>
-            <span className="text-lg font-black text-red-400">{item.quantityOut || 0}</span>
+          
+          <div className="hidden md:block">
+            {data.onEdit && (
+              <button 
+                onClick={() => data.onEdit!(item)}
+                className="p-2.5 bg-white/5 hover:bg-primary hover:text-white rounded-xl text-slate-400 transition-all shadow-sm border border-white/5 active:scale-95 group/editbtn ml-2"
+                title="Edit SKU"
+              >
+                <Edit className="w-4 h-4 group-hover/editbtn:rotate-12 transition-transform" />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -155,9 +171,17 @@ interface ProjectsProps {
   clients: any[];
   user: UserProfile;
   transactions: StockTransaction[];
+  onProjectDeepLink?: (jobNumber: string) => void;
 }
 
-export default function Projects({ projects, inventory, clients, user, transactions }: ProjectsProps) {
+const Projects = React.forwardRef<HTMLDivElement, ProjectsProps>(({ 
+  projects, 
+  inventory, 
+  clients, 
+  user, 
+  transactions,
+  onProjectDeepLink 
+}, ref) => {
   const [searchTerm, setSearchTerm] = useState('');
   const deferredSearchTerm = useDeferredValue(searchTerm);
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
@@ -170,6 +194,7 @@ export default function Projects({ projects, inventory, clients, user, transacti
   const [selectedWarehouseLocations, setSelectedWarehouseLocations] = useState<string[]>([]);
   const [jobSearch, setJobSearch] = useState('');
   const deferredJobSearch = useDeferredValue(jobSearch);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showFilters, setShowFilters] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -457,6 +482,7 @@ export default function Projects({ projects, inventory, clients, user, transacti
 
   return (
     <motion.div 
+      ref={ref}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="space-y-8 pb-32 md:pb-0"
@@ -513,6 +539,29 @@ export default function Projects({ projects, inventory, clients, user, transacti
                 <Filter className={cn("w-3 h-3 md:w-4 md:h-4", showFilters && "animate-bounce")} />
                 <span>Filters</span>
               </button>
+
+              <div className="flex items-center bg-slate-800/50 rounded-xl md:rounded-2xl border border-white/10 p-1 shrink-0">
+                <button 
+                  onClick={() => setViewMode('grid')}
+                  className={cn(
+                    "p-2 rounded-lg md:rounded-xl transition-all",
+                    viewMode === 'grid' ? "bg-primary text-white shadow-lg" : "text-slate-500 hover:text-slate-300"
+                  )}
+                  title="Grid View"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                </button>
+                <button 
+                  onClick={() => setViewMode('list')}
+                  className={cn(
+                    "p-2 rounded-lg md:rounded-xl transition-all",
+                    viewMode === 'list' ? "bg-primary text-white shadow-lg" : "text-slate-500 hover:text-slate-300"
+                  )}
+                  title="Detailed List View"
+                >
+                  <LucideList className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                </button>
+              </div>
               {(isApproved) && (
                 <>
                   <button 
@@ -554,12 +603,33 @@ export default function Projects({ projects, inventory, clients, user, transacti
       {/* DASHBOARD SUMMARY */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {[
-          { label: 'Total Jobs', value: stats.total, icon: Briefcase, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-          { label: 'Active Pipeline', value: stats.active, icon: ArrowDownLeft, color: 'text-green-400', bg: 'bg-green-500/10' },
-          { label: 'Finalized', value: stats.completed, icon: Save, color: 'text-slate-300', bg: 'bg-slate-500/10' },
-          { label: 'SKU Allocation', value: stats.inventoryLinked, icon: Package, color: 'text-primary', bg: 'bg-primary/10' }
+          { id: 'total', label: 'Total Jobs', value: stats.total, icon: Briefcase, color: 'text-blue-400', bg: 'bg-blue-500/10' },
+          { id: 'active', label: 'Active Pipeline', value: stats.active, icon: ArrowDownLeft, color: 'text-green-400', bg: 'bg-green-500/10' },
+          { id: 'finalized', label: 'Finalized', value: stats.completed, icon: Save, color: 'text-slate-300', bg: 'bg-slate-500/10' },
+          { id: 'sku', label: 'SKU Allocation', value: stats.inventoryLinked, icon: Package, color: 'text-primary', bg: 'bg-primary/10' }
         ].map((stat, i) => (
-          <div key={i} className="glass-morphism p-3 md:p-6 rounded-2xl shadow-sm md:rounded-[32px] border border-white/5 space-y-3 md:space-y-4">
+          <motion.div 
+            key={i} 
+            whileHover={{ y: -5 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => {
+              if (stat.id === 'active') {
+                setSelectedStatuses(['Active']);
+              } else if (stat.id === 'finalized') {
+                setSelectedStatuses(['Completed']);
+              } else if (stat.id === 'total') {
+                setSelectedStatuses([]);
+              }
+            }}
+            className={cn(
+              "glass-morphism p-3 md:p-6 rounded-2xl shadow-sm md:rounded-[32px] border cursor-pointer transition-all",
+              (stat.id === 'active' && selectedStatuses.includes('Active')) || 
+              (stat.id === 'finalized' && selectedStatuses.includes('Completed')) ||
+              (stat.id === 'total' && selectedStatuses.length === 0)
+                ? "border-primary/50 bg-primary/5 shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)]"
+                : "border-white/5"
+            )}
+          >
             <div className="flex items-center justify-between">
               <div className={cn("w-8 h-8 md:w-10 md:h-10 rounded-xl md:rounded-2xl flex items-center justify-center border border-white/5", stat.bg)}>
                 <stat.icon className={cn("w-4 h-4 md:w-5 md:h-5", stat.color)} />
@@ -569,7 +639,7 @@ export default function Projects({ projects, inventory, clients, user, transacti
                 <p className="text-xl md:text-2xl font-black text-white mt-1">{stat.value}</p>
               </div>
             </div>
-            <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+            <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mt-3 md:mt-4">
                <motion.div 
                  initial={{ width: 0 }}
                  animate={{ width: '100%' }}
@@ -577,7 +647,7 @@ export default function Projects({ projects, inventory, clients, user, transacti
                  className={cn("h-full", stat.bg.replace('/10', ''))} 
                />
             </div>
-          </div>
+          </motion.div>
         ))}
       </div>
 
@@ -742,25 +812,78 @@ export default function Projects({ projects, inventory, clients, user, transacti
         </AnimatePresence>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <AnimatePresence mode="popLayout">
-          {filteredProjects.map((project) => (
-            <ProjectCard 
-              key={project.id} 
-              project={project} 
-              user={user}
-              isDeleteMode={isDeleteMode}
-              isSelected={selectedForDeletion.includes(project.id)}
-              onToggleButton={(e) => toggleSelectForDeletion(project.id, e)}
-              onClick={(e) => {
-                if (isDeleteMode) toggleSelectForDeletion(project.id, e);
-                else setSelectedProject(project);
-              }}
-              onEdit={(e) => { e.stopPropagation(); setEditingProject(project); }}
-              onDelete={(e) => { e.stopPropagation(); handleDeleteProject(project.id); }}
-            />
-          ))}
-        </AnimatePresence>
+      <div className="space-y-6 flex-1 min-h-[600px] relative">
+        <div className="absolute inset-0">
+          <AutoSizer>
+            {({ height, width }) => {
+              const gutter = 24;
+              const columns = viewMode === 'grid' ? (width > 1024 ? 3 : width > 768 ? 2 : 1) : 1;
+              const columnWidth = (width - (columns - 1) * gutter) / columns;
+              const rowCount = Math.ceil(filteredProjects.length / columns);
+              const rowHeight = viewMode === 'grid' ? 420 : 130;
+
+              return (
+                <List
+                  height={height}
+                  itemCount={rowCount}
+                  itemSize={() => rowHeight}
+                  width={width}
+                  className="custom-scrollbar"
+                >
+                  {({ index, style }) => (
+                    <div style={{ ...style, display: 'flex', gap: gutter }} className="pb-6">
+                      {Array.from({ length: columns }).map((_, colIdx) => {
+                        const itemIdx = index * columns + colIdx;
+                        const project = filteredProjects[itemIdx];
+                        if (!project) return <div key={colIdx} style={{ width: columnWidth }} />;
+                        
+                        return (
+                          <div key={project.id} style={{ width: columnWidth }}>
+                            {viewMode === 'grid' ? (
+                              <ProjectCard 
+                                project={project} 
+                                user={user}
+                                isDeleteMode={isDeleteMode}
+                                isSelected={selectedForDeletion.includes(project.id)}
+                                onToggleButton={(e) => toggleSelectForDeletion(project.id, e)}
+                                onClick={(e) => {
+                                  if (isDeleteMode) toggleSelectForDeletion(project.id, e);
+                                  else setSelectedProject(project);
+                                }}
+                                onStatusClick={(e) => {
+                                  if (project.status === 'Active' && onProjectDeepLink) {
+                                    e.stopPropagation();
+                                    onProjectDeepLink(project.jobNumber);
+                                  }
+                                }}
+                                onEdit={(e) => { e.stopPropagation(); setEditingProject(project); }}
+                                onDelete={(e) => { e.stopPropagation(); handleDeleteProject(project.id); }}
+                              />
+                            ) : (
+                              <ProjectRow 
+                                project={project}
+                                isSelected={selectedProject?.id === project.id}
+                                onClick={() => setSelectedProject(project)}
+                                onStatusClick={(e) => {
+                                  if (project.status === 'Active' && onProjectDeepLink) {
+                                    e.stopPropagation();
+                                    onProjectDeepLink(project.jobNumber);
+                                  }
+                                }}
+                                onEdit={(e) => { e.stopPropagation(); setEditingProject(project); }}
+                                onDelete={(e) => { e.stopPropagation(); handleDeleteProject(project.id); }}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </List>
+              );
+            }}
+          </AutoSizer>
+        </div>
       </div>
 
       {filteredProjects.length === 0 && (
@@ -785,12 +908,20 @@ export default function Projects({ projects, inventory, clients, user, transacti
         )}
         {selectedProject && (
           <ProjectDetailModal 
-            project={selectedProject} 
+            project={selectedProject}
             inventory={inventory}
             transactions={transactions}
             onClose={() => setSelectedProject(null)}
-            onDelete={() => handleDeleteProject(selectedProject.id)}
+            onDelete={() => {
+              handleDeleteProject(selectedProject.id!);
+              setSelectedProject(null);
+            }}
+            onEdit={() => {
+              setEditingProject(selectedProject);
+              setSelectedProject(null);
+            }}
             isApproved={isApproved}
+            user={user}
           />
         )}
         {projectImportPreview && (
@@ -804,31 +935,131 @@ export default function Projects({ projects, inventory, clients, user, transacti
       </AnimatePresence>
     </motion.div>
   );
-}
+});
 
-function ProjectCard({ 
-  project, 
-  user, 
-  onClick, 
-  onEdit, 
-  onDelete, 
-  isDeleteMode, 
-  isSelected, 
-  onToggleButton 
-}: { 
+const ProjectRow = React.memo(({ project, onClick, onStatusClick, onEdit, onDelete, isSelected }: { project: Project, onClick: () => void, onStatusClick: (e: any) => void, onEdit: (e: any) => void, onDelete: (e: any) => void, isSelected?: boolean }) => {
+  const itemCount = project.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+  
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      onClick={onClick}
+      className={cn(
+        "glass-morphism p-4 md:px-6 md:py-4 rounded-2xl md:rounded-3xl border group cursor-pointer transition-all relative overflow-hidden",
+        isSelected ? "border-primary/50 bg-primary/5 shadow-[0_0_20px_rgba(var(--primary-rgb),0.1)]" : "border-white/5 hover:bg-white/[0.05]"
+      )}
+    >
+      <div className="md:grid md:grid-cols-12 md:gap-4 items-center">
+        <div className="col-span-3 flex items-center space-x-3">
+          <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
+            <Layout className="w-4 h-4 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-white group-hover:text-primary transition-colors truncate">{project.client}</p>
+            <div className="flex items-center space-x-2">
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">JN-#{project.jobNumber}</p>
+              <div className="flex items-center space-x-1.5 bg-primary/10 px-2 py-0.5 rounded-lg border border-primary/20">
+                <span className="text-[9px] font-black text-primary uppercase tracking-tighter">Units</span>
+                <span className="text-[10px] font-black text-white font-mono">{itemCount}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="hidden md:block col-span-2 text-center">
+          <p className="text-[10px] font-bold text-slate-300 truncate">{project.location || 'Local'}</p>
+          <p className="text-[9px] font-medium text-slate-500 truncate">{project.outlet || 'General'}</p>
+        </div>
+        
+        <div className="col-span-2 text-center mt-3 md:mt-0">
+          <span 
+            onClick={onStatusClick}
+            className={cn(
+            "px-2.5 py-1 rounded-xl text-[8px] md:text-[9px] font-black uppercase tracking-[0.2em] border shadow-sm transition-all",
+            project.status === 'Active' 
+              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 animate-pulse hover:bg-emerald-500/20 active:scale-95" 
+              : "bg-slate-500/10 text-slate-400 border-white/10"
+          )}>
+            {project.status === 'Active' ? 'Deployment Active' : project.status}
+          </span>
+        </div>
+        
+        <div className="hidden md:block col-span-1 text-center font-bold text-white font-mono">
+          {itemCount}
+        </div>
+        
+        <div className="hidden md:block col-span-1 text-center font-bold text-green-400 font-mono">
+          {project.totalQuantityIn || 0}
+        </div>
+        
+        <div className="hidden md:block col-span-1 text-center font-bold text-red-400 font-mono">
+          {project.totalQuantityOut || 0}
+        </div>
+        
+        <div className="col-span-2 flex items-center justify-end space-x-2 mt-4 md:mt-0">
+           <button 
+              onClick={onEdit}
+              className="p-2 bg-white/5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-primary transition-all"
+            >
+              <Edit className="w-3.5 h-3.5" />
+            </button>
+            <button 
+              onClick={onDelete}
+              className="p-2 bg-white/5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-red-400 transition-all"
+            >
+              <Trash className="w-3.5 h-3.5" />
+            </button>
+            <ChevronRight className="w-4 h-4 text-slate-600 group-hover:text-primary group-hover:translate-x-1 transition-all" />
+        </div>
+      </div>
+      
+      {/* Mobile fulfillment summary */}
+      <div className="mt-4 space-y-1 md:hidden">
+         <div className="flex justify-between items-center text-[8px] font-black uppercase">
+            <span className="text-slate-500 tracking-tighter">Units: {itemCount} | In: {project.totalQuantityIn || 0} | Out: {project.totalQuantityOut || 0}</span>
+            <span className="text-primary">{Math.round(((project.totalQuantityOut || 0) / (itemCount || 1)) * 100)}%</span>
+         </div>
+         <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-primary" 
+              style={{ width: `${Math.min(100, Math.round(((project.totalQuantityOut || 0) / (itemCount || 1)) * 100))}%` }} 
+            />
+         </div>
+      </div>
+    </motion.div>
+  );
+});
+
+export default Projects;
+
+const ProjectCard = React.memo(React.forwardRef<HTMLDivElement, { 
   project: Project, 
   user: UserProfile, 
   onClick: (e: React.MouseEvent) => void, 
+  onStatusClick?: (e: React.MouseEvent) => void,
   onEdit: (e: any) => void, 
   onDelete: (e: any) => void,
   isDeleteMode?: boolean,
   isSelected?: boolean,
   onToggleButton?: (e: any) => void
-}) {
+}>(({ 
+  project, 
+  user, 
+  onClick, 
+  onStatusClick,
+  onEdit, 
+  onDelete, 
+  isDeleteMode, 
+  isSelected, 
+  onToggleButton 
+}, ref) => {
   const itemCount = project.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
   
   return (
     <motion.div
+      ref={ref}
       layout
       whileHover={window.innerWidth > 768 && !isDeleteMode ? { y: -5, scale: 1.02 } : {}}
       className={cn(
@@ -878,10 +1109,12 @@ function ProjectCard({
           <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
             <Layout className="w-5 h-5 md:w-6 md:h-6 text-primary" />
           </div>
-          <span className={cn(
+          <span 
+            onClick={onStatusClick}
+            className={cn(
             "px-2.5 py-1 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] border shadow-sm transition-all",
             project.status === 'Active' 
-              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-emerald-500/10 animate-pulse" 
+              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-emerald-500/10 animate-pulse hover:bg-emerald-500/20 active:scale-95 cursor-pointer" 
               : "bg-slate-500/10 text-slate-400 border-white/10"
           )}>
             {project.status === 'Active' ? 'Deployment Active' : project.status}
@@ -962,7 +1195,7 @@ function ProjectCard({
       <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-primary/5 blur-3xl rounded-full pointer-events-none" />
     </motion.div>
   );
-}
+}));
 
 function ProjectFormModal({ 
   project, 
@@ -1771,8 +2004,379 @@ function ProjectItemRow({ item, inventory, onRemove, onUpdate }: { item: Project
   );
 }
 
-function ProjectDetailModal({ project, inventory, transactions, onClose, onDelete, isApproved }: { project: Project, inventory: InventoryItem[], transactions: StockTransaction[], onClose: () => void, onDelete: () => void, isApproved: boolean }) {
+function ProjectStatsGrid({ stats }: { stats: { totalRequired: number, fulfillment: number, totalIn: number, totalOut: number } }) {
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 py-2 md:py-0">
+      {[
+        { label: 'MANIFEST', value: stats.totalRequired, color: 'text-white', sub: 'Required' },
+        { label: 'FILL RATE', value: `${stats.fulfillment}%`, color: 'text-primary', sub: 'Volume' },
+        { label: 'VERIFIED IN', value: stats.totalIn, color: 'text-green-400', sub: 'Inbound' },
+        { label: 'VERIFIED OUT', value: stats.totalOut, color: 'text-red-400', sub: 'Release' }
+      ].map((m, i) => (
+        <div key={i} className="bg-black/40 border border-white/5 rounded-xl md:rounded-2xl p-2.5 md:px-5 md:py-4 min-w-[80px] md:min-w-[120px] text-left group hover:border-primary/30 transition-all hover:bg-black/60 shadow-xl overflow-hidden relative">
+          <div className={cn("absolute top-0 right-0 w-64 h-64 md:w-8 md:h-8 rounded-full blur-[10px] md:blur-[15px] -mr-3 -mt-3 md:-mr-4 md:-mt-4 opacity-50", m.color.replace('text-', 'bg-'))} />
+          <p className={cn("text-[6px] md:text-[8px] font-black uppercase tracking-[0.2em] mb-0.5 md:mb-1.5 opacity-80", m.color)}>{m.label}</p>
+          <p className="text-sm md:text-3xl font-black text-white tracking-tighter leading-none group-hover:text-primary transition-colors">{m.value}</p>
+          <p className="text-[5px] md:text-[7px] font-bold text-slate-500 uppercase tracking-widest mt-0.5 md:mt-1 opacity-60">{m.sub}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ProjectManifestTab({ 
+  manifestItems, 
+  onEditItem, 
+  onAddItem, 
+  statusFilter, 
+  setStatusFilter, 
+  categoryFilter, 
+  setCategoryFilter,
+  locationFilter,
+  setLocationFilter,
+  supplierFilter,
+  setSupplierFilter,
+  searchQuery,
+  setSearchQuery,
+  filterOptions,
+  isAdmin
+}: { 
+  manifestItems: any[], 
+  onEditItem: (item: ProjectItem) => void, 
+  onAddItem: () => void,
+  statusFilter: string,
+  setStatusFilter: (f: any) => void,
+  categoryFilter: string,
+  setCategoryFilter: (f: string) => void,
+  locationFilter: string,
+  setLocationFilter: (f: string) => void,
+  supplierFilter: string,
+  setSupplierFilter: (f: string) => void,
+  searchQuery: string,
+  setSearchQuery: (s: string) => void,
+  filterOptions: any,
+  isAdmin: boolean
+}) {
+  const [showFilters, setShowFilters] = useState(false);
+
+  return (
+    <div className="flex-1 overflow-hidden flex flex-col p-4 md:p-6 bg-slate-950/40">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between bg-slate-900/60 p-4 md:p-6 rounded-[32px] border border-white/10 gap-6 mb-6 shadow-2xl backdrop-blur-3xl shrink-0">
+         <div className="flex items-center space-x-5">
+            <div className="w-14 h-14 rounded-[24px] bg-primary/10 flex items-center justify-center border border-primary/20 shadow-inner">
+              <Package className="w-7 h-7 text-primary" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-white tracking-widest uppercase italic leading-none mb-1.5">Project Manifest</h3>
+              <div className="flex items-center space-x-3">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Digital Specification Table</p>
+                <span className="w-1 h-1 rounded-full bg-slate-700" />
+                <span className="text-[10px] font-black text-white uppercase tracking-widest">{manifestItems.length} Unique Units</span>
+              </div>
+            </div>
+         </div>
+         
+         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+            <div className="flex items-center space-x-1 bg-black/40 p-1.5 rounded-2xl border border-white/5">
+              {(['all', 'full', 'partial', 'missing'] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setStatusFilter(f)}
+                  className={cn(
+                    "px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
+                    statusFilter === f 
+                      ? "bg-primary text-white shadow-xl shadow-primary/20" 
+                      : "text-slate-500 hover:text-slate-300"
+                  )}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+
+            <div className="h-10 w-px bg-white/10 hidden lg:block" />
+
+            <div className="flex items-center gap-3">
+              <div className="relative group">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-primary transition-colors" />
+                <input 
+                  type="text" 
+                  placeholder="Search SKU..."
+                  className="bg-black/40 border border-white/10 rounded-2xl py-3 pl-12 pr-6 text-xs font-black text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/5 transition-all w-full sm:w-[200px] uppercase tracking-widest"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              
+              <button 
+                onClick={() => setShowFilters(!showFilters)}
+                className={cn(
+                  "p-3 rounded-2xl border transition-all relative",
+                  showFilters 
+                    ? "bg-primary border-primary text-white shadow-[0_0_20px_rgba(var(--primary),0.3)]" 
+                    : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
+                )}
+              >
+                <Filter className="w-5 h-5" />
+              </button>
+
+              {isAdmin && (
+                <button 
+                  onClick={onAddItem}
+                  className="p-3 bg-primary/20 hover:bg-primary text-primary hover:text-white rounded-2xl border border-primary/30 transition-all group shadow-xl"
+                >
+                  <Plus className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                </button>
+              )}
+            </div>
+         </div>
+      </div>
+
+      <AnimatePresence>
+        {showFilters && (
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden mb-4"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white/5 p-4 rounded-2xl border border-white/5">
+              <div className="space-y-2">
+                 <label className="text-[7px] font-black text-slate-500 uppercase tracking-widest ml-1">Asset Category</label>
+                 <select 
+                   className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-[10px] text-white outline-none focus:border-primary/50 transition-all cursor-pointer"
+                   value={categoryFilter}
+                   onChange={(e) => setCategoryFilter(e.target.value)}
+                 >
+                   <option value="all">ALL CATEGORIES</option>
+                   {filterOptions.categories.map((c: string) => <option key={c} value={c}>{c.toUpperCase()}</option>)}
+                 </select>
+              </div>
+              <div className="space-y-2">
+                 <label className="text-[7px] font-black text-slate-500 uppercase tracking-widest ml-1">Unit Location</label>
+                 <select 
+                   className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-[10px] text-white outline-none focus:border-primary/50 transition-all cursor-pointer"
+                   value={locationFilter}
+                   onChange={(e) => setLocationFilter(e.target.value)}
+                 >
+                   <option value="all">ALL LOCATIONS</option>
+                   {filterOptions.locations.map((l: string) => <option key={l} value={l}>{l.toUpperCase()}</option>)}
+                 </select>
+              </div>
+              <div className="space-y-2">
+                 <label className="text-[7px] font-black text-slate-500 uppercase tracking-widest ml-1">Assigned Supplier</label>
+                 <select 
+                   className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-[10px] text-white outline-none focus:border-primary/50 transition-all cursor-pointer"
+                   value={supplierFilter}
+                   onChange={(e) => setSupplierFilter(e.target.value)}
+                 >
+                   <option value="all">ALL SUPPLIERS</option>
+                   {filterOptions.suppliers.map((s: string) => <option key={s} value={s}>{s.toUpperCase()}</option>)}
+                 </select>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+              <div className="flex-1 min-h-0 bg-white/[0.03] rounded-[32px] md:rounded-[48px] overflow-hidden border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.3)] backdrop-blur-3xl">
+                <AutoSizer>
+                  {({ height, width }) => (
+                    <List
+                      height={height}
+                      itemCount={manifestItems.length}
+                      itemSize={(index) => 400} // ProjectItemCard is roughly 400px tall
+                      width={width}
+                      className="custom-scrollbar"
+                    >
+                      {({ index, style }) => (
+                        <div style={style} className="px-4 md:px-8 py-4">
+                          <ProjectItemCard 
+                            item={manifestItems[index]} 
+                            onEdit={() => onEditItem(manifestItems[index])} 
+                          />
+                        </div>
+                      )}
+                    </List>
+                  )}
+                </AutoSizer>
+                {manifestItems.length === 0 && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500">
+                    <Package className="w-24 h-24 mb-6 opacity-5" />
+                    <p className="text-xl font-black uppercase tracking-[0.4em] opacity-20">No entries found</p>
+                  </div>
+                )}
+              </div>
+    </div>
+  );
+}
+
+const ProjectItemCard = React.memo(({ item, onEdit }: { item: any, onEdit: () => void }) => {
+  const fulfillment = (item.quantityOut || 0) >= (item.quantity || 0) && (item.quantity || 0) > 0 ? 'FULFILLED' : (item.quantityIn || 0) > 0 ? 'INBOUND' : 'PENDING';
+  const statusColor = fulfillment === 'FULFILLED' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : fulfillment === 'INBOUND' ? "bg-blue-500/10 text-blue-400 border-blue-500/20" : "bg-amber-500/10 text-amber-500 border-amber-500/20";
+
+  return (
+    <div className="group relative">
+      <div className="h-full bg-slate-800/60 rounded-[32px] md:rounded-[40px] border border-white/10 p-5 md:p-6 flex flex-col hover:bg-slate-800/80 hover:border-primary/40 transition-all duration-500 shadow-2xl backdrop-blur-xl group-hover:-translate-y-1 overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1.5 bg-primary/20 group-hover:bg-primary transition-all duration-500 shadow-[0_0_20px_rgba(var(--primary),0.3)]" />
+        
+        <div className="flex items-start justify-between mb-6">
+          <div className="flex items-center space-x-4">
+            <div className="w-12 h-12 rounded-[20px] bg-primary/10 flex items-center justify-center text-primary shrink-0 border border-primary/20 shadow-inner group-hover:scale-110 transition-transform duration-500">
+              <Package className="w-6 h-6" />
+            </div>
+            <div className="min-w-0">
+               <h4 className="text-base font-black text-white truncate tracking-tight uppercase italic drop-shadow-sm leading-none mb-1.5">{item.name}</h4>
+               <span className={cn("text-[7px] font-black px-2 py-0.5 rounded-full border tracking-[0.2em] shadow-sm uppercase inline-block", statusColor)}>
+                  {fulfillment}
+               </span>
+            </div>
+          </div>
+          
+          <button 
+            onClick={onEdit}
+            className="p-2.5 bg-white/5 hover:bg-primary hover:text-white rounded-xl text-slate-400 transition-all shadow-lg border border-white/10 active:scale-90"
+          >
+            <Edit className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 space-y-4 mb-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-black/20 p-3 rounded-2xl border border-white/5">
+              <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mb-1 opacity-50">Brand</p>
+              <p className="text-[10px] font-bold text-slate-400 truncate uppercase">{item.brand || 'No Brand'}</p>
+            </div>
+            <div className="bg-black/20 p-3 rounded-2xl border border-white/5">
+              <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mb-1 opacity-50">POS ID</p>
+              <p className="text-[10px] font-black text-primary truncate">#{item.posNo || 'N/A'}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mb-1 opacity-50">Location</p>
+              <p className="text-[10px] font-bold text-blue-400 truncate uppercase">{item.unitLocation || 'STANDBY'}</p>
+            </div>
+            <div>
+              <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mb-1 opacity-50">ETA</p>
+              <p className="text-[10px] font-bold text-amber-500 truncate uppercase">{item.eta || 'NOT SET'}</p>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mb-1 opacity-50">Dimensions / Spec</p>
+            <p className="text-[9px] font-bold text-emerald-400 font-mono tracking-tighter truncate">{item.dimensions || 'NOT QUANTIFIED'}</p>
+          </div>
+        </div>
+
+        <div className="bg-black/40 px-5 py-4 rounded-[28px] border border-white/10 shadow-inner flex items-center justify-between">
+          <div className="text-center group-hover:scale-110 transition-transform">
+            <p className="text-[8px] font-black text-slate-600 mb-0.5 uppercase tracking-tighter">Required</p>
+            <span className="text-2xl font-black text-white italic tracking-tighter leading-none">{item.quantity}</span>
+          </div>
+          <div className="w-px h-8 bg-white/10" />
+          <div className="flex items-center space-x-4">
+            <div className="text-center">
+              <p className="text-[8px] font-black text-emerald-500 mb-0.5 uppercase tracking-tighter">IN</p>
+              <span className="text-xl font-black text-emerald-400 leading-none">{item.quantityIn || 0}</span>
+            </div>
+            <div className="text-center">
+              <p className="text-[8px] font-black text-red-500 mb-0.5 uppercase tracking-tighter">OUT</p>
+              <span className="text-xl font-black text-red-400 leading-none">{item.quantityOut || 0}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+ProjectItemCard.displayName = 'ProjectItemCard';
+
+function ProjectDetailModal({ project, inventory, transactions, onClose, onDelete, onEdit, isApproved, inline, user }: { project: Project, inventory: InventoryItem[], transactions: StockTransaction[], onClose: () => void, onDelete: () => void, onEdit: () => void, isApproved: boolean, inline?: boolean, user: UserProfile }) {
   const [activeTab, setActiveTab] = useState<'manifest' | 'activity' | 'client-stock'>('manifest');
+  const [manifestSearch, setManifestSearch] = useState('');
+  const deferredManifestSearch = useDeferredValue(manifestSearch);
+  const [manifestStatusFilter, setManifestStatusFilter] = useState<'all' | 'full' | 'partial' | 'missing'>('all');
+  const [manifestCategoryFilter, setManifestCategoryFilter] = useState<string>('all');
+  const [manifestLocationFilter, setManifestLocationFilter] = useState<string>('all');
+  const [manifestSupplierFilter, setManifestSupplierFilter] = useState<string>('all');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [editingItem, setEditingItem] = useState<ProjectItem | null>(null);
+  const [isSavingItem, setIsSavingItem] = useState(false);
+  const [showAddUnit, setShowAddUnit] = useState(false);
+  const [itemSearch, setItemSearch] = useState('');
+  const deferredItemSearch = useDeferredValue(itemSearch);
+
+  const isAdmin = user.role === 'admin' || user.email.toLowerCase() === 'imranzecorp@gmail.com';
+
+  const handleUpdateItem = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem || !project.id) return;
+
+    setIsSavingItem(true);
+    try {
+      const updatedItems = (project.items || []).map(item => {
+        const isSameItem = item.inventoryItemId === editingItem.inventoryItemId && item.name === editingItem.name;
+        return isSameItem ? editingItem : item;
+      });
+
+      await updateDoc(doc(db, 'projects', project.id), {
+        items: updatedItems,
+        updatedAt: serverTimestamp()
+      });
+
+      setEditingItem(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `projects/${project.id}`);
+    } finally {
+      setIsSavingItem(false);
+    }
+  }, [editingItem, project.id]);
+
+  const addUnitToProject = async (invItem: InventoryItem) => {
+    if (!project.id) return;
+    
+    setIsSavingItem(true);
+    try {
+      const newItem: ProjectItem = {
+        inventoryItemId: invItem.id,
+        name: invItem.name,
+        brand: invItem.brand || '',
+        model: invItem.modelNumber || '',
+        quantity: 1,
+        supplier: invItem.supplier || '',
+        location: invItem.location || '',
+        quantityIn: 0,
+        quantityOut: 0
+      };
+
+      const updatedItems = [...(project.items || []), newItem];
+      
+      await updateDoc(doc(db, 'projects', project.id), {
+        items: updatedItems,
+        updatedAt: serverTimestamp()
+      });
+
+      setShowAddUnit(false);
+      setItemSearch('');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `projects/${project.id}`);
+    } finally {
+      setIsSavingItem(false);
+    }
+  };
+
+  const filteredInventoryForAdd = useMemo(() => {
+    if (!deferredItemSearch) return inventory.slice(0, 50);
+    const low = deferredItemSearch.toLowerCase();
+    return inventory.filter(i => 
+      i.name.toLowerCase().includes(low) ||
+      (i.brand && i.brand.toLowerCase().includes(low)) ||
+      (i.modelNumber && i.modelNumber.toLowerCase().includes(low))
+    );
+  }, [inventory, deferredItemSearch]);
 
   const clientInventory = inventory.filter(item => 
     item.client?.toLowerCase() === project.client.toLowerCase() &&
@@ -1786,226 +2390,548 @@ function ProjectDetailModal({ project, inventory, transactions, onClose, onDelet
     );
   }, [transactions, project.jobNumber, project.outlet]);
 
+  const manifestWithStats = useMemo(() => {
+    // Optimization: Create index for transactions
+    const txMap: Record<string, { in: number, out: number }> = {};
+    
+    projectTransactions.forEach(tx => {
+      const key = tx.itemId || tx.itemName.toLowerCase();
+      if (!txMap[key]) txMap[key] = { in: 0, out: 0 };
+      if (tx.type === 'IN') txMap[key].in += tx.quantity;
+      if (tx.type === 'OUT') txMap[key].out += tx.quantity;
+      
+      // Also map by name if itemId is present to capture name-based transactions
+      if (tx.itemId && tx.itemName) {
+        const nameKey = tx.itemName.toLowerCase();
+        if (!txMap[nameKey]) txMap[nameKey] = { in: 0, out: 0 };
+        // We handle this carefully to avoid double counting if a project uses both ID and Name
+        // In most cases, they should be consistent.
+      }
+    });
+
+    return (project.items || []).map(item => {
+      const stats = txMap[item.inventoryItemId] || txMap[item.name.toLowerCase()] || { in: 0, out: 0 };
+      
+      return {
+        ...item,
+        quantityIn: stats.in,
+        quantityOut: stats.out
+      };
+    });
+  }, [project.items, projectTransactions]);
+
+  const stats = useMemo(() => {
+    const totalRequired = manifestWithStats.reduce((sum, i) => sum + i.quantity, 0);
+    const totalOut = manifestWithStats.reduce((sum, i) => sum + (i.quantityOut || 0), 0);
+    const totalIn = manifestWithStats.reduce((sum, i) => sum + (i.quantityIn || 0), 0);
+    
+    return {
+      fulfillment: totalRequired > 0 ? Math.round((totalOut / totalRequired) * 100) : 0,
+      totalIn,
+      totalOut,
+      totalRequired
+    };
+  }, [manifestWithStats]);
+
+  const filterOptions = useMemo(() => {
+    const categories = Array.from(new Set(manifestWithStats.map(i => i.category || 'Standard'))).filter(Boolean).sort();
+    const locations = Array.from(new Set(manifestWithStats.map(i => i.unitLocation || 'Unassigned'))).filter(Boolean).sort();
+    const suppliers = Array.from(new Set(manifestWithStats.map(i => i.supplier || 'Direct'))).filter(Boolean).sort();
+    return { categories, locations, suppliers };
+  }, [manifestWithStats]);
+
+  const filteredManifest = useMemo(() => {
+    let result = manifestWithStats;
+    
+    // Status Filter
+    if (manifestStatusFilter !== 'all') {
+      result = result.filter(item => {
+        const out = item.quantityOut || 0;
+        const req = item.quantity;
+        if (manifestStatusFilter === 'full') return out >= req;
+        if (manifestStatusFilter === 'partial') return out > 0 && out < req;
+        if (manifestStatusFilter === 'missing') return out === 0;
+        return true;
+      });
+    }
+
+    // Category Filter
+    if (manifestCategoryFilter !== 'all') {
+      result = result.filter(item => (item.category || 'Standard') === manifestCategoryFilter);
+    }
+
+    // Location Filter
+    if (manifestLocationFilter !== 'all') {
+      result = result.filter(item => (item.unitLocation || 'Unassigned') === manifestLocationFilter);
+    }
+
+    // Supplier Filter
+    if (manifestSupplierFilter !== 'all') {
+      result = result.filter(item => (item.supplier || 'Direct') === manifestSupplierFilter);
+    }
+
+    if (!deferredManifestSearch) return result;
+    const low = deferredManifestSearch.toLowerCase();
+    return result.filter(item => 
+      item.name.toLowerCase().includes(low) ||
+      (item.brand && item.brand.toLowerCase().includes(low)) ||
+      (item.model && item.model.toLowerCase().includes(low)) ||
+      (item.posNo && item.posNo.toLowerCase().includes(low)) ||
+      (item.unitLocation && item.unitLocation.toLowerCase().includes(low)) ||
+      (item.supplier && item.supplier.toLowerCase().includes(low))
+    );
+  }, [manifestWithStats, deferredManifestSearch, manifestStatusFilter, manifestCategoryFilter, manifestLocationFilter, manifestSupplierFilter]);
+
+  const content = (
+    <motion.div 
+      initial={inline ? { opacity: 0 } : { opacity: 0, scale: 0.95, y: 20 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={inline ? { opacity: 0 } : { opacity: 0, scale: 0.95, y: 20 }}
+      className={cn(
+        "bg-slate-900 border-white/10 shadow-2xl flex flex-col overflow-hidden transition-all duration-500",
+        inline ? "h-full w-full rounded-[40px] border" : "fixed inset-0 md:inset-4 md:rounded-[48px] border z-[71]"
+      )}
+    >
+      <div className="p-6 border-b border-white/10 shrink-0 bg-white/[0.03] backdrop-blur-md relative overflow-hidden">
+        {/* Subtle decorative background element */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-[100px] -mr-32 -mt-32 pointer-events-none" />
+        
+        <div className="flex items-center justify-between mb-6 relative z-10">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 group-hover:scale-110 transition-transform">
+              <Briefcase className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-[10px] font-black tracking-[0.3em] text-primary uppercase leading-tight">Project Specification</h2>
+              <div className="flex items-center space-x-2 text-[10px] font-bold text-slate-500 font-mono mt-0.5">
+                <span className="flex items-center space-x-1">
+                  <Database className="w-3 h-3 opacity-50" />
+                  <span>REF: {project.id?.substring(0, 8).toUpperCase()}</span>
+                </span>
+                <span className="w-1 h-1 rounded-full bg-slate-700" />
+                <span className="text-emerald-500/80">ONLINE • SYNCED</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            {isApproved && (
+              <>
+                <button 
+                  onClick={onEdit}
+                  className="px-4 py-2 bg-white/5 hover:bg-primary/20 rounded-xl text-slate-400 hover:text-primary transition-all border border-white/10 hover:border-primary/30 flex items-center space-x-2 text-[10px] font-black uppercase tracking-widest group"
+                  title="Modify Project Header"
+                >
+                  <Edit className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Modify</span>
+                </button>
+                <button 
+                  onClick={onDelete}
+                  className="px-4 py-2 bg-white/5 hover:bg-red-500/20 rounded-xl text-slate-400 hover:text-red-500 transition-all border border-white/10 hover:border-red-500/30 flex items-center space-x-2 text-[10px] font-black uppercase tracking-widest group"
+                  title="Archive Project"
+                >
+                  <Trash className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Archive</span>
+                </button>
+              </>
+            )}
+            <div className="w-px h-8 bg-white/10 mx-1" />
+            <button onClick={onClose} className="p-2.5 bg-white/5 hover:bg-white/10 rounded-xl text-slate-400 transition-all border border-white/10 active:scale-95"><X className="w-4 h-4" /></button>
+          </div>
+        </div>
+        
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 relative z-10">
+          <div className="space-y-4 max-w-4xl">
+            <div className="flex flex-col space-y-1">
+              <div className="flex items-center space-x-4 flex-wrap gap-y-2">
+                <h1 className="text-3xl md:text-5xl font-black text-white tracking-tighter leading-none italic uppercase drop-shadow-2xl">{project.client}</h1>
+                <div className="bg-primary/20 border border-primary/30 rounded-xl px-4 py-1.5 shadow-[0_0_20px_rgba(var(--primary-rgb),0.15)] flex items-center space-x-2">
+                  <Hash className="w-3.5 h-3.5 text-primary" />
+                  <span className="text-xs md:text-sm font-black text-white tracking-widest font-mono italic">{project.jobNumber}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-3 flex-wrap gap-y-2">
+               <div className="flex items-center space-x-2.5 px-4 py-1.5 bg-white/5 rounded-xl border border-white/10 group/outlet hover:border-primary/30 transition-colors">
+                 <Store className="w-4 h-4 text-primary group-hover/outlet:animate-pulse" />
+                 <div className="flex flex-col">
+                   <span className="text-[7px] font-black text-slate-500 uppercase tracking-[0.2em] leading-none mb-0.5">Physical Outlet</span>
+                   <span className="text-xs font-bold text-slate-200 uppercase tracking-tight">{project.outlet || 'Standard Facility'}</span>
+                 </div>
+               </div>
+               <div className="flex items-center space-x-2.5 px-4 py-1.5 bg-white/5 rounded-xl border border-white/10 group/loc hover:border-amber-500/30 transition-colors">
+                 <MapPin className="w-4 h-4 text-amber-500 group-hover/loc:animate-bounce" />
+                 <div className="flex flex-col">
+                    <span className="text-[7px] font-black text-slate-500 uppercase tracking-[0.2em] leading-none mb-0.5">Asset Location</span>
+                    <span className="text-xs font-bold text-slate-200 uppercase tracking-tight">{project.location || 'Site General'}</span>
+                 </div>
+               </div>
+               <div className="flex items-center space-x-2.5 px-4 py-1.5 bg-white/5 rounded-xl border border-white/10 group/status">
+                 <div className={cn(
+                   "w-2 h-2 rounded-full animate-pulse",
+                   project.status === 'Active' ? "bg-emerald-500" : "bg-slate-500"
+                 )} />
+                 <div className="flex flex-col">
+                    <span className="text-[7px] font-black text-slate-500 uppercase tracking-[0.2em] leading-none mb-0.5">Status</span>
+                    <span className="text-xs font-bold text-slate-200 uppercase tracking-tight">{project.status}</span>
+                 </div>
+               </div>
+            </div>
+          </div>
+
+          <ProjectStatsGrid stats={stats} />
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-hidden flex flex-col bg-slate-900/50">
+        <div className="px-5 pt-4 flex items-center space-x-6 border-b border-white/5 bg-white/[0.02] shrink-0">
+          {[
+            { id: 'manifest', label: 'Inventory Manifest', icon: Package },
+            { id: 'activity', label: 'Recent Activity', icon: LucideHistory },
+            { id: 'client-stock', label: 'Client Stock', icon: User }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={cn(
+                "flex items-center space-x-2 pb-4 text-[10px] font-black uppercase tracking-[0.2em] transition-all relative",
+                activeTab === tab.id ? "text-primary" : "text-slate-500 hover:text-slate-300"
+              )}
+            >
+              <tab.icon className="w-3.5 h-3.5" />
+              <span>{tab.label}</span>
+              {activeTab === tab.id && (
+                <motion.div layoutId="detail-tab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+              )}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === 'manifest' && (
+          <ProjectManifestTab 
+            manifestItems={filteredManifest}
+            onEditItem={setEditingItem}
+            onAddItem={() => setShowAddUnit(true)}
+            statusFilter={manifestStatusFilter}
+            setStatusFilter={setManifestStatusFilter}
+            categoryFilter={manifestCategoryFilter}
+            setCategoryFilter={setManifestCategoryFilter}
+            locationFilter={manifestLocationFilter}
+            setLocationFilter={setManifestLocationFilter}
+            supplierFilter={manifestSupplierFilter}
+            setSupplierFilter={setManifestSupplierFilter}
+            searchQuery={manifestSearch}
+            setSearchQuery={setManifestSearch}
+            filterOptions={filterOptions}
+            isAdmin={isAdmin}
+          />
+        )}
+
+        {activeTab === 'activity' && (
+          <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
+            <div className="flex items-center justify-between border-b border-white/5 pb-2">
+              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Transaction Timeline</h3>
+              <span className="text-[10px] font-bold text-slate-500 italic">History Log</span>
+            </div>
+            <div className="space-y-3">
+              {projectTransactions.length > 0 ? (
+                projectTransactions.map((tx) => (
+                  <div key={tx.id} className="bg-white/[0.05] p-3 rounded-2xl border border-white/10 shadow-sm hover:bg-white/[0.08] transition-all">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs font-bold text-white">{tx.itemName}</p>
+                      <span className={cn(
+                        "text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded",
+                        tx.type === 'IN' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
+                      )}>
+                        {tx.type} {tx.quantity} units
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-[8px] text-slate-500 font-mono">
+                      <p>{formatDateTime(tx.date)}</p>
+                      <p className="opacity-60">{tx.userName}</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="py-20 text-center opacity-40">
+                  <LucideHistory className="w-12 h-12 mx-auto mb-4" />
+                  <p className="text-sm font-bold text-white">No Transaction Data</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'client-stock' && (
+          <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar">
+            <div className="flex items-center justify-between border-b border-white/5 pb-2">
+              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Client Inventory</h3>
+              <span className="text-[10px] font-bold text-primary italic">Stock Available</span>
+            </div>
+            <div className="space-y-2">
+              {clientInventory.length > 0 ? clientInventory.map((item) => (
+                <div key={item.id} className="bg-white/[0.05] p-3 rounded-2xl border border-white/10 flex items-center justify-between shadow-sm hover:bg-white/[0.08] transition-all">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 rounded-lg bg-primary/5 flex items-center justify-center text-primary border border-primary/10">
+                      <Package className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-white">{item.name}</p>
+                      <p className="text-[8px] text-slate-500 font-mono uppercase">QTY: {item.currentQuantity} | {item.location}</p>
+                    </div>
+                  </div>
+                </div>
+              )) : (
+                <div className="py-20 text-center opacity-40">
+                  <User className="w-12 h-12 mx-auto mb-4" />
+                  <p className="text-sm font-bold">No Allocation Data</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="p-4 border-t border-white/10 bg-slate-900/60 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+             <div className="flex items-center space-x-1.5 grayscale opacity-50">
+               <AlertCircle className="w-3 h-3 text-primary" />
+               <p className="text-[8px] font-bold text-slate-400">SYNCED TO CENTRAL DB</p>
+             </div>
+          </div>
+          <div className="flex items-center space-x-3 text-[9px] font-black text-slate-600 uppercase tracking-widest">
+            <span>Created: {formatDate(project.createdAt)}</span>
+            <span className="w-1 h-1 rounded-full bg-slate-800" />
+            <span>ID: {project.id?.substring(0, 10)}</span>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+
+  if (inline) return content;
+
   return (
     <>
       <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[70]" onClick={onClose} />
-      <motion.div 
-        initial={{ opacity: 0, x: 100 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: 100 }}
-        className="fixed top-0 right-0 h-full w-full max-w-xl glass-morphism border-l border-white/10 z-[71] shadow-2xl flex flex-col"
-      >
-        <div className="p-8 border-b border-white/10">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-[10px] font-black tracking-[0.3em] text-primary uppercase">Job Specification</h2>
-            <div className="flex items-center space-x-2">
-              {isApproved && (
-                <button 
-                  onClick={onDelete}
-                  className="p-3 bg-red-500/10 hover:bg-red-500/20 rounded-2xl text-red-500 transition-all"
-                  title="Delete Project"
-                >
-                  <Trash className="w-5 h-5" />
-                </button>
-              )}
-              <button onClick={onClose} className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl text-slate-400 transition-all"><X className="w-5 h-5" /></button>
-            </div>
-          </div>
-          
-          <div className="space-y-4">
-            <h1 className="text-4xl font-black text-white tracking-tighter leading-none">{project.client}</h1>
-            <div className="flex flex-wrap items-center gap-y-2 gap-x-4">
-              <div className="flex items-center space-x-2 bg-primary/10 px-3 py-1.5 rounded-xl border border-primary/20">
-                <Hash className="w-3.5 h-3.5 text-primary" />
-                <span className="text-sm font-bold text-primary">{project.jobNumber}</span>
-              </div>
-              <div className="flex items-center space-x-2 text-slate-400 font-medium">
-                <Store className="w-4 h-4 text-primary" />
-                <span className="text-sm border-b border-primary/20 pb-0.5">{project.outlet || 'General Project'}</span>
-              </div>
-              {project.location && (
-                <div className="flex items-center space-x-2 text-slate-400 font-medium">
-                  <MapPin className="w-4 h-4 text-amber-500" />
-                  <span className="text-sm font-bold text-slate-300">{project.location}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+      {content}
 
-        <div className="flex-1 overflow-y-auto p-8 space-y-10 custom-scrollbar">
-          <div className="flex items-center space-x-6 border-b border-white/5">
-            {[
-              { id: 'manifest', label: 'Inventory Manifest', icon: Package },
-              { id: 'activity', label: 'Recent Activity', icon: LucideHistory },
-              { id: 'client-stock', label: 'Client Stock', icon: User }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={cn(
-                  "flex items-center space-x-2 pb-4 text-[10px] font-black uppercase tracking-[0.2em] transition-all relative",
-                  activeTab === tab.id ? "text-primary" : "text-slate-500 hover:text-slate-300"
-                )}
-              >
-                <tab.icon className="w-3.5 h-3.5" />
-                <span>{tab.label}</span>
-                {activeTab === tab.id && (
-                  <motion.div layoutId="detail-tab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
-                )}
-              </button>
-            ))}
-          </div>
-
-          {activeTab === 'manifest' && (
-            <div className="space-y-10">
-              {/* STATS OVERVIEW */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between px-1">
-                  <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Efficiency Metrics</h3>
-                  <span className="text-[10px] font-bold text-primary">Live Data</span>
+      <AnimatePresence>
+        {editingItem && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[80] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-[#1e293b] border border-white/10 rounded-[40px] w-full max-w-2xl shadow-2xl overflow-hidden"
+            >
+              <form onSubmit={handleUpdateItem}>
+                <div className="p-8 border-b border-white/5 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-black text-white italic uppercase tracking-tighter">Edit Asset Details</h2>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Refining {editingItem.name}</p>
+                  </div>
+                  <button type="button" onClick={() => setEditingItem(null)} className="p-2 bg-white/5 hover:bg-white/10 rounded-xl text-slate-400 transition-all"><X className="w-5 h-5" /></button>
                 </div>
-                <div className="grid grid-cols-3 gap-4">
-                  {[
-                    { label: 'Fulfillment', value: `${Math.round(((project.totalQuantityOut || 0) / (project.items?.reduce((sum, i) => sum + i.quantity, 0) || 1)) * 100)}%`, color: 'text-primary' },
-                    { label: 'Inbound', value: project.totalQuantityIn || 0, color: 'text-green-400' },
-                    { label: 'Outbound', value: project.totalQuantityOut || 0, color: 'text-red-400' }
-                  ].map((m, i) => (
-                    <div key={i} className="glass-morphism p-4 rounded-3xl border border-white/5 flex flex-col items-center justify-center text-center">
-                      <span className="text-2xl font-black text-white">{m.value}</span>
-                      <span className={cn("text-[8px] font-black uppercase tracking-tighter mt-1", m.color)}>{m.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                  <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest">Inventory Manifest</h3>
-                  <div className="flex items-center space-x-2">
-                    <Package className="w-3.5 h-3.5 text-slate-700" />
-                    <span className="text-[10px] font-bold text-slate-500">{project.items?.length || 0} SKU References</span>
+                
+                <div className="p-8 grid grid-cols-2 gap-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Asset Brand</label>
+                    <input 
+                      type="text"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-primary/50 outline-none transition-all"
+                      value={editingItem.brand || ''}
+                      onChange={(e) => setEditingItem({ ...editingItem, brand: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Asset Model</label>
+                    <input 
+                      type="text"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-primary/50 outline-none transition-all"
+                      value={editingItem.model || ''}
+                      onChange={(e) => setEditingItem({ ...editingItem, model: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">POS Reference</label>
+                    <input 
+                      type="text"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-primary/50 outline-none transition-all"
+                      value={editingItem.posNo || ''}
+                      onChange={(e) => setEditingItem({ ...editingItem, posNo: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Reserved Quantity</label>
+                    <input 
+                      type="number"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-primary/50 outline-none transition-all font-mono"
+                      value={editingItem.quantity}
+                      onChange={(e) => setEditingItem({ ...editingItem, quantity: parseInt(e.target.value) || 0 })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Asset Location</label>
+                    <input 
+                      type="text"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-primary/50 outline-none transition-all"
+                      value={editingItem.unitLocation || ''}
+                      onChange={(e) => setEditingItem({ ...editingItem, unitLocation: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Asset Category</label>
+                    <input 
+                      type="text"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-primary/50 outline-none transition-all"
+                      value={editingItem.category || ''}
+                      onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">ETA Details</label>
+                    <input 
+                      type="text"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-primary/50 outline-none transition-all"
+                      value={editingItem.eta || ''}
+                      onChange={(e) => setEditingItem({ ...editingItem, eta: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Supplier</label>
+                    <input 
+                      type="text"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-primary/50 outline-none transition-all"
+                      value={editingItem.supplier || ''}
+                      onChange={(e) => setEditingItem({ ...editingItem, supplier: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Asset Dimensions</label>
+                    <input 
+                      type="text"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm text-white focus:border-primary/50 outline-none transition-all font-mono"
+                      value={editingItem.dimensions || ''}
+                      onChange={(e) => setEditingItem({ ...editingItem, dimensions: e.target.value })}
+                    />
                   </div>
                 </div>
-                <div className="h-[500px]">
-                  <AutoSizer>
-                    {({ height, width }) => (
-                      <List
-                        height={height}
-                        width={width}
-                        itemCount={project.items?.length || 0}
-                        itemSize={() => 120}
-                        itemData={{ items: project.items || [] }}
-                        className="scrollbar-hide"
-                      >
-                        {ManifestRow}
-                      </List>
+
+                <div className="p-8 border-t border-white/5 bg-white/[0.01] flex items-center justify-end space-x-3">
+                  <button 
+                    type="button" 
+                    onClick={() => setEditingItem(null)}
+                    disabled={isSavingItem}
+                    className="px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:bg-white/5 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit"
+                    disabled={isSavingItem}
+                    className="bg-primary hover:bg-primary/90 text-[10px] font-black uppercase tracking-widest px-8 py-3 rounded-2xl text-white shadow-xl shadow-primary/20 transition-all flex items-center space-x-2 disabled:opacity-50"
+                  >
+                    {isSavingItem ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Applying...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-3.5 h-3.5" />
+                        <span>Save Changes</span>
+                      </>
                     )}
-                  </AutoSizer>
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+        {showAddUnit && (
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-2xl z-[90] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-[#0f172a] border border-white/10 rounded-[40px] w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col h-[75vh]"
+            >
+              <div className="p-8 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+                <div>
+                  <h2 className="text-xl font-black text-white italic uppercase tracking-tighter">Add Asset to Manifest</h2>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Select SKU from master inventory</p>
+                </div>
+                <button 
+                  onClick={() => setShowAddUnit(false)} 
+                  className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl text-slate-400 transition-all border border-white/10"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="p-8 flex-1 flex flex-col min-h-0 bg-slate-900/40">
+                <div className="relative mb-6">
+                  <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <input 
+                    autoFocus
+                    className="w-full pl-14 pr-4 py-4 rounded-2xl bg-white/5 border border-white/10 text-white outline-none focus:ring-4 focus:ring-primary/20 focus:border-primary/50 transition-all font-mono text-sm"
+                    placeholder="Search by name, brand, or model..."
+                    value={itemSearch}
+                    onChange={e => setItemSearch(e.target.value)}
+                  />
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
+                  {filteredInventoryForAdd.map(invItem => (
+                    <button
+                      key={invItem.id}
+                      onClick={() => addUnitToProject(invItem)}
+                      disabled={isSavingItem}
+                      className="w-full p-5 flex items-center justify-between hover:bg-white/10 bg-white/[0.02] rounded-3xl border border-white/5 hover:border-primary/30 transition-all group/item text-left disabled:opacity-50 shadow-lg"
+                    >
+                      <div className="flex items-center space-x-5">
+                        <div className="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center text-slate-500 group-hover/item:text-primary transition-colors border border-white/10 group-hover/item:border-primary/20 shadow-inner">
+                          <Package className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <p className="text-base font-black text-white italic uppercase tracking-tight group-hover/item:text-primary transition-colors leading-none mb-1">{invItem.name}</p>
+                          <div className="flex items-center space-x-2">
+                             <p className="text-[10px] text-slate-500 font-mono mt-0.5 uppercase">{invItem.brand || 'No Brand'}</p>
+                             <span className="w-1 h-1 rounded-full bg-slate-700" />
+                             <p className="text-[10px] text-primary/60 font-black uppercase tracking-tighter">#{invItem.modelNumber || 'REF-N/A'}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">{invItem.currentQuantity} In Stock</p>
+                        <p className="text-[9px] text-slate-600 font-bold mt-1 uppercase tracking-tighter">{invItem.location || 'WAREHOUSE'}</p>
+                      </div>
+                    </button>
+                  ))}
+                  {filteredInventoryForAdd.length === 0 && (
+                    <div className="py-20 text-center opacity-40">
+                      <Search className="w-12 h-12 mx-auto mb-4 text-slate-700" />
+                      <p className="text-lg font-black text-slate-500 uppercase tracking-[0.2em] italic">No match found</p>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
-          )}
 
-          {activeTab === 'activity' && (
-             <div className="space-y-6">
-              <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest">Transaction Timeline</h3>
-                <span className="text-[10px] font-bold text-slate-500">Historical Footprint</span>
-              </div>
-              <div className="space-y-4">
-                {projectTransactions.length > 0 ? (
-                  projectTransactions.map((tx) => (
-                    <div key={tx.id} className="relative pl-6 pb-6 last:pb-0">
-                      <div className="absolute left-0 top-0 bottom-0 w-px bg-white/5" />
-                      <div className={cn(
-                        "absolute left-[-4px] top-1.5 w-2 h-2 rounded-full",
-                        tx.type === 'IN' ? 'bg-green-500' : 'bg-red-500'
-                      )} />
-                      <div className="bg-white/[0.02] p-4 rounded-2xl border border-white/5">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-sm font-bold text-white">{tx.itemName}</p>
-                          <span className={cn(
-                            "text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded",
-                            tx.type === 'IN' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
-                          )}>
-                            {tx.type} {tx.quantity} units
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-[10px] text-slate-500">
-                          <div className="flex items-center space-x-2">
-                            <Clock className="w-3 h-3" />
-                            <span>{formatDateTime(tx.date)}</span>
-                          </div>
-                          <span>by {tx.userName}</span>
-                        </div>
-                        {tx.notes && <p className="text-[10px] text-slate-600 mt-2 italic">{tx.notes}</p>}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="py-20 text-center opacity-40">
-                    <LucideHistory className="w-12 h-12 mx-auto mb-4" />
-                    <p className="text-sm font-bold">No Transaction Data</p>
-                    <p className="text-[10px] uppercase tracking-widest mt-1">Ready for initialization</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'client-stock' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest">Available Client Inventory</h3>
-                <span className="text-[10px] font-bold text-primary flex items-center space-x-1">
-                  <div className="w-1 h-1 rounded-full bg-primary" />
-                  <span>Found {clientInventory.length} items</span>
-                </span>
-              </div>
-              <div className="space-y-3">
-                {clientInventory.length > 0 ? clientInventory.map((item) => (
-                  <div key={item.id} className="bg-white/[0.02] p-4 rounded-2xl border border-white/5 flex items-center justify-between group">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-9 h-9 rounded-xl bg-primary/5 flex items-center justify-center text-primary border border-primary/10">
-                        <Package className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-white tracking-tight">{item.name}</p>
-                        <p className="text-[10px] text-slate-500 font-mono">STOCK: {item.currentQuantity} | LOC: {item.location}</p>
-                      </div>
+              {isSavingItem && (
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-[95] flex items-center justify-center">
+                  <div className="bg-slate-900 px-10 py-6 rounded-3xl border border-white/10 flex items-center space-x-4 text-white shadow-3xl">
+                    <Loader2 className="w-7 h-7 animate-spin text-primary" />
+                    <div className="flex flex-col">
+                      <span className="text-xs font-black uppercase tracking-[0.3em] italic text-primary">Syncing Ledger</span>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase mt-0.5">Please wait...</span>
                     </div>
                   </div>
-                )) : (
-                  <div className="py-20 text-center opacity-40">
-                    <User className="w-12 h-12 mx-auto mb-4" />
-                    <p className="text-sm font-bold">Clean Allocation</p>
-                    <p className="text-[10px] uppercase tracking-widest mt-1">No loose items detected</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="bg-primary/5 rounded-[40px] p-8 border border-primary/10 relative overflow-hidden">
-             <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/10 blur-[80px] rounded-full" />
-             <div className="flex items-center space-x-3 mb-4">
-                <AlertCircle className="w-5 h-5 text-primary" />
-                <h4 className="text-sm font-black text-white uppercase tracking-widest">System Note</h4>
-             </div>
-             <p className="text-sm text-slate-300 leading-relaxed italic">
-               This project stock is connected to the central database. Any changes here represent actual inventory allocations for {project.client}.
-             </p>
+                </div>
+              )}
+            </motion.div>
           </div>
-        </div>
-
-        <div className="p-8 border-t border-white/10 bg-[#030712]/20">
-          <div className="flex items-center justify-between text-[10px] font-black text-slate-500 uppercase tracking-wider">
-            <p>Created: {formatDate(project.createdAt)}</p>
-            <p>ID: {project.id}</p>
-          </div>
-        </div>
-      </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

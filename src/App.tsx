@@ -97,6 +97,21 @@ export default function App() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [lastNotificationId, setLastNotificationId] = useState<string | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isOnline, setIsOnline] = useState(true);
+
+  // Monitor online status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
       // Focus search: CMD+K or CTRL+K
@@ -382,164 +397,137 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-screen w-full items-center justify-center bg-[#020617] relative overflow-hidden touch-none select-none">
-        {/* Deep Field Background Layers */}
-        <div className="absolute inset-0 z-0">
+      <div className="flex flex-col h-screen w-full items-center justify-center bg-[#05070a] relative overflow-hidden touch-none select-none">
+        {/* Futuristic Multi-Color Background Elements */}
+        <div className="absolute inset-0 z-0 overflow-hidden">
           <motion.div 
             animate={{ 
-              scale: [1, 1.4, 1],
-              opacity: [0.3, 0.6, 0.3],
-              rotate: [0, 90, 0]
+              scale: [1, 1.2, 1],
+              x: [0, 50, 0],
+              y: [0, 30, 0],
             }}
-            transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-            className="absolute -top-[20%] -left-[20%] w-[100%] h-[100%] bg-blue-600/30 rounded-full blur-[120px] mix-blend-screen"
+            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute -top-[20%] -left-[10%] w-[80%] h-[80%] bg-blue-600/20 rounded-full blur-[120px] mix-blend-screen"
           />
           <motion.div 
             animate={{ 
-              scale: [1.2, 1.6, 1.2],
-              opacity: [0.2, 0.5, 0.2],
-              rotate: [0, -120, 0]
+              scale: [1.2, 1, 1.2],
+              x: [0, -40, 0],
+              y: [0, -60, 0],
+            }}
+            transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+            className="absolute -bottom-[20%] -right-[10%] w-[70%] h-[70%] bg-rose-600/20 rounded-full blur-[140px] mix-blend-screen"
+          />
+          <motion.div 
+            animate={{ 
+              scale: [1, 1.5, 1],
+              opacity: [0.1, 0.3, 0.1],
+            }}
+            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60%] h-[60%] bg-violet-600/15 rounded-full blur-[160px] mix-blend-color-dodge"
+          />
+          <motion.div 
+            animate={{ 
+              rotate: 360,
             }}
             transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-            className="absolute -bottom-[20%] -right-[20%] w-[100%] h-[100%] bg-fuchsia-600/25 rounded-full blur-[150px] mix-blend-screen"
+            className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,transparent_0%,rgba(5,7,10,0.8)_80%)]"
           />
-          <motion.div 
-            animate={{ 
-              scale: [1, 1.8, 1],
-              opacity: [0.15, 0.4, 0.15],
-              x: [-100, 100, -100]
-            }}
-            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80%] h-[80%] bg-emerald-500/20 rounded-full blur-[180px] mix-blend-screen"
-          />
-          
-          {/* Scanning Grid Overlay */}
-          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 contrast-150 brightness-150 pointer-events-none" />
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
+          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.05] pointer-events-none" />
         </div>
 
-        <div className="relative z-10 flex flex-col items-center max-w-sm w-full px-8">
-          {/* Logo Assembly */}
+        <div className="relative z-10 flex flex-col items-center w-full max-w-xl px-12">
+          {/* Brand Identity */}
           <motion.div
-             initial={{ opacity: 0, scale: 0.8 }}
+             initial={{ opacity: 0, scale: 0.95 }}
              animate={{ opacity: 1, scale: 1 }}
-             className="relative mb-12"
+             transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+             className="flex flex-col items-center mb-10 text-center w-full"
           >
-            <motion.div 
-              animate={{ 
-                rotate: 360,
-                scale: [1, 1.1, 1],
-              }}
-              transition={{ 
-                rotate: { duration: 10, repeat: Infinity, ease: "linear" },
-                scale: { duration: 4, repeat: Infinity, ease: "easeInOut" }
-              }}
-              className="absolute inset-[-40px] border border-primary/20 rounded-full border-dashed"
-            />
-            <motion.div 
-              animate={{ 
-                rotate: -360,
-              }}
-              transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-              className="absolute inset-[-60px] border border-white/5 rounded-full border-dotted"
-            />
-            <div className="relative p-8 glass-morphism rounded-full border-white/10 shadow-[0_0_50px_rgba(var(--primary-rgb),0.2)]">
-              <Logo className="scale-150 md:scale-[2] relative z-10 drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]" />
+            <h1 className="text-7xl md:text-8xl font-black text-[#e11d48] tracking-[-0.05em] leading-none drop-shadow-[0_0_35px_rgba(225,29,72,0.5)] italic uppercase">
+              ZECORP
+            </h1>
+            
+            <div className="w-full h-px bg-white/20 my-5 relative overflow-hidden">
+               <motion.div 
+                 animate={{ x: ['-100%', '200%'] }}
+                 transition={{ duration: 3.5, repeat: Infinity, ease: "linear" }}
+                 className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/40 to-transparent"
+               />
+            </div>
+
+            <h2 className="text-lg md:text-3xl font-extrabold text-white tracking-[0.8em] uppercase flex justify-between w-full px-4 opacity-90 leading-none drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">
+              SOLUTIONS
+            </h2>
+
+            <div className="mt-12 flex flex-col items-center space-y-4">
               <motion.div 
-                animate={{ opacity: [0, 0.5, 0] }}
-                transition={{ duration: 2, repeat: Infinity }}
-                className="absolute inset-0 rounded-full bg-primary/20 blur-xl"
-              />
+                animate={{ 
+                  scale: [1, 1.1, 1],
+                  filter: ["brightness(1)", "brightness(1.5)", "brightness(1)"]
+                }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                className="flex items-center justify-center w-14 h-14 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm shadow-[0_0_20px_rgba(129,140,248,0.1)]"
+              >
+                 <Zap className="w-7 h-7 text-[#818cf8] fill-[#818cf8]/20" />
+              </motion.div>
+              <p className="text-[10px] md:text-xs font-black text-white/30 tracking-[0.4em] uppercase">
+                Power by <span className="bg-gradient-to-r from-blue-400 via-fuchsia-400 to-rose-400 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]">ZEC AI</span>
+              </p>
             </div>
           </motion.div>
 
-          <div className="w-full space-y-6">
-            <div className="flex items-end justify-between mb-2">
-              <div className="flex flex-col">
-                <motion.span 
-                  className="text-[10px] font-black text-primary uppercase tracking-[0.3em] mb-1"
-                >
-                  System Protocol
-                </motion.span>
-                <div className="h-5 overflow-hidden">
-                  <AnimatePresence mode="wait">
-                    <motion.p
-                      key={loadingMessageIndex}
-                      initial={{ y: 10, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      exit={{ y: -10, opacity: 0 }}
-                      className="text-xs font-bold text-white uppercase tracking-wider"
-                    >
-                      {loadingMessages[loadingMessageIndex]}
-                    </motion.p>
-                  </AnimatePresence>
-                </div>
-              </div>
-              <span className="text-xl font-black text-white font-mono tabular-nums">
-                {Math.floor(loadingProgress)}%
-              </span>
-            </div>
-
-            <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden p-[1px] border border-white/10 relative">
+          <div className="w-full max-w-md space-y-8">
+            {/* Custom Progress Bar */}
+            <div className="relative h-[4px] w-full bg-white/5 rounded-full border border-white/5 overflow-hidden">
               <motion.div 
-                className="h-full bg-gradient-to-r from-primary via-indigo-500 to-emerald-400 rounded-full shadow-[0_0_20px_rgba(var(--primary-rgb),0.5)]"
+                className="absolute inset-y-0 left-0 bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.6)]"
                 initial={{ width: "0%" }}
                 animate={{ width: `${loadingProgress}%` }}
                 transition={{ duration: 0.5, ease: "easeOut" }}
               />
-              <motion.div 
-                animate={{ x: ["-100%", "200%"] }}
-                transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-                className="absolute inset-0 w-1/3 h-full bg-white/30 skew-x-[-20deg] blur-sm pointer-events-none"
-              />
             </div>
 
-            <div className="flex justify-between items-center pt-2">
-              <div className="flex space-x-1.5">
-                {[0, 1, 2, 3].map(i => (
-                  <motion.div
-                    key={i}
-                    animate={{ 
-                      scaleY: [1, 2.5, 1],
-                      opacity: [0.3, 1, 0.3]
-                    }}
-                    transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
-                    className="w-1 h-3 bg-primary/60 rounded-full origin-bottom"
-                  />
-                ))}
-              </div>
-              <div className="flex flex-col items-end">
-                <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest leading-none">Kernel Tier 4</span>
-                <span className="text-[8px] font-black text-slate-600 uppercase tracking-widest mt-1">Status: Operational</span>
-              </div>
+            {/* Status Dots */}
+            <div className="flex justify-center items-center space-x-3">
+              {[
+                { color: 'bg-white', delay: 0 },
+                { color: 'bg-[#a78bfa]', delay: 0.1 },
+                { color: 'bg-[#3b82f6]', delay: 0.2 },
+                { color: 'bg-[#10b981]', delay: 0.3 },
+                { color: 'bg-white', delay: 0.4 }
+              ].map((dot, i) => (
+                <motion.div
+                  key={i}
+                  animate={{ 
+                    opacity: [0.4, 1, 0.4],
+                    scale: [1, 1.2, 1]
+                  }}
+                  transition={{ duration: 1.2, repeat: Infinity, delay: dot.delay }}
+                  className={cn("w-2 h-2 rounded-full", dot.color)}
+                />
+              ))}
             </div>
+
+            {/* Bottom Status Text */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.8 }}
+              className="text-center mt-10"
+            >
+              <p className="text-[10px] md:text-xs font-black text-slate-400 tracking-[0.6em] uppercase opacity-60 leading-relaxed max-w-[320px] mx-auto whitespace-nowrap">
+                SYNTHESIZING GLOBAL INVENTORY
+              </p>
+            </motion.div>
           </div>
         </div>
 
-        {/* Floating Background Assets */}
-        <div className="absolute inset-0 pointer-events-none opacity-20">
-          {[...Array(6)].map((_, i) => (
-            <motion.div
-              key={i}
-              initial={{ 
-                x: Math.random() * 100 + "%", 
-                y: Math.random() * 100 + "%",
-                rotate: Math.random() * 360
-              }}
-              animate={{ 
-                y: [null, (Math.random() - 0.5) * 200 + "px"],
-                rotate: [null, Math.random() * 360]
-              }}
-              transition={{ 
-                duration: 10 + Math.random() * 20, 
-                repeat: Infinity, 
-                ease: "linear"
-              }}
-              className="absolute"
-            >
-              <div className="w-24 h-24 border border-white/5 rounded-3xl" />
-            </motion.div>
-          ))}
+        {/* Technical Detail Footer */}
+        <div className="absolute bottom-8 left-0 right-0 text-center opacity-20">
+          <p className="text-[8px] font-black font-mono text-white tracking-[0.5em] uppercase">
+            OS TIER 4 // V4.2.0 // KERNEL OPERATIONAL
+          </p>
         </div>
       </div>
     );
@@ -568,6 +556,15 @@ export default function App() {
           items={items}
           onGlobalSearch={handleGlobalSearch}
         />
+        
+        {!isOnline && (
+          <div className="bg-rose-500/20 border-y border-rose-500/30 px-4 py-1.5 flex items-center justify-center space-x-2 backdrop-blur-md">
+            <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+            <p className="text-[10px] md:text-xs font-black text-rose-500 uppercase tracking-[0.2em]">
+              Network Disconnected • Operating in Offline Mode
+            </p>
+          </div>
+        )}
         
         {!isApproved && (
           <div className="bg-amber-500/10 border-y border-amber-500/20 px-4 py-2 flex items-center justify-center space-x-3 backdrop-blur-md">
@@ -618,7 +615,16 @@ export default function App() {
                 />
               )}
               {activeTab === 'projects' && projectsProps && (
-                <Projects {...projectsProps} />
+                <Projects 
+                  {...projectsProps} 
+                  onProjectDeepLink={(jobNumber) => {
+                    if (window.innerWidth <= 768) {
+                      navigator.vibrate?.(10);
+                    }
+                    setGlobalSearch(jobNumber);
+                    setActiveTab('inventory');
+                  }}
+                />
               )}
               {activeTab === 'transactions' && historyProps && (
                 <TransactionHistory {...historyProps} />

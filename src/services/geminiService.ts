@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { InventoryItem, StockTransaction, ProjectItem, Project } from "../types";
+import { safeJsonParse } from "../lib/utils";
 
 let aiInstance: GoogleGenAI | null = null;
 function getAi() {
@@ -32,27 +33,6 @@ function isQuotaError(error: any): boolean {
   );
 }
 
-function safeParse(text: string | null | undefined, fallback: any = []): any {
-  if (!text) return fallback;
-  try {
-    // Remove markdown code blocks if present
-    const cleaned = text.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
-    return JSON.parse(cleaned);
-  } catch (e) {
-    console.error("AI JSON Parse Error:", e, "Raw Text:", text);
-    // Try to find a JSON array or object if it's buried in text
-    try {
-      const match = text.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
-      if (match) {
-        return JSON.parse(match[0]);
-      }
-    } catch (innerE) {
-      console.error("AI Nested JSON Parse Error:", innerE);
-    }
-    return fallback;
-  }
-}
-
 export async function analyzeInventory(items: InventoryItem[], transactions: StockTransaction[]): Promise<InventoryInsight[]> {
   try {
     const ai = getAi();
@@ -74,7 +54,7 @@ export async function analyzeInventory(items: InventoryItem[], transactions: Sto
             Recent Transactions:
             ${JSON.stringify(transactions.slice(0, 20).map(t => ({ name: t.itemName, type: t.type, qty: t.quantity, date: t.date })))}
             
-            Return ONLY a JSON array.
+            Return ONLY a JSON array. Do not include any other text.
           `
         }]
       }],
@@ -83,7 +63,7 @@ export async function analyzeInventory(items: InventoryItem[], transactions: Sto
       }
     });
 
-    return safeParse(response.text, []);
+    return safeJsonParse(response.text, []);
   } catch (error: any) {
     if (isQuotaError(error)) {
       console.warn("Gemini Analysis: Quota limit reached (429).");
@@ -121,7 +101,7 @@ export async function suggestItemDetails(itemName: string, brand?: string, model
       }
     });
 
-    return safeParse(response.text, { description: "" });
+    return safeJsonParse(response.text, { description: "" });
   } catch (error: any) {
     if (isQuotaError(error)) {
       return { description: "AI usage limit reached. Please specify details manually." };
@@ -154,7 +134,7 @@ export async function processAiSearch(query: string, items: InventoryItem[]): Pr
       }
     });
 
-    return safeParse(response.text, []);
+    return safeJsonParse(response.text, []);
   } catch (error: any) {
     console.error("Gemini Search Error:", error);
     return [];
@@ -190,7 +170,7 @@ export async function findInventoryMatches(importedItems: Partial<ProjectItem>[]
       }
     });
 
-    const matches = safeParse(response.text, []);
+    const matches = safeJsonParse(response.text, []);
     return importedItems.map((item, idx) => ({
       ...item,
       inventoryItemId: matches[idx] || `EXT-${Math.random().toString(36).substr(2, 9)}`,
@@ -268,7 +248,7 @@ export async function getExcelMapping(headers: string[], sampleData: any[]): Pro
       }
     });
 
-    return safeParse(response.text, {});
+    return safeJsonParse(response.text, {});
   } catch (error) {
     console.error("Gemini Mapping identification error:", error);
     return {};
@@ -297,7 +277,7 @@ export async function mapExcelItems(rawData: any[]): Promise<Partial<ProjectItem
       }
     });
 
-    return safeParse(response.text, []);
+    return safeJsonParse(response.text, []);
   } catch (error: any) {
     console.error("Gemini Excel Mapping Error:", error);
     return [];
@@ -326,7 +306,7 @@ export async function getProjectExcelMapping(headers: string[], sampleData: any[
       }
     });
 
-    return safeParse(response.text, {});
+    return safeJsonParse(response.text, {});
   } catch (error) {
     console.error("Gemini Project Mapping error:", error);
     return {};
@@ -355,7 +335,7 @@ export async function mapExcelProjects(rawData: any[]): Promise<any[]> {
       }
     });
 
-    return safeParse(response.text, []);
+    return safeJsonParse(response.text, []);
   } catch (error: any) {
     console.error("Gemini Project Mapping Error:", error);
     return [];
@@ -410,7 +390,7 @@ export async function analyzeSupplyChain(
       }
     });
 
-    const results = safeParse(response.text, []);
+    const results = safeJsonParse(response.text, []);
     insightsCache.set(dataHash, { timestamp: Date.now(), data: results });
     return results;
   } catch (error: any) {

@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { safeJsonParse } from "../lib/utils";
 
 let aiInstance: GoogleGenAI | null = null;
 function getAi() {
@@ -24,7 +25,7 @@ export async function getDailyKitchenNews(): Promise<NewsInsight[]> {
       contents: [{
         role: "user",
         parts: [{
-          text: "Generate 3 short, professional news snippets about commercial kitchen equipment. Focus on: 1. A recent UAE-specific industry update. 2. A global innovation in kitchen tech. 3. An energy-efficiency trend. Return ONLY a JSON array of objects with keys: title, content (max 120 chars), source, category ('UAE', 'Global', or 'Trend')."
+          text: "Generate 3 short, professional news snippets about commercial kitchen equipment. Focus on: 1. A recent UAE-specific industry update. 2. A global innovation in kitchen tech. 3. An energy-efficiency trend. Return ONLY a JSON array of objects with keys: title, content (max 120 chars), source, category ('UAE', 'Global', or 'Trend'). Do not include any text before or after the JSON array."
         }]
       }],
       config: {
@@ -33,20 +34,7 @@ export async function getDailyKitchenNews(): Promise<NewsInsight[]> {
     });
 
     const text = response.text;
-    if (!text) return [];
-    
-    try {
-      // Clean markdown code blocks if present
-      const cleaned = text.trim().replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
-      return JSON.parse(cleaned);
-    } catch (e) {
-      console.warn("AI News Parse Error:", e, "Raw Text:", text);
-      const match = text.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
-      if (match) {
-        return JSON.parse(match[0]);
-      }
-      throw e;
-    }
+    return safeJsonParse(text, []);
   } catch (error: any) {
     const errorStr = JSON.stringify(error);
     const isQuotaError = errorStr.includes('429') || 

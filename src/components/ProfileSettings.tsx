@@ -24,7 +24,7 @@ interface ProfileSettingsProps {
   setUser: (user: UserProfile) => void;
 }
 
-export default React.memo(function ProfileSettings({ user, setUser }: ProfileSettingsProps) {
+export default React.memo(React.forwardRef<HTMLDivElement, ProfileSettingsProps>(({ user, setUser }, ref) => {
   const [name, setName] = useState(user.displayName || '');
   const [photo, setPhoto] = useState(user.photoURL || '');
   const [email, setEmail] = useState(user.email || '');
@@ -68,6 +68,7 @@ export default React.memo(function ProfileSettings({ user, setUser }: ProfileSet
 
   return (
     <motion.div 
+      ref={ref}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="max-w-4xl mx-auto space-y-8"
@@ -267,4 +268,4 @@ export default React.memo(function ProfileSettings({ user, setUser }: ProfileSet
       </div>
     </motion.div>
   );
-});
+}));

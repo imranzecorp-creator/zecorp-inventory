@@ -112,7 +112,7 @@ const StockTableRow = React.memo(({ index, style, data }: { index: number, style
   );
 });
 
-export default function Dashboard({ user, items, transactions, projects }: DashboardProps) {
+const Dashboard = React.forwardRef<HTMLDivElement, DashboardProps>(({ user, items, transactions, projects }, ref) => {
   const [stockSearch, setStockSearch] = useState('');
   const deferredStockSearch = useDeferredValue(stockSearch);
   const [showStockSuggestions, setShowStockSuggestions] = useState(false);
@@ -459,6 +459,7 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
 
   return (
     <motion.div 
+      ref={ref}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
@@ -1375,7 +1376,9 @@ export default function Dashboard({ user, items, transactions, projects }: Dashb
       </div>
     </motion.div>
   );
-}
+});
+
+export default Dashboard;
 
 const StatCard = React.memo(({ label, value, icon: Icon, trend, trendUp, color, active }: any) => {
   const colors: any = {

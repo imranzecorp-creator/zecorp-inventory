@@ -223,6 +223,16 @@
     "/approved_emails/{emailId}": {
       "schema": "ApprovedEmail",
       "description": "Whitelisted emails for auto-approval"
+    },
+    "/_system_/{docId}": {
+      "schema": {
+        "title": "System Data",
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" }
+        }
+      },
+      "description": "Internal system metadata and connectivity checks"
     }
   }
 }

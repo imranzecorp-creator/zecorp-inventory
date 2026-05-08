@@ -45,27 +45,45 @@ export default React.memo(function Sidebar({ activeTab, setActiveTab, role }: Si
   }, [role]);
 
   return (
-    <div className="hidden md:flex flex-col w-60 bg-[#030712]/60 border-r border-white/10 relative z-50 overflow-hidden shadow-[10px_0_40px_-20px_rgba(0,0,0,0.5)] backdrop-blur-xl">
-      {/* Dynamic Background Glows */}
+    <div className="hidden md:flex flex-col w-60 bg-[#030712]/80 border-r border-white/10 relative z-50 overflow-hidden shadow-[10px_0_40px_-20px_rgba(0,0,0,0.5)] backdrop-blur-3xl">
+      {/* Energetic Dynamic Background Glows */}
       <motion.div 
         animate={{ 
-          scale: [1, 1.2, 1],
-          opacity: [0.1, 0.2, 0.1],
-          x: [-20, 20, -20],
-          y: [-20, 20, -20]
+          scale: [1, 1.4, 1],
+          opacity: [0.15, 0.3, 0.15],
+          x: [-30, 30, -30],
+          y: [-50, 50, -50]
         }}
-        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute top-0 -left-20 w-64 h-64 bg-primary/20 rounded-full blur-[100px] pointer-events-none" 
+        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute top-0 -left-20 w-80 h-80 bg-blue-600/30 rounded-full blur-[120px] pointer-events-none mix-blend-plus-lighter" 
       />
       <motion.div 
         animate={{ 
-          scale: [1.2, 1, 1.2],
-          opacity: [0.1, 0.15, 0.1],
-          x: [20, -20, 20],
-          y: [20, -20, 20]
+          scale: [1.2, 1.5, 1.2],
+          opacity: [0.1, 0.25, 0.1],
+          x: [40, -40, 40],
+          y: [30, -30, 30]
         }}
-        transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute bottom-40 -right-20 w-64 h-64 bg-indigo-500/20 rounded-full blur-[100px] pointer-events-none" 
+        transition={{ duration: 18, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+        className="absolute middle-40 -right-20 w-72 h-72 bg-fuchsia-500/30 rounded-full blur-[100px] pointer-events-none mix-blend-plus-lighter" 
+      />
+      <motion.div 
+        animate={{ 
+          scale: [1, 1.3, 1],
+          opacity: [0.1, 0.2, 0.1],
+          y: [100, -100, 100]
+        }}
+        transition={{ duration: 25, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+        className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/20 rounded-full blur-[110px] pointer-events-none mix-blend-plus-lighter" 
+      />
+      <motion.div 
+        animate={{ 
+          scale: [0.8, 1.2, 0.8],
+          opacity: [0.05, 0.15, 0.05],
+          x: [100, -50, 100]
+        }}
+        transition={{ duration: 20, repeat: Infinity, ease: "easeInOut", delay: 3 }}
+        className="absolute top-[40%] left-[20%] w-48 h-48 bg-amber-500/10 rounded-full blur-[90px] pointer-events-none" 
       />
       
       <div className="p-5 relative z-10">

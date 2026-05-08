@@ -2,57 +2,51 @@ import React, { useState, useMemo, useCallback, useEffect, useDeferredValue } fr
 import { 
   Plus, 
   Search, 
-  MoreVertical, 
+  RotateCcw, 
   Edit, 
   Trash, 
-  RotateCcw,
   AlertCircle, 
-  MapPin, 
-  Filter,
   Package,
   Download,
-  Info,
   X,
-  Sparkles,
   Loader2,
-  Minus,
   CheckSquare,
   Square,
   Zap,
   Building,
   User,
-  Warehouse,
+  MapPin,
+  Minus,
   ChevronDown,
   Hash,
-  FileUp,
-  FileText,
-  Mic,
-  MicOff
+  Sparkles,
+  Warehouse,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
-import { useVoiceSearch } from '../hooks/useVoiceSearch';
-import { VoiceLanguageSelector } from './VoiceLanguageSelector';
 import { 
   collection, 
   addDoc, 
   updateDoc, 
-  deleteDoc, 
   doc, 
   serverTimestamp,
   increment,
-  getDocs,
+  writeBatch,
   query,
   where,
-  writeBatch
+  getDocs
 } from 'firebase/firestore';
-import { db, OperationType, handleFirestoreError, auth } from '../lib/firebase';
+import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { InventoryItem, UserProfile, Project } from '../types';
 import { cn, formatDate, formatDateForInput, getDateObject } from '../lib/utils';
 import { generateInventoryReport } from '../services/pdfService';
 import { suggestItemDetails, processAiSearch, mapExcelItems, getExcelMapping } from '../services/geminiService';
+import { useVoiceSearch } from '../hooks/useVoiceSearch';
 
-import { FilterDropdown } from './ui/FilterDropdown';
+import { InventoryListItem } from './InventoryListItem';
+import { InventoryFilterBar } from './InventoryFilterBar';
+import { VariableSizeList as List } from 'react-window';
+import AutoSizer from 'react-virtualized-auto-sizer';
 
 interface InventoryListProps {
   items: InventoryItem[];
@@ -63,247 +57,7 @@ interface InventoryListProps {
   onSearchClear?: () => void;
 }
 
-import { VariableSizeList as List } from 'react-window';
-import AutoSizer from 'react-virtualized-auto-sizer';
-
-const InventoryRow = React.memo(({ index, style, data }: { index: number, style: React.CSSProperties, data: any }) => {
-  const { items, expandedId, selectedIds, toggleSelectItem, toggleExpand, isApproved, isAdmin, canUpdateStock, openAdjustment, setEditingItem, setItemToDelete } = data;
-  const item = items[index];
-  if (!item) return null;
-  const isExpanded = expandedId === item.id;
-  const isSelected = selectedIds.includes(item.id);
-
-  return (
-    <div style={style} className="px-1 md:px-2">
-      <motion.div 
-        layout
-        initial={false}
-        animate={{ 
-          backgroundColor: isSelected ? "rgba(59, 130, 246, 0.08)" : "rgba(255, 255, 255, 0)",
-          scale: isSelected ? 1.002 : 1,
-        }}
-        className={cn(
-          "group cursor-pointer border border-white/[0.03] rounded-xl md:rounded-2xl overflow-hidden transition-all duration-200 active:bg-white/[0.05] touch-manipulation",
-          isSelected && "ring-1 ring-inset ring-primary/20",
-          isExpanded ? "bg-white/[0.04] mb-4 shadow-xl" : "hover:bg-white/[0.02] mb-1"
-        )}
-        onClick={() => toggleExpand(item.id)}
-      >
-        <div className="flex items-center p-2 md:p-3">
-          {isApproved && (
-            <div className="w-8 md:w-10 flex items-center justify-center shrink-0" onClick={(e) => { e.stopPropagation(); toggleSelectItem(item.id); }}>
-              <div className="text-slate-500 group-hover:text-primary transition-colors">
-                <AnimatePresence mode="wait">
-                  {isSelected ? (
-                    <motion.div key="c" initial={{ scale: 0, rotate: -90 }} animate={{ scale: 1, rotate: 0 }} exit={{ scale: 0, rotate: 90 }}>
-                      <CheckSquare className="w-4 h-4 text-primary" />
-                    </motion.div>
-                  ) : (
-                    <motion.div key="u" initial={{ scale: 0.8, opacity: 0.5 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0.5 }}>
-                      <Square className="w-4 h-4" />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </div>
-          )}
-          
-          <div className="flex-1 flex items-center space-x-2 md:space-x-3 truncate">
-            <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-white/10 flex items-center justify-center overflow-hidden border border-white/10 shrink-0">
-              {item.imageUrl ? (
-                <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-              ) : (
-                <Package className="w-4 h-4 md:w-5 md:h-5 text-slate-500" />
-              )}
-            </div>
-            <div className="flex flex-col truncate">
-              <div className="flex items-center space-x-2">
-                <p className="text-xs md:text-sm font-bold text-slate-200 group-hover:text-primary transition-colors truncate">{item.name}</p>
-                {item.inventoryType === 'Client Stock' && <Warehouse className="w-2.5 h-2.5 md:w-3 md:h-3 text-amber-500/60" />}
-              </div>
-              <p className="text-[9px] md:text-[10px] text-slate-500 font-medium truncate">
-                {item.modelNumber || 'No Model'}
-              </p>
-            </div>
-          </div>
-
-          <div className="w-20 md:w-24 px-2 md:px-4 hidden sm:block shrink-0 text-slate-400">
-             <span className="text-[9px] md:text-[10px] font-black uppercase tracking-tighter truncate block">{item.brand || 'No Brand'}</span>
-          </div>
-
-          <div className="w-20 md:w-24 px-2 md:px-4 text-center shrink-0">
-            <div className={cn(
-              "px-1.5 md:px-2 py-0.5 md:py-1 rounded-lg border flex flex-col justify-center",
-              item.currentQuantity <= item.minStock 
-                ? "bg-amber-500/10 border-amber-500/30 text-amber-400" 
-                : "bg-primary/10 border-primary/30 text-primary"
-            )}>
-              <span className="text-xs md:text-sm font-black leading-none">{item.currentQuantity}</span>
-              <span className="text-[7px] md:text-[8px] font-black uppercase opacity-60 mt-0.5">Units</span>
-            </div>
-          </div>
-
-          <div className="w-32 px-4 hidden lg:block shrink-0">
-             <div className="flex items-center space-x-2 text-slate-400">
-                <Warehouse className="w-3 h-3 text-slate-600 shrink-0" />
-                <span className="text-[10px] font-black uppercase tracking-tighter truncate text-primary/80">{item.warehouseLocation || 'N/A'}</span>
-             </div>
-          </div>
-
-          <div className="w-32 px-4 hidden lg:block shrink-0">
-            <span className="text-[10px] text-slate-300 font-black uppercase tracking-tighter truncate block">{item.client || 'Internal'}</span>
-          </div>
-
-          <div className="w-32 px-4 hidden xl:block shrink-0">
-             <span className="text-[10px] text-slate-300 font-bold truncate block">{item.outlet || item.location || '-'}</span>
-          </div>
-
-          {isApproved && (
-            <div className="w-24 md:w-32 flex items-center justify-end pr-2 md:pr-4 space-x-1 md:space-x-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center space-x-1">
-                <button 
-                  onClick={() => openAdjustment('IN', item)}
-                  className="p-1.5 md:p-2 bg-emerald-500/10 text-emerald-400 rounded-lg h-8 w-8 md:h-10 md:w-10 flex items-center justify-center hover:bg-emerald-500/20 hover:scale-110 transition-all border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
-                >
-                  <Plus className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                </button>
-                <button 
-                  onClick={() => openAdjustment('OUT', item)}
-                  className="p-1.5 md:p-2 bg-amber-500/10 text-amber-500 rounded-lg h-8 w-8 md:h-10 md:w-10 flex items-center justify-center hover:bg-amber-500/20 hover:scale-110 transition-all border border-amber-500/20 shadow-[0_0_10px_rgba(245,158,11,0.2)]"
-                >
-                  <Minus className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                </button>
-              </div>
-              <div className="hidden sm:block h-6 w-px bg-white/10 mx-1" />
-              <div className="hidden sm:flex items-center space-x-1">
-                <button 
-                  onClick={() => setEditingItem(item)}
-                  className="p-1.5 hover:bg-white/10 rounded-lg transition-all text-slate-400 hover:text-white"
-                >
-                  <Edit className="w-3.5 h-3.5" />
-                </button>
-                <button 
-                  onClick={() => setItemToDelete(item)}
-                  className="p-1.5 hover:bg-red-500/10 rounded-lg transition-all text-slate-400 hover:text-red-500"
-                >
-                  <Trash className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <AnimatePresence>
-          {isExpanded && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="bg-white/[0.04] border-t border-white/5 p-6"
-            >
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                  <div className="space-y-4">
-                     <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-1.5"><Info className="w-3 h-3" />Item Info</p>
-                     <div className="space-y-2">
-                        <div className="flex flex-col">
-                           <span className="text-[10px] text-slate-400 uppercase font-bold">Category</span>
-                           <span className="text-sm text-white font-medium">{item.category || 'Standard Asset'}</span>
-                        </div>
-                        <div className="flex flex-col">
-                           <span className="text-[10px] text-slate-400 uppercase font-bold">Supplier</span>
-                           <span className="text-sm text-white font-medium">{item.supplier || 'Not Specified'}</span>
-                        </div>
-                        <div className="flex flex-col">
-                           <span className="text-[10px] text-slate-400 uppercase font-bold">Warehouse-Loc</span>
-                           <span className="text-[10px] text-primary font-bold">{item.warehouseLocation || 'N/A'}</span>
-                        </div>
-                     </div>
-                  </div>
-                  <div className="space-y-4">
-                     <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-1.5"><Building className="w-3 h-3" />Project Details</p>
-                     <div className="space-y-2">
-                        <div className="flex flex-col">
-                           <span className="text-[10px] text-slate-400 uppercase font-bold">Client</span>
-                           <span className="text-sm text-white font-medium">{item.client || 'Internal'}</span>
-                        </div>
-                        <div className="flex flex-col">
-                           <span className="text-[10px] text-slate-400 uppercase font-bold">Assignment</span>
-                           <span className="text-[10px] text-amber-500 font-bold">{item.clientAssignment || 'N/A'}</span>
-                        </div>
-                        <div className="flex flex-col">
-                           <span className="text-[10px] text-slate-400 uppercase font-bold">Project Outlet</span>
-                           <span className="text-sm text-white font-medium">{item.outlet || 'Unknown'}</span>
-                        </div>
-                     </div>
-                  </div>
-                  <div className="space-y-4">
-                     <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-1.5"><Hash className="w-3 h-3" />System Meta</p>
-                     <div className="space-y-2">
-                        <div className="flex flex-col">
-                           <span className="text-[10px] text-slate-400 uppercase font-bold">Job Number</span>
-                           <span className="text-sm font-mono text-primary font-bold">{item.jobNumber || 'PENDING'}</span>
-                        </div>
-                        <div className="flex flex-col">
-                           <span className="text-[10px] text-slate-400 uppercase font-bold">Entry ID</span>
-                           <span className="text-[10px] font-mono text-slate-300 truncate">{item.id}</span>
-                        </div>
-                     </div>
-                  </div>
-                  <div className="space-y-4">
-                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><FileText className="w-3 h-3" />Technical Spec</p>
-                     <div className="space-y-2">
-                        {item.posNo && (
-                          <div className="flex flex-col">
-                             <span className="text-[10px] text-slate-500 uppercase font-bold">Pos No</span>
-                             <span className="text-sm text-slate-200 font-medium">{item.posNo}</span>
-                          </div>
-                        )}
-                        {item.dimensions && (
-                          <div className="flex flex-col">
-                             <span className="text-[10px] text-slate-500 uppercase font-bold">Dimensions</span>
-                             <span className="text-sm text-slate-200 font-medium">{item.dimensions}</span>
-                          </div>
-                        )}
-                        {item.origin && (
-                          <div className="flex flex-col">
-                             <span className="text-[10px] text-slate-500 uppercase font-bold">Origin</span>
-                             <span className="text-sm text-slate-200 font-medium">{item.origin}</span>
-                          </div>
-                        )}
-                     </div>
-                  </div>
-                  <div className="space-y-4">
-                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Sparkles className="w-3 h-3" />Status & Logistics</p>
-                     <div className="space-y-2">
-                        {item.logistics && (
-                          <div className="flex flex-col">
-                             <span className="text-[10px] text-slate-500 uppercase font-bold">Logistics</span>
-                             <span className="text-sm text-slate-200 font-medium">{item.logistics}</span>
-                          </div>
-                        )}
-                        {(item.eta || item.deliveryDate) && (
-                          <div className="flex flex-col">
-                             <span className="text-[10px] text-slate-500 uppercase font-bold">ETA / Delivery</span>
-                             <span className="text-sm text-slate-200 font-medium truncate">{item.eta || ''} {item.deliveryDate ? `| ${item.deliveryDate}` : ''}</span>
-                          </div>
-                        )}
-                        {item.description && (
-                          <p className="text-xs text-slate-400 italic leading-relaxed border-l-2 border-white/5 pl-3 mt-2">
-                            {item.description}
-                          </p>
-                        )}
-                     </div>
-                  </div>
-               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    </div>
-  );
-});
-
-export default function InventoryList({ items, clients, user, projects, initialSearch = '', onSearchClear }: InventoryListProps) {
+const InventoryList = React.forwardRef<HTMLDivElement, InventoryListProps>(({ items, clients, user, projects, initialSearch = '', onSearchClear }, ref) => {
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const deferredSearchTerm = useDeferredValue(searchTerm);
   const [isAiSearching, setIsAiSearching] = useState(false);
@@ -311,7 +65,6 @@ export default function InventoryList({ items, clients, user, projects, initialS
   const [aiFilteredIds, setAiFilteredIds] = useState<string[] | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const inventoryFileInputRef = React.useRef<HTMLInputElement>(null);
-  const listRef = React.useRef<List>(null);
 
   const [importPreview, setImportPreview] = useState<any[] | null>(null);
 
@@ -507,6 +260,7 @@ export default function InventoryList({ items, clients, user, projects, initialS
   const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null);
   const [inventoryError, setInventoryError] = useState<string | null>(null);
   
+
   const { isListening, startListening, currentLang, setCurrentLang } = useVoiceSearch((transcript) => {
     setSearchTerm(transcript);
   });
@@ -635,7 +389,10 @@ export default function InventoryList({ items, clients, user, projects, initialS
         item.location.toLowerCase().includes(searchLow) ||
         (item.brand && item.brand.toLowerCase().includes(searchLow)) ||
         (item.modelNumber && item.modelNumber.toLowerCase().includes(searchLow)) ||
-        (item.supplier && item.supplier.toLowerCase().includes(searchLow));
+        (item.supplier && item.supplier.toLowerCase().includes(searchLow)) ||
+        (item.jobNumber && item.jobNumber.toLowerCase().includes(searchLow)) ||
+        (item.client && item.client.toLowerCase().includes(searchLow)) ||
+        (item.outlet && item.outlet.toLowerCase().includes(searchLow));
       
       if (!matchesSearch) return false;
 
@@ -679,13 +436,24 @@ export default function InventoryList({ items, clients, user, projects, initialS
     });
   }, [items, deferredSearchTerm, aiFilteredIds, selectedBrands, selectedModels, selectedCategories, selectedSuppliers, selectedOutlets, selectedWarehouseLocations, clientFilter, jobFilter, locationFilter, inventoryTypeFilter, stockInStart, stockInEnd, updatedStart, updatedEnd]);
 
-  const getItemSize = useCallback((index: number) => {
-    return expandedId === filteredItems[index]?.id ? 440 : 72;
-  }, [expandedId, filteredItems]);
+  const resultsCount = filteredItems.length;
+
+  const listRef = React.useRef<List>(null);
 
   useEffect(() => {
-    listRef.current?.resetAfterIndex(0);
-  }, [expandedId]);
+    if (listRef.current) {
+      listRef.current.resetAfterIndex(0);
+    }
+  }, [expandedId, filteredItems.length]);
+
+  const getItemSize = useCallback((index: number) => {
+    const item = filteredItems[index];
+    if (expandedId === item?.id) {
+      const hasDescription = !!item.description;
+      return hasDescription ? 650 : 500;
+    }
+    return 130;
+  }, [expandedId, filteredItems]);
 
   const toggleSelectAll = () => {
     if (selectedIds.length === filteredItems.length) {
@@ -851,6 +619,7 @@ export default function InventoryList({ items, clients, user, projects, initialS
 
   return (
     <motion.div 
+      ref={ref}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="space-y-6"
@@ -924,427 +693,88 @@ export default function InventoryList({ items, clients, user, projects, initialS
         </div>
       </div>
 
-      <div className="flex flex-col space-y-4 glass-morphism p-4 rounded-2xl border border-white/5 shadow-sm">
-        <div className="flex items-center space-x-4">
-          <div className="relative flex-1 group">
-            <motion.div
-              animate={{ 
-                scale: searchTerm ? 1.1 : 1,
-                color: (searchTerm || isAiSearching) ? 'var(--color-primary)' : 'rgb(100 116 139)'
-              }}
-              className="absolute left-3 top-1/2 -translate-y-1/2"
+      <InventoryFilterBar 
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        onAiSearch={handleAiSearch}
+        isAiSearching={isAiSearching}
+        onClear={clearSearch}
+        showAdvancedFilters={showAdvancedFilters}
+        setShowAdvancedFilters={setShowAdvancedFilters}
+        isListening={isListening}
+        startListening={startListening}
+        currentLang={currentLang}
+        setCurrentLang={setCurrentLang}
+        uniqueValues={uniqueValues}
+        selectedBrands={selectedBrands}
+        setSelectedBrands={setSelectedBrands}
+        selectedModels={selectedModels}
+        setSelectedModels={setSelectedModels}
+        selectedCategories={selectedCategories}
+        setSelectedCategories={setSelectedCategories}
+        selectedSuppliers={selectedSuppliers}
+        setSelectedSuppliers={setSelectedSuppliers}
+        selectedOutlets={selectedOutlets}
+        setSelectedOutlets={setSelectedOutlets}
+        selectedWarehouseLocations={selectedWarehouseLocations}
+        setSelectedWarehouseLocations={setSelectedWarehouseLocations}
+        clientFilter={clientFilter}
+        setClientFilter={setClientFilter}
+        showClientSuggestions={showClientSuggestions}
+        setShowClientSuggestions={setShowClientSuggestions}
+        clientSuggestions={clientSuggestions}
+        jobFilter={jobFilter}
+        setJobFilter={setJobFilter}
+        showJobSuggestions={showJobSuggestions}
+        setShowJobSuggestions={setShowJobSuggestions}
+        jobSuggestions={jobSuggestions}
+        locationFilter={locationFilter}
+        setLocationFilter={setLocationFilter}
+        showLocationSuggestions={showLocationSuggestions}
+        setShowLocationSuggestions={setShowLocationSuggestions}
+        locationSuggestions={locationSuggestions}
+        inventoryTypeFilter={inventoryTypeFilter}
+        setInventoryTypeFilter={setInventoryTypeFilter}
+        resultsCount={resultsCount}
+      />
+
+      {/* Inventory List - Virtualized for performance */}
+      <div className="flex-1 min-h-0 bg-black/20 rounded-[32px] border border-white/5 shadow-inner overflow-hidden relative">
+        <AutoSizer>
+          {({ height, width }) => (
+            <List
+              ref={listRef}
+              height={height}
+              itemCount={filteredItems.length}
+              itemSize={getItemSize}
+              width={width}
+              className="custom-scrollbar"
             >
-              {isAiSearching ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Search className="w-4 h-4 transition-colors" />
-              )}
-            </motion.div>
-            <input 
-              type="text" 
-              placeholder={aiFilteredIds ? "Showing AI matches..." : "Search items or ask anything (e.g. show only low stock)..."} 
-              className={cn(
-                "w-full pl-10 pr-24 py-2 rounded-xl bg-white/5 border border-white/5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium",
-                aiFilteredIds && "border-primary/40 bg-primary/5 ring-1 ring-primary/20"
-              )}
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setShowSearchSuggestions(true);
-                if (aiFilteredIds && !e.target.value) setAiFilteredIds(null);
-              }}
-              onFocus={() => setShowSearchSuggestions(true)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAiSearch()}
-            />
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center space-x-1">
-              <VoiceLanguageSelector 
-                currentLang={currentLang} 
-                onLangChange={setCurrentLang} 
-                className="mr-1"
-              />
-              <button
-                type="button"
-                onClick={startListening}
-                className={cn(
-                  "p-1.5 rounded-lg transition-all",
-                  isListening ? "bg-red-500/20 text-red-500 animate-pulse" : "hover:bg-white/10 text-slate-500"
-                )}
-              >
-                {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-              </button>
-            </div>
-            <AnimatePresence>
-              {showSearchSuggestions && searchSuggestions.length > 0 && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowSearchSuggestions(false)} />
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
-                  >
-                    <div className="p-2 space-y-1">
-                      {searchSuggestions.map((suggestion, index) => (
-                        <button
-                          key={index}
-                          onClick={() => {
-                            setSearchTerm(suggestion);
-                            setShowSearchSuggestions(false);
-                          }}
-                          className="w-full px-4 py-2.5 flex items-center space-x-3 hover:bg-white/5 transition-colors text-left rounded-xl group"
-                        >
-                          <Search className="w-4 h-4 text-slate-500 group-hover:text-primary transition-colors" />
-                          <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">{suggestion}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center space-x-1">
-              {searchTerm && (
-                <button 
-                  onClick={clearSearch}
-                  className="p-1.5 text-slate-500 hover:text-white transition-colors"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-              <button 
-                onClick={handleAiSearch}
-                disabled={isAiSearching || !searchTerm.trim()}
-                className={cn(
-                  "flex items-center space-x-1.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 disabled:opacity-30",
-                  aiFilteredIds 
-                    ? "bg-gradient-to-r from-primary to-indigo-500 text-slate-950 shadow-lg shadow-primary/20" 
-                    : "bg-white/10 hover:bg-primary hover:text-slate-950 text-slate-400 shadow-xl border border-white/5"
-                )}
-              >
-                <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-                <span>{aiFilteredIds ? 'AI Matched' : 'AI Search'}</span>
-              </button>
-            </div>
-          </div>
-          <motion.button 
-            whileHover={{ scale: 1.05, filter: "brightness(1.1)" }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            className={cn(
-              "flex items-center space-x-2 px-5 py-2.5 rounded-xl border transition-all duration-300",
-              showAdvancedFilters 
-                ? "bg-amber-500 text-slate-950 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.3)]" 
-                : "bg-slate-800/50 border-white/10 text-slate-400 hover:text-white hover:bg-white/10"
-            )}
-          >
-            <Filter className={cn("w-4 h-4", (selectedBrands.length > 0 || selectedModels.length > 0 || selectedCategories.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || selectedWarehouseLocations.length > 0 || clientFilter || jobFilter || locationFilter || stockInStart || stockInEnd || updatedStart || updatedEnd) && "animate-bounce")} />
-            <span className="text-sm font-black uppercase tracking-widest">Filters</span>
-            {(selectedBrands.length > 0 || selectedModels.length > 0 || selectedCategories.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || selectedWarehouseLocations.length > 0 || clientFilter || jobFilter || locationFilter || stockInStart || stockInEnd || updatedStart || updatedEnd) && (
-              <div className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-pulse" />
-            )}
-          </motion.button>
-        </div>
-
-        <AnimatePresence>
-          {showAdvancedFilters && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="overflow-hidden"
-            >
-              <div className="pt-4 border-t border-white/5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <FilterDropdown 
-                  label="Brands" 
-                  options={uniqueValues.brands} 
-                  selected={selectedBrands} 
-                  onChange={setSelectedBrands} 
-                />
-                
-                <FilterDropdown 
-                  label="Model Numbers" 
-                  options={uniqueValues.models} 
-                  selected={selectedModels} 
-                  onChange={setSelectedModels} 
-                />
-                
-                <FilterDropdown 
-                  label="Categories" 
-                  options={uniqueValues.categories} 
-                  selected={selectedCategories} 
-                  onChange={setSelectedCategories} 
-                />
-
-                <FilterDropdown 
-                  label="Suppliers" 
-                  options={uniqueValues.suppliers} 
-                  selected={selectedSuppliers} 
-                  onChange={setSelectedSuppliers} 
-                />
-
-                <FilterDropdown 
-                  label="Projects" 
-                  options={uniqueValues.projects} 
-                  selected={selectedOutlets} 
-                  onChange={setSelectedOutlets} 
-                />
-                
-                <FilterDropdown 
-                  label="WH Location" 
-                  options={uniqueValues.warehouseLocations} 
-                  selected={selectedWarehouseLocations} 
-                  onChange={setSelectedWarehouseLocations} 
-                />
-
-                <div className="space-y-1.5 relative">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Client Search</label>
-                  <div className="relative">
-                    <input 
-                      type="text"
-                      value={clientFilter}
-                      onChange={(e) => {
-                        setClientFilter(e.target.value);
-                        setShowClientSuggestions(true);
-                      }}
-                      onFocus={() => setShowClientSuggestions(true)}
-                      placeholder="Search clients..."
-                      className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
-                    />
-                    <AnimatePresence>
-                      {showClientSuggestions && clientSuggestions.length > 0 && (
-                        <>
-                          <div className="fixed inset-0 z-40" onClick={() => setShowClientSuggestions(false)} />
-                          <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 10 }}
-                            className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
-                          >
-                            <div className="p-2 space-y-1">
-                              {clientSuggestions.map((suggestion, index) => (
-                                <button
-                                  key={index}
-                                  onClick={() => {
-                                    setClientFilter(suggestion);
-                                    setShowClientSuggestions(false);
-                                  }}
-                                  className="w-full px-4 py-2.5 flex items-center space-x-3 hover:bg-white/5 transition-colors text-left rounded-xl group"
-                                >
-                                  <Search className="w-3.5 h-3.5 text-slate-600 group-hover:text-primary transition-colors" />
-                                  <span className="text-[11px] font-medium text-slate-400 group-hover:text-white transition-colors">{suggestion}</span>
-                                </button>
-                              ))}
-                            </div>
-                          </motion.div>
-                        </>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5 relative">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Job Number</label>
-                  <div className="relative">
-                    <input 
-                      type="text"
-                      value={jobFilter}
-                      onChange={(e) => {
-                        setJobFilter(e.target.value);
-                        setShowJobSuggestions(true);
-                      }}
-                      onFocus={() => setShowJobSuggestions(true)}
-                      placeholder="Filter by Job#..."
-                      className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
-                    />
-                    <AnimatePresence>
-                      {showJobSuggestions && jobSuggestions.length > 0 && (
-                        <>
-                          <div className="fixed inset-0 z-40" onClick={() => setShowJobSuggestions(false)} />
-                          <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 10 }}
-                            className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
-                          >
-                            <div className="p-2 space-y-1">
-                              {jobSuggestions.map((suggestion, index) => (
-                                <button
-                                  key={index}
-                                  onClick={() => {
-                                    setJobFilter(suggestion);
-                                    setShowJobSuggestions(false);
-                                  }}
-                                  className="w-full px-4 py-2.5 flex items-center space-x-3 hover:bg-white/5 transition-colors text-left rounded-xl group"
-                                >
-                                  <Search className="w-3.5 h-3.5 text-slate-600 group-hover:text-primary transition-colors" />
-                                  <span className="text-[11px] font-medium text-slate-400 group-hover:text-white transition-colors">{suggestion}</span>
-                                </button>
-                              ))}
-                            </div>
-                          </motion.div>
-                        </>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Stock Type</label>
-                  <select
-                    value={inventoryTypeFilter}
-                    onChange={(e) => setInventoryTypeFilter(e.target.value as any)}
-                    className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:ring-2 focus:ring-primary/20 outline-none appearance-none"
-                  >
-                    <option value="" className="bg-[#0f172a]">All Stock Types</option>
-                    <option value="Warehouse Stock" className="bg-[#0f172a]">Warehouse Stock</option>
-                    <option value="Client Stock" className="bg-[#0f172a]">Client Stock</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5 relative">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Project Outlet</label>
-                  <div className="relative">
-                    <input 
-                      type="text"
-                      value={locationFilter}
-                      onChange={(e) => {
-                        setLocationFilter(e.target.value);
-                        setShowLocationSuggestions(true);
-                      }}
-                      onFocus={() => setShowLocationSuggestions(true)}
-                      placeholder="Search outlets..."
-                      className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
-                    />
-                    <AnimatePresence>
-                      {showLocationSuggestions && locationSuggestions.length > 0 && (
-                        <>
-                          <div className="fixed inset-0 z-40" onClick={() => setShowLocationSuggestions(false)} />
-                          <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 10 }}
-                            className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
-                          >
-                            <div className="p-2 space-y-1">
-                              {locationSuggestions.map((suggestion, index) => (
-                                <button
-                                  key={index}
-                                  onClick={() => {
-                                    setLocationFilter(suggestion);
-                                    setShowLocationSuggestions(false);
-                                  }}
-                                  className="w-full px-4 py-2.5 flex items-center space-x-3 hover:bg-white/5 transition-colors text-left rounded-xl group"
-                                >
-                                  <Search className="w-3.5 h-3.5 text-slate-600 group-hover:text-primary transition-colors" />
-                                  <span className="text-[11px] font-medium text-slate-400 group-hover:text-white transition-colors">{suggestion}</span>
-                                </button>
-                              ))}
-                            </div>
-                          </motion.div>
-                        </>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                </div>
-
-                {/* Date Filters Row */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Stock In (From)</label>
-                  <input 
-                    type="date"
-                    value={stockInStart}
-                    onChange={(e) => setStockInStart(e.target.value)}
-                    className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:ring-2 focus:ring-primary/20 outline-none"
+              {({ index, style }) => (
+                <div style={style} className="px-4 md:px-6 py-2">
+                   <InventoryListItem 
+                    item={filteredItems[index]}
+                    idx={index}
+                    isExpanded={expandedId === filteredItems[index].id}
+                    isSelected={selectedIds.includes(filteredItems[index].id)}
+                    onToggleExpand={toggleExpand}
+                    onToggleSelect={toggleSelectItem}
+                    onEdit={setEditingItem}
+                    onDelete={setItemToDelete}
+                    onAdjustment={openAdjustment}
+                    canUpdateStock={canUpdateStock}
+                    isAdmin={isAdmin}
+                    isApproved={isApproved}
+                    deletingId={deletingId}
                   />
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Stock In (To)</label>
-                  <input 
-                    type="date"
-                    value={stockInEnd}
-                    onChange={(e) => setStockInEnd(e.target.value)}
-                    className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:ring-2 focus:ring-primary/20 outline-none"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Updated (From)</label>
-                  <input 
-                    type="date"
-                    value={updatedStart}
-                    onChange={(e) => setUpdatedStart(e.target.value)}
-                    className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:ring-2 focus:ring-primary/20 outline-none"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Updated (To)</label>
-                  <div className="flex space-x-2">
-                    <input 
-                      type="date"
-                      value={updatedEnd}
-                      onChange={(e) => setUpdatedEnd(e.target.value)}
-                      className="flex-1 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white focus:ring-2 focus:ring-primary/20 outline-none"
-                    />
-                    <button 
-                      onClick={clearSearch}
-                      className="p-2 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-                      title="Clear All Filters"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-4 flex items-center justify-between pb-2 px-2">
-                <div className="flex items-center space-x-4">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase">
-                    Matching Results: <span className="text-primary">{filteredItems.length}</span>
-                  </p>
-                </div>
-                { (selectedBrands.length > 0 || selectedModels.length > 0 || selectedCategories.length > 0 || selectedSuppliers.length > 0 || selectedOutlets.length > 0 || clientFilter || jobFilter || locationFilter || stockInStart || stockInEnd || updatedStart || updatedEnd) && (
-                  <button 
-                    onClick={clearSearch}
-                    className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline"
-                  >
-                    Reset All Filters
-                  </button>
-                )}
-              </div>
-            </motion.div>
+              )}
+            </List>
           )}
-        </AnimatePresence>
-      </div>
-
-      {/* Inventory Grid/Table - Unified Virtualized View */}
-      <div className="glass-morphism rounded-3xl border border-white/5 shadow-sm overflow-hidden h-[600px] relative flex flex-col">
-        <div className="flex items-center px-5 py-3 bg-white/[0.03] border-b border-white/5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 shrink-0">
-          {isApproved && <div className="w-10 shrink-0" />}
-          <div className="flex-1 px-3">Item Matrix</div>
-          <div className="w-24 px-4 hidden md:block shrink-0">Brand</div>
-          <div className="w-24 px-4 text-center shrink-0">Stock</div>
-          <div className="w-32 px-4 hidden lg:block shrink-0">Warehouse</div>
-          <div className="w-32 px-4 hidden lg:block shrink-0">Client</div>
-          <div className="w-32 px-4 hidden xl:block shrink-0">Outlet</div>
-          <div className="w-32 flex justify-end shrink-0">Actions</div>
-        </div>
-        <div className="flex-1 relative">
-          <AutoSizer>
-            {({ height, width }) => (
-              <List
-                ref={listRef}
-                height={height}
-                width={width}
-                itemCount={filteredItems.length}
-                itemSize={getItemSize}
-                itemData={itemData}
-              >
-                {InventoryRow}
-              </List>
-            )}
-          </AutoSizer>
-        </div>
+        </AutoSizer>
 
         {filteredItems.length === 0 && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 bg-slate-950/20 backdrop-blur-sm">
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500">
             <Search className="w-12 h-12 mb-4 opacity-10" />
             <p className="text-sm font-medium">No units matching your current matrix</p>
             <button 
@@ -1516,7 +946,9 @@ export default function InventoryList({ items, clients, user, projects, initialS
       </AnimatePresence>
     </motion.div>
   );
-}
+});
+
+export default InventoryList;
 
 function BulkUpdateModal({ items, clients, projects, onClose, user }: { items: InventoryItem[], clients: any[], projects: Project[], onClose: () => void, user: UserProfile }) {
   const [stockAction, setStockAction] = useState<'IN' | 'OUT' | null>(null);

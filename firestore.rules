@@ -175,5 +175,11 @@ service cloud.firestore {
       allow read: if isVerified();
       allow write: if isAdmin();
     }
+
+    match /_system_/{docId} {
+      // Allow public get only for the connectivity check ID to verify backend reachability
+      allow get: if docId == 'connectivity_check';
+      allow write: if isAdmin();
+    }
   }
 }
