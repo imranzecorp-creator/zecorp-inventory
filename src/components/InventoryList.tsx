@@ -360,13 +360,27 @@ const InventoryList = React.forwardRef<HTMLDivElement, InventoryListProps>(({ it
   }, []);
 
   const uniqueValues = useMemo(() => {
+    const getUnique = (arr: (string|undefined|null)[]) => {
+      const seen = new Set<string>();
+      return arr
+        .filter(Boolean)
+        .map(s => s!.trim())
+        .filter(s => {
+          const low = s.toLowerCase();
+          if (seen.has(low)) return false;
+          seen.add(low);
+          return true;
+        })
+        .sort();
+    };
+
     return {
-      brands: Array.from(new Set(items.map(i => i.brand).filter(Boolean))) as string[],
-      models: Array.from(new Set(items.map(i => i.modelNumber).filter(Boolean))) as string[],
-      categories: Array.from(new Set(items.map(i => i.category).filter(Boolean))) as string[],
-      suppliers: Array.from(new Set(items.map(i => i.supplier).filter(Boolean))) as string[],
-      projects: Array.from(new Set(items.map(i => i.outlet).filter(Boolean))) as string[],
-      warehouseLocations: Array.from(new Set(['Dip Room 35', 'AL Quoz', 'Home Box', 'Head Office', ...items.map(i => i.warehouseLocation).filter(Boolean)])) as string[],
+      brands: getUnique(items.map(i => i.brand)),
+      models: getUnique(items.map(i => i.modelNumber)),
+      categories: getUnique(items.map(i => i.category)),
+      suppliers: getUnique(items.map(i => i.supplier)),
+      projects: getUnique(items.map(i => i.outlet)),
+      warehouseLocations: getUnique(['Dip Room 35', 'AL Quoz', 'Home Box', 'Head Office', ...items.map(i => i.warehouseLocation)]),
     };
   }, [items]);
 
@@ -396,13 +410,19 @@ const InventoryList = React.forwardRef<HTMLDivElement, InventoryListProps>(({ it
       
       if (!matchesSearch) return false;
 
+      const includesCaseInsensitive = (arr: string[], val: string | undefined | null) => {
+        if (!val) return false;
+        const low = val.toLowerCase().trim();
+        return arr.some(s => s.toLowerCase() === low);
+      };
+
       // New Multi-select Filters
-      if (selectedBrands.length > 0 && (!item.brand || !selectedBrands.includes(item.brand))) return false;
-      if (selectedModels.length > 0 && (!item.modelNumber || !selectedModels.includes(item.modelNumber))) return false;
-      if (selectedCategories.length > 0 && (!item.category || !selectedCategories.includes(item.category))) return false;
-      if (selectedSuppliers.length > 0 && (!item.supplier || !selectedSuppliers.includes(item.supplier))) return false;
-      if (selectedOutlets.length > 0 && (!item.outlet || !selectedOutlets.includes(item.outlet))) return false;
-      if (selectedWarehouseLocations.length > 0 && (!item.warehouseLocation || !selectedWarehouseLocations.includes(item.warehouseLocation))) return false;
+      if (selectedBrands.length > 0 && !includesCaseInsensitive(selectedBrands, item.brand)) return false;
+      if (selectedModels.length > 0 && !includesCaseInsensitive(selectedModels, item.modelNumber)) return false;
+      if (selectedCategories.length > 0 && !includesCaseInsensitive(selectedCategories, item.category)) return false;
+      if (selectedSuppliers.length > 0 && !includesCaseInsensitive(selectedSuppliers, item.supplier)) return false;
+      if (selectedOutlets.length > 0 && !includesCaseInsensitive(selectedOutlets, item.outlet)) return false;
+      if (selectedWarehouseLocations.length > 0 && !includesCaseInsensitive(selectedWarehouseLocations, item.warehouseLocation)) return false;
 
       // Legacy/Remaining Advanced Filters
       const clientLow = clientFilter.toLowerCase();

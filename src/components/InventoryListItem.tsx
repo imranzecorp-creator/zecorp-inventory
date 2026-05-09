@@ -102,29 +102,29 @@ export const InventoryListItem = React.memo(({
               )}
             </div>
             
-            <div className="flex flex-col space-y-1 md:space-y-1.5 mt-2">
-              <div className="flex items-center space-x-2 bg-white/5 px-2 py-0.5 rounded-full border border-white/5 w-fit">
-                <Tag className="w-2.5 h-2.5 text-slate-500" />
-                <span className="text-[8px] md:text-[10px] font-bold text-slate-300 uppercase tracking-widest leading-none">{item.brand || 'No Brand'}</span>
-                <span className="w-1 h-1 rounded-full bg-slate-700 mx-1 md:mx-2" />
-                <Hash className="w-2.5 h-2.5 text-primary" />
-                <span className="text-[8px] md:text-[10px] font-bold text-primary font-mono leading-none">#{item.modelNumber || 'N/A'}</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <div className="flex items-center space-x-2 bg-white/5 px-2 py-0.5 rounded-full border border-white/5 w-fit shrink-0">
-                  <MapPin className="w-2.5 h-2.5 text-emerald-500" />
-                  <span className="text-[8px] md:text-[10px] font-bold text-emerald-400 uppercase tracking-wider leading-none">{item.warehouseLocation || 'OFF-SITE'}</span>
+                <div className="flex flex-col space-y-1.5 mt-2">
+                  <div className="flex items-center space-x-2 bg-white/5 px-2.5 py-1 rounded-xl border border-white/5 w-fit">
+                    <Tag className="w-3 h-3 text-slate-500" />
+                    <span className="text-[10px] md:text-xs font-bold text-slate-300 uppercase tracking-widest">{item.brand || 'No Brand'}</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-700 mx-2" />
+                    <Hash className="w-3 h-3 text-primary" />
+                    <span className="text-[10px] md:text-xs font-black text-primary font-mono tracking-tight">#{item.modelNumber || 'N/A'}</span>
+                  </div>
+                  <div className="flex flex-col space-y-1 pl-1">
+                    <div className="flex items-center space-x-2">
+                      <MapPin className="w-3 h-3 text-emerald-500" />
+                      <span className="text-[9px] md:text-[11px] font-bold text-emerald-400 uppercase tracking-wider">{item.warehouseLocation || 'OFF-SITE'}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Building className="w-3 h-3 text-amber-500" />
+                      <span className="text-[9px] md:text-[11px] font-bold text-amber-400 uppercase tracking-wider">{item.client || 'INTERNAL'}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Warehouse className="w-3 h-3 text-blue-500" />
+                      <span className="text-[9px] md:text-[11px] font-bold text-blue-400 uppercase tracking-wider">{item.outlet || 'GEN-01'}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2 bg-white/5 px-2 py-0.5 rounded-full border border-white/5 w-fit shrink-0">
-                  <Building className="w-2.5 h-2.5 text-amber-500" />
-                  <span className="text-[8px] md:text-[10px] font-bold text-amber-400 uppercase tracking-wider leading-none">{item.client || 'INTERNAL'}</span>
-                </div>
-                <div className="flex items-center space-x-2 bg-white/5 px-2 py-0.5 rounded-full border border-white/5 w-fit shrink-0">
-                  <Warehouse className="w-2.5 h-2.5 text-blue-500" />
-                  <span className="text-[8px] md:text-[10px] font-bold text-blue-400 uppercase tracking-wider leading-none">{item.outlet || 'GEN-01'}</span>
-                </div>
-              </div>
-            </div>
           </div>
 
           <div className="hidden lg:flex flex-col items-center justify-center px-10 border-x border-white/5 h-16">

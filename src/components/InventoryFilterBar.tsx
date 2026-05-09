@@ -200,11 +200,26 @@ export const InventoryFilterBar = React.memo(({
         {showAdvancedFilters && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
+            animate={{ 
+              height: "auto", 
+              opacity: 1,
+              transitionEnd: { overflow: "visible" }
+            }}
+            exit={{ 
+              height: 0, 
+              opacity: 0,
+              overflow: "hidden" 
+            }}
             className="overflow-hidden"
           >
-            <div className="pt-4 border-t border-white/5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="pt-4 border-t border-white/5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 relative z-10 max-h-[50vh] lg:max-h-[70vh] overflow-y-auto custom-scrollbar pr-2 pb-32">
+              <FilterDropdown 
+                label="Warehouse Location" 
+                options={uniqueValues.warehouseLocations} 
+                selected={selectedWarehouseLocations} 
+                onChange={setSelectedWarehouseLocations} 
+              />
+
               <FilterDropdown 
                 label="Brands" 
                 options={uniqueValues.brands} 
@@ -238,13 +253,6 @@ export const InventoryFilterBar = React.memo(({
                 options={uniqueValues.projects} 
                 selected={selectedOutlets} 
                 onChange={setSelectedOutlets} 
-              />
-              
-              <FilterDropdown 
-                label="WH Location" 
-                options={uniqueValues.warehouseLocations} 
-                selected={selectedWarehouseLocations} 
-                onChange={setSelectedWarehouseLocations} 
               />
 
               <div className="space-y-1.5 relative">

@@ -34,7 +34,7 @@ export function FilterDropdown({
   };
 
   return (
-    <div className={cn("space-y-1.5 relative", className)}>
+    <div className={cn("space-y-1.5 relative", isOpen ? "z-[60]" : "z-10", className)}>
       <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">{label}</label>
       <div className="relative">
         <button
@@ -54,12 +54,12 @@ export function FilterDropdown({
         <AnimatePresence>
           {isOpen && (
             <>
-              <div className="fixed inset-0 z-[100]" onClick={() => setIsOpen(false)} />
+              <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
               <motion.div
                 initial={{ opacity: 0, y: 10, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                className="absolute top-full left-0 right-0 mt-2 bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl z-[101] overflow-hidden min-w-[220px]"
+                className="absolute top-full left-0 right-0 mt-2 bg-[#0f172a] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden min-w-[240px]"
               >
                 <div className="p-2 border-b border-white/5 bg-white/[0.02]">
                   <div className="relative">
@@ -74,9 +74,9 @@ export function FilterDropdown({
                     />
                   </div>
                 </div>
-                <div className="max-h-60 overflow-y-auto custom-scrollbar p-1">
+                <div className="max-h-96 overflow-y-auto custom-scrollbar p-1.5 space-y-0.5">
                   {filtered.length === 0 && (
-                    <div className="px-3 py-4 text-[10px] text-slate-500 text-center uppercase tracking-widest font-black">No options found</div>
+                    <div className="px-3 py-6 text-[10px] text-slate-500 text-center uppercase tracking-widest font-black">No options found</div>
                   )}
                   {filtered.map(opt => (
                     <button
@@ -84,17 +84,17 @@ export function FilterDropdown({
                       type="button"
                       onClick={() => toggle(opt)}
                       className={cn(
-                        "w-full px-3 py-2 flex items-center space-x-2 rounded-lg text-xs transition-colors text-left group",
-                        selected.includes(opt) ? "bg-primary/20 text-primary" : "text-slate-400 hover:bg-white/5 hover:text-white"
+                        "w-full px-4 py-3 flex items-center space-x-3 rounded-xl text-[11px] md:text-xs transition-all text-left group",
+                        selected.includes(opt) ? "bg-primary/20 text-white" : "text-slate-400 hover:bg-white/5 hover:text-white"
                       )}
                     >
                       <div className={cn(
-                        "w-3.5 h-3.5 rounded flex items-center justify-center border transition-all",
-                        selected.includes(opt) ? "bg-primary border-primary scale-110 shadow-[0_0_8px_rgba(59,130,246,0.3)]" : "border-white/20 group-hover:border-white/40"
+                        "w-4 h-4 rounded-md flex items-center justify-center border transition-all shrink-0",
+                        selected.includes(opt) ? "bg-primary border-primary scale-110 shadow-[0_0_10px_rgba(59,130,246,0.4)]" : "border-white/20 group-hover:border-white/40"
                       )}>
-                        {selected.includes(opt) && <Plus className="w-2.5 h-2.5 text-white" />}
+                        {selected.includes(opt) && <Plus className="w-3 h-3 text-white" />}
                       </div>
-                      <span className="truncate flex-1">{opt}</span>
+                      <span className="truncate flex-1 font-medium">{opt}</span>
                     </button>
                   ))}
                 </div>

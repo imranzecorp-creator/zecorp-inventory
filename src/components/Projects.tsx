@@ -112,41 +112,41 @@ const ManifestRow = React.memo(({ index, style, data }: { index: number, style: 
             </div>
           </div>
  
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 px-1">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 px-1">
             <div className="flex flex-col">
-              <p className="text-[6px] font-black text-slate-500 uppercase tracking-widest mb-0.5 opacity-70">Location</p>
-              <p className="text-[10px] font-bold text-blue-400 truncate uppercase">{item.unitLocation || 'STANDBY'}</p>
+              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5 opacity-70">Location</p>
+              <p className="text-xs font-bold text-blue-400 truncate uppercase tracking-tight">{item.unitLocation || 'STANDBY'}</p>
             </div>
             <div className="flex flex-col">
-              <p className="text-[6px] font-black text-slate-500 uppercase tracking-widest mb-0.5 opacity-70">Delivery</p>
-              <p className="text-[10px] font-bold text-amber-500 truncate uppercase">{item.eta || 'NOT SET'}</p>
+              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5 opacity-70">Delivery</p>
+              <p className="text-xs font-bold text-amber-500 truncate uppercase tracking-tight">{item.eta || 'NOT SET'}</p>
             </div>
             <div className="flex flex-col">
-              <p className="text-[6px] font-black text-slate-500 uppercase tracking-widest mb-0.5 opacity-70">Category</p>
-              <p className="text-[10px] font-bold text-slate-300 truncate uppercase">{item.category || 'GENERAL'}</p>
+              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5 opacity-70">Category</p>
+              <p className="text-xs font-bold text-slate-300 truncate uppercase tracking-tight">{item.category || 'GENERAL'}</p>
             </div>
             <div className="flex flex-col">
-              <p className="text-[6px] font-black text-slate-500 uppercase tracking-widest mb-0.5 opacity-70">Spec</p>
-              <p className="text-[10px] font-bold text-emerald-400 truncate font-mono">{item.dimensions || 'N/A'}</p>
+              <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5 opacity-70">Spec</p>
+              <p className="text-xs font-bold text-emerald-400 truncate font-mono tracking-tight">{item.dimensions || 'N/A'}</p>
             </div>
           </div>
         </div>
  
-        <div className="flex items-center justify-between md:justify-center gap-4 bg-black/30 px-4 py-2 md:py-3 rounded-[20px] border border-white/5 min-w-[110px] md:min-w-[180px] shadow-lg group-hover:bg-black/50 transition-all w-full md:w-auto">
-          <div className="flex items-center space-x-6 md:space-x-8">
+        <div className="flex items-center justify-between md:justify-center gap-6 bg-black/40 px-6 py-3 md:py-4 rounded-[24px] border border-white/5 min-w-[130px] md:min-w-[200px] shadow-lg group-hover:bg-black/60 transition-all w-full md:w-auto">
+          <div className="flex items-center space-x-8 md:space-x-12">
             <div className="text-center group-hover:scale-110 transition-transform">
-              <p className="text-[7px] font-bold text-slate-500 mb-0.5 tracking-tighter uppercase">REQ</p>
-              <span className="text-xl md:text-2xl font-bold text-white leading-none tracking-tight">{item.quantity}</span>
+              <p className="text-[9px] font-bold text-slate-500 mb-1 tracking-tighter uppercase">REQ</p>
+              <span className="text-2xl md:text-3xl font-black text-white leading-none tracking-tight">{item.quantity}</span>
             </div>
-            <div className="w-px h-8 bg-white/10" />
-            <div className="flex items-center space-x-4">
+            <div className="w-px h-10 bg-white/10" />
+            <div className="flex items-center space-x-6">
               <div className="text-center">
-                <p className="text-[7px] font-black text-emerald-500 mb-0.5 tracking-tighter">IN</p>
-                <span className="text-lg font-black text-emerald-400 leading-none tracking-tighter">{item.quantityIn || 0}</span>
+                <p className="text-[9px] font-black text-emerald-500 mb-1 tracking-tighter">IN</p>
+                <span className="text-xl font-black text-emerald-400 leading-none tracking-tighter">{item.quantityIn || 0}</span>
               </div>
               <div className="text-center">
-                <p className="text-[7px] font-black text-red-500 mb-0.5 tracking-tighter">OUT</p>
-                <span className="text-lg font-black text-red-400 leading-none tracking-tighter">{item.quantityOut || 0}</span>
+                <p className="text-[9px] font-black text-red-500 mb-1 tracking-tighter">OUT</p>
+                <span className="text-xl font-black text-red-400 leading-none tracking-tighter">{item.quantityOut || 0}</span>
               </div>
             </div>
           </div>
@@ -374,11 +374,25 @@ const Projects = React.forwardRef<HTMLDivElement, ProjectsProps>(({
   }, [projects]);
 
   const uniqueValues = useMemo(() => {
+    const getUnique = (arr: (string|undefined|null)[]) => {
+      const seen = new Set<string>();
+      return arr
+        .filter(Boolean)
+        .map(s => s!.trim())
+        .filter(s => {
+          const low = s.toLowerCase();
+          if (seen.has(low)) return false;
+          seen.add(low);
+          return true;
+        })
+        .sort();
+    };
+
     return {
-      statuses: Array.from(new Set(projects.map(p => p.status).filter(Boolean))) as string[],
-      clients: Array.from(new Set(projects.map(p => p.client).filter(Boolean))) as string[],
-      projectOutlets: Array.from(new Set(projects.map(p => p.outlet).filter(Boolean))) as string[],
-      warehouseLocations: Array.from(new Set(projects.map(p => p.location).filter(Boolean))) as string[],
+      statuses: getUnique(projects.map(p => p.status)),
+      clients: getUnique(projects.map(p => p.client)),
+      projectOutlets: getUnique(projects.map(p => p.outlet)),
+      warehouseLocations: getUnique(projects.map(p => p.location)),
     };
   }, [projects]);
 
@@ -395,10 +409,16 @@ const Projects = React.forwardRef<HTMLDivElement, ProjectsProps>(({
       if (!matchesGlobal) return false;
 
       // Advanced Filters
-      if (selectedStatuses.length > 0 && !selectedStatuses.includes(p.status)) return false;
-      if (selectedClients.length > 0 && !selectedClients.includes(p.client)) return false;
-      if (selectedProjectOutlets.length > 0 && (!p.outlet || !selectedProjectOutlets.includes(p.outlet))) return false;
-      if (selectedWarehouseLocations.length > 0 && (!p.location || !selectedWarehouseLocations.includes(p.location))) return false;
+      const includesCaseInsensitive = (arr: string[], val: string | undefined | null) => {
+        if (!val) return false;
+        const low = val.toLowerCase().trim();
+        return arr.some(s => s.toLowerCase() === low);
+      };
+
+      if (selectedStatuses.length > 0 && !includesCaseInsensitive(selectedStatuses, p.status)) return false;
+      if (selectedClients.length > 0 && !includesCaseInsensitive(selectedClients, p.client)) return false;
+      if (selectedProjectOutlets.length > 0 && !includesCaseInsensitive(selectedProjectOutlets, p.outlet)) return false;
+      if (selectedWarehouseLocations.length > 0 && !includesCaseInsensitive(selectedWarehouseLocations, p.location)) return false;
       
       if (deferredJobSearch && !p.jobNumber.toLowerCase().includes(deferredJobSearch.toLowerCase())) return false;
 
@@ -658,8 +678,16 @@ const Projects = React.forwardRef<HTMLDivElement, ProjectsProps>(({
         {showFilters && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
+            animate={{ 
+              height: 'auto', 
+              opacity: 1,
+              transitionEnd: { overflow: "visible" }
+            }}
+            exit={{ 
+              height: 0, 
+              opacity: 0,
+              overflow: "hidden" 
+            }}
             className="overflow-hidden"
           >
             <div className="glass-morphism p-8 rounded-[32px] border border-white/10 space-y-6 mb-8">
@@ -680,7 +708,14 @@ const Projects = React.forwardRef<HTMLDivElement, ProjectsProps>(({
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 max-h-[50vh] lg:max-h-[70vh] overflow-y-auto custom-scrollbar pr-2 pb-32">
+                <FilterDropdown 
+                  label="Warehouse Location" 
+                  options={uniqueValues.warehouseLocations} 
+                  selected={selectedWarehouseLocations} 
+                  onChange={setSelectedWarehouseLocations} 
+                />
+
                 <FilterDropdown 
                   label="Status" 
                   options={uniqueValues.statuses} 
@@ -700,13 +735,6 @@ const Projects = React.forwardRef<HTMLDivElement, ProjectsProps>(({
                   options={uniqueValues.projectOutlets} 
                   selected={selectedProjectOutlets} 
                   onChange={setSelectedProjectOutlets} 
-                />
-
-                <FilterDropdown 
-                  label="Warehouse Location" 
-                  options={uniqueValues.warehouseLocations} 
-                  selected={selectedWarehouseLocations} 
-                  onChange={setSelectedWarehouseLocations} 
                 />
 
                 <div className="space-y-1.5 relative">
@@ -1011,7 +1039,7 @@ const ProjectRow = React.memo(({ project, onClick, onStatusClick, onEdit, onDele
               onClick={onEdit}
               className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl text-slate-400 hover:text-primary transition-all border border-white/5"
             >
-              <Edit2 className="w-5 h-5" />
+              <Edit className="w-5 h-5" />
             </button>
             <button 
               onClick={onDelete}
