@@ -18,6 +18,7 @@ export interface ApprovedEmail {
 
 export interface InventoryItem {
   id: string;
+  sku?: string;
   name: string;
   description: string;
   location: string;

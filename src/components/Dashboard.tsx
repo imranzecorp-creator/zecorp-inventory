@@ -78,9 +78,22 @@ const StockTableRow = React.memo(({ index, style, data }: { index: number, style
         <div className="flex flex-col truncate">
           <span className="text-xs md:text-sm font-bold text-white group-hover:text-primary transition-colors truncate">{item.name}</span>
           {(item.brand || item.modelNumber) && (
-            <span className="text-[8px] md:text-[9px] text-primary font-bold uppercase tracking-tight truncate">
-              {item.brand} {item.modelNumber}
-            </span>
+            <div className="flex items-center space-x-1">
+              <span className="text-[8px] md:text-[9px] text-primary font-bold uppercase tracking-tight truncate">
+                {item.brand}
+              </span>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(item.modelNumber || '');
+                  // Optional: add a tiny visual feedback
+                }}
+                className="text-[8px] md:text-[9px] text-primary/60 font-bold uppercase tracking-tight truncate hover:text-white transition-colors"
+                title="Copy Model Number"
+              >
+                {item.modelNumber}
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -94,10 +107,10 @@ const StockTableRow = React.memo(({ index, style, data }: { index: number, style
           {item.currentQuantity}
         </span>
       </div>
-      <div className="px-4 py-4 flex-1 hidden md:block truncate text-[10px] text-slate-200 uppercase font-bold tracking-tight">
+      <div className="px-4 py-4 flex-1 hidden md:block truncate text-[10px] text-slate-100 uppercase font-bold tracking-tight">
         {item.client || 'Internal'}
       </div>
-      <div className="px-4 py-4 flex-1 hidden lg:block truncate text-[10px] text-slate-300 uppercase font-bold tracking-tight">
+      <div className="px-4 py-4 flex-1 hidden lg:block truncate text-[10px] text-slate-200 uppercase font-bold tracking-tight">
         {item.outlet || item.location || '-'}
       </div>
       <div className="px-4 py-4 w-24 hidden lg:block text-right shrink-0">
@@ -105,7 +118,7 @@ const StockTableRow = React.memo(({ index, style, data }: { index: number, style
           {item.jobNumber || 'PENDING'}
         </span>
       </div>
-      <div className="px-4 py-4 flex-1 hidden xl:block truncate text-[10px] text-slate-200 uppercase font-black tracking-tighter">
+      <div className="px-4 py-4 flex-1 hidden xl:block truncate text-[10px] text-slate-100 uppercase font-black tracking-tighter">
         {item.warehouseLocation || '-'}
       </div>
     </div>
@@ -135,6 +148,7 @@ const Dashboard = React.forwardRef<HTMLDivElement, DashboardProps>(({ user, item
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [selectedSuppliers, setSelectedSuppliers] = useState<string[]>([]);
   const [selectedOutlets, setSelectedOutlets] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedWarehouseLocations, setSelectedWarehouseLocations] = useState<string[]>([]);
   const [stockInStart, setStockInStart] = useState('');
   const [stockInEnd, setStockInEnd] = useState('');
@@ -337,6 +351,7 @@ const Dashboard = React.forwardRef<HTMLDivElement, DashboardProps>(({ user, item
     return {
       brands: getUnique(items.map(i => i.brand)),
       models: getUnique(items.map(i => i.modelNumber)),
+      categories: getUnique(items.map(i => i.category)),
       suppliers: getUnique(items.map(i => i.supplier)),
       projects: getUnique(items.map(i => i.outlet)),
       warehouseLocations: getUnique(['Dip Room 35', 'AL Quoz', 'Home Box', 'Head Office', ...items.map(i => i.warehouseLocation)]),
@@ -420,6 +435,7 @@ const Dashboard = React.forwardRef<HTMLDivElement, DashboardProps>(({ user, item
       // New Multi-select Filters
       if (selectedBrands.length > 0 && !includesCaseInsensitive(selectedBrands, item.brand)) return false;
       if (selectedModels.length > 0 && !includesCaseInsensitive(selectedModels, item.modelNumber)) return false;
+      if (selectedCategories.length > 0 && !includesCaseInsensitive(selectedCategories, item.category)) return false;
       if (selectedSuppliers.length > 0 && !includesCaseInsensitive(selectedSuppliers, item.supplier)) return false;
       if (selectedOutlets.length > 0 && !includesCaseInsensitive(selectedOutlets, item.outlet)) return false;
       if (selectedWarehouseLocations.length > 0 && !includesCaseInsensitive(selectedWarehouseLocations, item.warehouseLocation)) return false;
@@ -466,6 +482,7 @@ const Dashboard = React.forwardRef<HTMLDivElement, DashboardProps>(({ user, item
     setStockLocationFilter('');
     setSelectedBrands([]);
     setSelectedModels([]);
+    setSelectedCategories([]);
     setSelectedSuppliers([]);
     setSelectedOutlets([]);
     setSelectedWarehouseLocations([]);
@@ -616,7 +633,7 @@ const Dashboard = React.forwardRef<HTMLDivElement, DashboardProps>(({ user, item
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-1">
-                              <p className="text-[10px] font-black uppercase tracking-wider opacity-60 truncate">{insight.title}</p>
+                              <p className="text-[10px] font-black uppercase tracking-wider opacity-80 truncate">{insight.title}</p>
                               <div className="flex items-center space-x-1">
                                 {insight.type === 'WARNING' && (
                                   <motion.button
@@ -853,7 +870,7 @@ const Dashboard = React.forwardRef<HTMLDivElement, DashboardProps>(({ user, item
                 setShowStockSuggestions(true);
               }}
               onFocus={() => setShowStockSuggestions(true)}
-              className="w-full pl-11 pr-32 py-3 bg-white/5 border border-white/10 rounded-2xl text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all"
+              className="w-full pl-11 pr-32 py-3 bg-white/5 border border-white/10 rounded-2xl text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all font-bold tracking-wider"
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center space-x-2">
               <VoiceLanguageSelector 
@@ -920,13 +937,20 @@ const Dashboard = React.forwardRef<HTMLDivElement, DashboardProps>(({ user, item
               }}
               className="overflow-hidden mb-8"
             >
-              <div className="p-6 bg-white/[0.02] border border-white/5 rounded-3xl space-y-6 max-h-[50vh] lg:max-h-[70vh] overflow-y-auto custom-scrollbar pb-32">
+              <div className="p-6 bg-white/[0.02] border border-white/5 rounded-3xl space-y-6 max-h-[85vh] lg:max-h-[90vh] overflow-y-auto custom-scrollbar pb-32">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <FilterDropdown 
                     label="Warehouse Location" 
                     options={uniqueValues.warehouseLocations} 
                     selected={selectedWarehouseLocations} 
                     onChange={setSelectedWarehouseLocations} 
+                  />
+
+                  <FilterDropdown 
+                    label="Asset Category" 
+                    options={uniqueValues.categories} 
+                    selected={selectedCategories} 
+                    onChange={setSelectedCategories} 
                   />
 
                   <FilterDropdown 
@@ -958,7 +982,7 @@ const Dashboard = React.forwardRef<HTMLDivElement, DashboardProps>(({ user, item
                   />
 
                    <div className="space-y-1.5 relative">
-                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Client Search</label>
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Client Search</label>
                      <div className="relative">
                        <input 
                          type="text"
@@ -969,7 +993,7 @@ const Dashboard = React.forwardRef<HTMLDivElement, DashboardProps>(({ user, item
                          }}
                          onFocus={() => setShowClientSuggestions(true)}
                          placeholder="Search clients..."
-                         className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
+                         className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-500 focus:ring-2 focus:ring-primary/20 outline-none"
                        />
                        <AnimatePresence>
                          {showClientSuggestions && clientSuggestions.length > 0 && (
@@ -1004,7 +1028,7 @@ const Dashboard = React.forwardRef<HTMLDivElement, DashboardProps>(({ user, item
                    </div>
 
                    <div className="space-y-1.5 relative">
-                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Job Number</label>
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Job Number</label>
                      <div className="relative">
                        <input 
                          type="text"
@@ -1015,7 +1039,7 @@ const Dashboard = React.forwardRef<HTMLDivElement, DashboardProps>(({ user, item
                          }}
                          onFocus={() => setShowJobSuggestions(true)}
                          placeholder="Filter by Job#..."
-                         className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
+                         className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-500 focus:ring-2 focus:ring-primary/20 outline-none"
                        />
                        <AnimatePresence>
                          {showJobSuggestions && jobSuggestions.length > 0 && (
@@ -1050,7 +1074,7 @@ const Dashboard = React.forwardRef<HTMLDivElement, DashboardProps>(({ user, item
                    </div>
 
                    <div className="space-y-1.5 relative">
-                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Project Outlet</label>
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Project Outlet</label>
                      <div className="relative">
                        <input 
                          type="text"
@@ -1061,7 +1085,7 @@ const Dashboard = React.forwardRef<HTMLDivElement, DashboardProps>(({ user, item
                          }}
                          onFocus={() => setShowLocationSuggestions(true)}
                          placeholder="Search outlets..."
-                         className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
+                         className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-500 focus:ring-2 focus:ring-primary/20 outline-none"
                        />
                        <AnimatePresence>
                          {showLocationSuggestions && locationSuggestions.length > 0 && (
@@ -1097,7 +1121,7 @@ const Dashboard = React.forwardRef<HTMLDivElement, DashboardProps>(({ user, item
 
                   {/* Date Filters Row */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Stock In (From)</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Stock In (From)</label>
                     <input 
                       type="date"
                       value={stockInStart}
@@ -1106,7 +1130,7 @@ const Dashboard = React.forwardRef<HTMLDivElement, DashboardProps>(({ user, item
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Stock In (To)</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Stock In (To)</label>
                     <input 
                       type="date"
                       value={stockInEnd}
@@ -1115,7 +1139,7 @@ const Dashboard = React.forwardRef<HTMLDivElement, DashboardProps>(({ user, item
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Updated (From)</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Updated (From)</label>
                     <input 
                       type="date"
                       value={updatedStart}
@@ -1124,7 +1148,7 @@ const Dashboard = React.forwardRef<HTMLDivElement, DashboardProps>(({ user, item
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Updated (To)</label>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Updated (To)</label>
                     <div className="flex space-x-2">
                       <input 
                         type="date"
@@ -1145,7 +1169,7 @@ const Dashboard = React.forwardRef<HTMLDivElement, DashboardProps>(({ user, item
                 <div className="flex items-center justify-between pt-4 border-t border-white/5">
                    <p className="text-[10px] font-black text-slate-500 uppercase">
                      Filters applied: <span className="text-primary">{
-                        [selectedBrands.length, selectedModels.length, selectedSuppliers.length, selectedOutlets.length, selectedWarehouseLocations.length, stockJobFilter, stockClientFilter, stockLocationFilter, stockInStart, stockInEnd, updatedStart, updatedEnd].filter(Boolean).length
+                        [selectedBrands.length, selectedModels.length, selectedCategories.length, selectedSuppliers.length, selectedOutlets.length, selectedWarehouseLocations.length, stockJobFilter, stockClientFilter, stockLocationFilter, stockInStart, stockInEnd, updatedStart, updatedEnd].filter(Boolean).length
                      }</span>
                    </p>
                    <button 

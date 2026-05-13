@@ -4,8 +4,10 @@ import {
   RotateCcw, 
   Sparkles, 
   Loader2, 
-  Filter, 
-  Mic, 
+  LayoutGrid,
+  List as ListIcon,
+  Filter,
+  Mic,
   MicOff,
   X
 } from 'lucide-react';
@@ -72,10 +74,17 @@ interface InventoryFilterBarProps {
   inventoryTypeFilter: string;
   setInventoryTypeFilter: (val: any) => void;
   
+  aiSuggestions: string[];
+  showAiSuggestions: boolean;
+  setShowAiSuggestions: (val: boolean) => void;
+  
+  viewMode: 'matrix' | 'list';
+  setViewMode: (mode: 'matrix' | 'list') => void;
+  
   resultsCount: number;
 }
 
-export const InventoryFilterBar = React.memo(({
+export const InventoryFilterBar = React.forwardRef<HTMLInputElement, InventoryFilterBarProps>(({
   searchTerm,
   setSearchTerm,
   onAiSearch,
@@ -117,8 +126,13 @@ export const InventoryFilterBar = React.memo(({
   locationSuggestions,
   inventoryTypeFilter,
   setInventoryTypeFilter,
+  aiSuggestions,
+  showAiSuggestions,
+  setShowAiSuggestions,
+  viewMode,
+  setViewMode,
   resultsCount
-}: InventoryFilterBarProps) => {
+}, ref) => {
   return (
     <div className="bg-[#0f172a]/60 backdrop-blur-3xl border-b border-white/5 p-4 md:p-6 space-y-4 relative z-50">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -126,13 +140,23 @@ export const InventoryFilterBar = React.memo(({
           <div className="relative flex-1 group">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-primary transition-all" />
             <input 
+              ref={ref}
               type="text"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search Matrix by SKU, Brand, or Location..."
-              className="w-full bg-black/40 border border-white/10 rounded-2xl py-4 pl-14 pr-32 text-sm font-black text-white placeholder:text-slate-600 focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/5 transition-all uppercase tracking-widest italic"
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setShowAiSuggestions(true);
+              }}
+              onFocus={() => setShowAiSuggestions(true)}
+              placeholder="Search Matrix by Warehouse Location, SKU, or Brand..."
+              className="w-full bg-black/40 border border-white/10 rounded-2xl py-4 pl-14 pr-44 text-sm font-black text-white placeholder:text-slate-500 focus:outline-none focus:border-primary/50 focus:ring-4 focus:ring-primary/5 transition-all uppercase tracking-wider"
             />
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center space-x-2">
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center space-x-3">
+              {!searchTerm && (
+                <div className="hidden md:flex items-center bg-white/5 border border-white/10 px-2 py-1 rounded-lg text-[9px] font-black text-slate-500 uppercase tracking-widest pointer-events-none">
+                  Press [ / ] to search
+                </div>
+              )}
               {searchTerm && (
                 <button onClick={onClear} className="p-2 hover:bg-white/10 rounded-xl text-slate-500 hover:text-white transition-all">
                   <RotateCcw className="w-4 h-4" />
@@ -150,6 +174,46 @@ export const InventoryFilterBar = React.memo(({
               </button>
               <VoiceLanguageSelector currentLang={currentLang} onLangChange={setCurrentLang} />
             </div>
+            
+            <AnimatePresence>
+              {showAiSuggestions && aiSuggestions.length > 0 && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowAiSuggestions(false)} />
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute top-full left-0 right-0 mt-2 bg-[#030712]/95 border border-primary/30 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl"
+                  >
+                    <div className="p-2 border-b border-white/5 bg-primary/5 flex items-center justify-between px-4 py-2">
+                       <div className="flex items-center space-x-2">
+                         <Sparkles className="w-3 h-3 text-primary" />
+                         <span className="text-[10px] font-black text-primary uppercase tracking-widest">Flash-Lite Autocomplete</span>
+                       </div>
+                       <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">Powered by Gemini</span>
+                    </div>
+                    <div className="p-2 space-y-1">
+                      {aiSuggestions.map((suggestion, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            setSearchTerm(suggestion);
+                            setShowAiSuggestions(false);
+                          }}
+                          className="w-full px-4 py-3 flex items-center justify-between hover:bg-primary/10 transition-all text-left rounded-xl group"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <Search className="w-4 h-4 text-slate-500 group-hover:text-primary transition-colors" />
+                            <span className="text-sm font-bold text-slate-100 group-hover:text-white transition-colors uppercase tracking-tight">{suggestion}</span>
+                          </div>
+                          <Sparkles className="w-3 h-3 text-primary/0 group-hover:text-primary transition-all scale-0 group-hover:scale-100" />
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
           </div>
           
           <button 
@@ -177,6 +241,31 @@ export const InventoryFilterBar = React.memo(({
         </div>
 
         <div className="flex items-center space-x-3 self-end lg:self-auto">
+          <div className="flex items-center bg-white/5 border border-white/10 rounded-2xl p-1 gap-1">
+            <button
+              onClick={() => setViewMode('matrix')}
+              className={cn(
+                "p-2.5 rounded-xl transition-all flex items-center space-x-2",
+                viewMode === 'matrix' ? "bg-primary text-white shadow-lg" : "text-slate-500 hover:text-white"
+              )}
+              title="Matrix View"
+            >
+              <LayoutGrid className="w-4 h-4" />
+              <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Matrix</span>
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={cn(
+                "p-2.5 rounded-xl transition-all flex items-center space-x-2",
+                viewMode === 'list' ? "bg-primary text-white shadow-lg" : "text-slate-500 hover:text-white"
+              )}
+              title="List View"
+            >
+              <ListIcon className="w-4 h-4" />
+              <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">List</span>
+            </button>
+          </div>
+
           <div className="px-4 py-2 bg-black/40 border border-white/5 rounded-xl hidden sm:flex items-center space-x-2">
              <div className="w-2 h-2 rounded-full bg-emerald-500" />
              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{resultsCount} Units Filtered</span>
@@ -212,7 +301,7 @@ export const InventoryFilterBar = React.memo(({
             }}
             className="overflow-hidden"
           >
-            <div className="pt-4 border-t border-white/5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 relative z-10 max-h-[50vh] lg:max-h-[70vh] overflow-y-auto custom-scrollbar pr-2 pb-32">
+            <div className="pt-4 border-t border-white/5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 relative z-10 pb-12 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
               <FilterDropdown 
                 label="Warehouse Location" 
                 options={uniqueValues.warehouseLocations} 
@@ -256,7 +345,7 @@ export const InventoryFilterBar = React.memo(({
               />
 
               <div className="space-y-1.5 relative">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Client Search</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Client Search</label>
                 <div className="relative">
                   <input 
                     type="text"
@@ -267,7 +356,7 @@ export const InventoryFilterBar = React.memo(({
                     }}
                     onFocus={() => setShowClientSuggestions(true)}
                     placeholder="Search clients..."
-                    className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
+                    className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-500 focus:ring-2 focus:ring-primary/20 outline-none"
                   />
                   <AnimatePresence>
                     {showClientSuggestions && clientSuggestions.length > 0 && (
@@ -290,7 +379,7 @@ export const InventoryFilterBar = React.memo(({
                                 className="w-full px-4 py-2.5 flex items-center space-x-3 hover:bg-white/5 transition-colors text-left rounded-xl group"
                               >
                                 <Search className="w-3.5 h-3.5 text-slate-600 group-hover:text-primary transition-colors" />
-                                <span className="text-[11px] font-medium text-slate-400 group-hover:text-white transition-colors">{suggestion}</span>
+                                <span className="text-[11px] font-medium text-slate-200 group-hover:text-white transition-colors">{suggestion}</span>
                               </button>
                             ))}
                           </div>
@@ -302,7 +391,7 @@ export const InventoryFilterBar = React.memo(({
               </div>
 
               <div className="space-y-1.5 relative">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Job Number</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Job Number</label>
                 <div className="relative">
                   <input 
                     type="text"
@@ -313,7 +402,7 @@ export const InventoryFilterBar = React.memo(({
                     }}
                     onFocus={() => setShowJobSuggestions(true)}
                     placeholder="Filter by Job#..."
-                    className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
+                    className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-500 focus:ring-2 focus:ring-primary/20 outline-none"
                   />
                   <AnimatePresence>
                     {showJobSuggestions && jobSuggestions.length > 0 && (
@@ -361,7 +450,7 @@ export const InventoryFilterBar = React.memo(({
               </div>
 
               <div className="space-y-1.5 relative">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Project Outlet</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Project Outlet</label>
                 <div className="relative">
                   <input 
                     type="text"
@@ -372,7 +461,7 @@ export const InventoryFilterBar = React.memo(({
                     }}
                     onFocus={() => setShowLocationSuggestions(true)}
                     placeholder="Search outlets..."
-                    className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-600 focus:ring-2 focus:ring-primary/20 outline-none"
+                    className="w-full px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder:text-slate-500 focus:ring-2 focus:ring-primary/20 outline-none"
                   />
                   <AnimatePresence>
                     {showLocationSuggestions && locationSuggestions.length > 0 && (

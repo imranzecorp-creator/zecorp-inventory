@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { InventoryItem, StockTransaction, ProjectItem, Project } from "../types";
 import { safeJsonParse } from "../lib/utils";
 
@@ -190,10 +190,11 @@ export async function getAiResponse(message: string): Promise<string> {
   try {
     const ai = getAi();
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3.1-flash-lite",
       contents: [{ parts: [{ text: message }] }],
       config: {
-        systemInstruction: "You are a professional Inventory Specialist and Assistant for an inventory management app. Answer concisely and professionally. You help users manage stock, understand reports, and optimize their inventory."
+        systemInstruction: "You are a professional Inventory Specialist and Assistant for an inventory management app. Answer concisely and professionally. You help users manage stock, understand reports, and optimize their inventory.",
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }
       }
     });
     
@@ -201,6 +202,29 @@ export async function getAiResponse(message: string): Promise<string> {
   } catch (error: any) {
     console.error("Gemini Chat Error:", error);
     return "I'm experiencing some technical difficulties at the moment.";
+  }
+}
+
+export async function* streamAiResponse(message: string) {
+  try {
+    const ai = getAi();
+    const result = await ai.models.generateContentStream({
+      model: "gemini-3.1-flash-lite",
+      contents: [{ role: 'user', parts: [{ text: message }] }],
+      config: {
+        systemInstruction: "You are a professional Inventory Specialist and Assistant for an inventory management app. Answer concisely and professionally. You help users manage stock, understand reports, and optimize their inventory.",
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }
+      }
+    });
+
+    for await (const chunk of result) {
+      if (chunk.text) {
+        yield chunk.text;
+      }
+    }
+  } catch (error: any) {
+    console.error("Gemini Streaming Chat Error:", error);
+    yield "I'm experiencing some technical difficulties at the moment.";
   }
 }
 
@@ -403,6 +427,34 @@ export async function analyzeSupplyChain(
       }];
     }
     console.error("Gemini Supply Chain Analysis Error:", error);
+    return [];
+  }
+}
+
+export async function getAiAutocompleteSuggestions(partialQuery: string, items: InventoryItem[]): Promise<string[]> {
+  try {
+    if (partialQuery.length < 2) return [];
+    
+    const ai = getAi();
+    const context = items.map(i => i.name).slice(0, 100).join(', ');
+    
+    const response = await ai.models.generateContent({
+      model: "gemini-3.1-flash-lite",
+      contents: [{
+        role: 'user',
+        parts: [{
+          text: `Based on the user's partial search query: "${partialQuery}", suggest 5 relevant item names or categories from this inventory summary: ${context}. Return ONLY a JSON array of strings.`
+        }]
+      }],
+      config: {
+        responseMimeType: "application/json",
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }
+      }
+    });
+
+    return safeJsonParse(response.text, []);
+  } catch (error) {
+    console.error("Autocomplete error:", error);
     return [];
   }
 }

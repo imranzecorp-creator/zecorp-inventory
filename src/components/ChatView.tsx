@@ -30,7 +30,7 @@ import {
 import { db, OperationType, handleFirestoreError } from '../lib/firebase';
 import { UserProfile, ChatMessage } from '../types';
 import { cn, formatDate } from '../lib/utils';
-import { getAiResponse } from '../services/geminiService';
+import { getAiResponse, streamAiResponse } from '../services/geminiService';
 import { useVoiceSearch } from '../hooks/useVoiceSearch';
 import { VoiceLanguageSelector } from './VoiceLanguageSelector';
 import { useVoiceRecorder } from '../hooks/useVoiceRecorder';
@@ -44,6 +44,7 @@ const ChatView = React.forwardRef<HTMLDivElement, ChatViewProps>(({ user }, ref)
   const [newMessage, setNewMessage] = useState('');
   const [isAiMode, setIsAiMode] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [streamingMessage, setStreamingMessage] = useState<string | null>(null);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [selectedRecipient, setSelectedRecipient] = useState<UserProfile | null>(null);
   const [showMobileList, setShowMobileList] = useState(true);
@@ -204,23 +205,39 @@ const ChatView = React.forwardRef<HTMLDivElement, ChatViewProps>(({ user }, ref)
       }
 
       if (isAiMode) {
-        const aiResponse = await getAiResponse(content);
+        let fullResponse = '';
+        const stream = streamAiResponse(content);
+        
         try {
+          // MasterAI thinking state
+          setLoading(true);
+          
+          for await (const chunk of stream) {
+            if (loading) setLoading(false);
+            fullResponse += chunk;
+            setStreamingMessage(fullResponse);
+            // Small delay to make it feel more natural but still "lightning fast"
+            await new Promise(r => setTimeout(r, 20));
+          }
+
           await addDoc(collection(db, `chats/${chatId}/messages`), {
             senderId: 'ai',
             senderName: 'MasterAI',
-            content: aiResponse,
+            content: fullResponse,
             isAi: true,
             createdAt: Date.now()
           });
         } catch (err) {
           handleFirestoreError(err, OperationType.CREATE, `chats/${chatId}/messages`);
+        } finally {
+          setStreamingMessage(null);
+          setLoading(false);
         }
       }
     } catch (error) {
       console.error(error);
     } finally {
-      setLoading(false);
+      // Don't set loading false here if we are streaming, handled inside
     }
   };
 
@@ -482,7 +499,21 @@ const ChatView = React.forwardRef<HTMLDivElement, ChatViewProps>(({ user }, ref)
             </div>
           ))}
 
-          {loading && (
+          {streamingMessage && (
+            <div className="flex flex-col max-w-[85%] space-y-2 mr-auto items-start">
+              <div className="px-5 py-3 rounded-2xl text-sm leading-relaxed shadow-lg bg-slate-800 text-slate-100 border border-slate-700 rounded-tl-none">
+                {streamingMessage}
+                <motion.span 
+                  animate={{ opacity: [1, 0] }}
+                  transition={{ duration: 0.5, repeat: Infinity }}
+                  className="inline-block w-1.5 h-4 bg-primary ml-1 align-middle"
+                />
+              </div>
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter px-2">Streaming...</span>
+            </div>
+          )}
+
+          {loading && !streamingMessage && (
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

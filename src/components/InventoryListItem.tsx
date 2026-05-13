@@ -24,6 +24,7 @@ import { cn } from '../lib/utils';
 interface InventoryListItemProps {
   item: InventoryItem;
   idx: number;
+  viewMode?: 'matrix' | 'list';
   isExpanded: boolean;
   isSelected: boolean;
   onToggleExpand: (id: string) => void;
@@ -37,9 +38,10 @@ interface InventoryListItemProps {
   deletingId: string | null;
 }
 
-export const InventoryListItem = React.memo(({
+export const InventoryListItem = React.memo(React.forwardRef<HTMLDivElement, InventoryListItemProps>(({
   item,
   idx,
+  viewMode = 'matrix',
   isExpanded,
   isSelected,
   onToggleExpand,
@@ -51,12 +53,136 @@ export const InventoryListItem = React.memo(({
   isAdmin,
   isApproved,
   deletingId
-}: InventoryListItemProps) => {
+}, ref) => {
+  if (viewMode === 'list') {
+    return (
+      <motion.div
+        ref={ref}
+        layout
+        initial={{ opacity: 0, x: -10 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: 10 }}
+        transition={{ 
+          type: "spring",
+          stiffness: 400,
+          damping: 30,
+          opacity: { duration: 0.2 },
+          delay: Math.min(idx * 0.01, 0.2) 
+        }}
+        className={cn(
+          "group flex items-center h-16 bg-[#020617]/40 hover:bg-white/5 border border-white/5 hover:border-white/10 rounded-xl px-4 transition-all overflow-hidden cursor-pointer",
+          isSelected && "border-primary/40 bg-primary/5 ring-1 ring-primary/20",
+          item.currentQuantity <= (item.minStock || 0) && "border-red-500/20 bg-red-500/5 shadow-[inset_0_0_20px_rgba(239,68,68,0.05)]"
+        )}
+        onClick={() => onToggleExpand(item.id)}
+      >
+        <div className="flex items-center space-x-3 flex-1 min-w-0">
+          {isApproved && (
+            <div 
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSelect(item.id);
+              }}
+              className="p-1 px-1.5 hover:bg-white/10 rounded transition-all shrink-0 active:scale-90"
+            >
+              {isSelected ? <CheckSquare className="w-3.5 h-3.5 text-primary" /> : <Square className="w-3.5 h-3.5 text-slate-700" />}
+            </div>
+          )}
+
+          <div className="w-8 h-8 rounded-lg bg-slate-900 border border-white/10 shrink-0 overflow-hidden flex items-center justify-center group-hover:border-primary/30 transition-colors">
+            {item.imageUrl ? (
+              <img src={item.imageUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              <Package className="w-4 h-4 text-slate-700 group-hover:text-primary transition-colors" />
+            )}
+          </div>
+
+          <div className="flex-1 min-w-0 flex items-center space-x-4">
+             <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-bold text-white truncate uppercase tracking-tight group-hover:text-primary transition-colors">{item.name}</p>
+             </div>
+             
+             <div className="hidden lg:flex items-center space-x-2 w-32 shrink-0">
+                <Tag className="w-3 h-3 text-slate-400 group-hover:text-primary/60 transition-colors" />
+                <span className="text-[10px] font-bold text-slate-300 uppercase truncate">{item.brand || '—'}</span>
+             </div>
+
+             <div className="hidden xl:flex items-center space-x-2 w-32 shrink-0">
+                <Hash className="w-3 h-3 text-primary" />
+                <span className="text-[10px] font-mono text-primary uppercase truncate">#{item.modelNumber || '—'}</span>
+             </div>
+
+             <div className="hidden md:flex items-center space-x-2 w-32 shrink-0">
+                <MapPin className="w-3 h-3 text-emerald-500" />
+                <span className="text-[10px] font-bold text-emerald-400 uppercase truncate">{item.warehouseLocation || '—'}</span>
+             </div>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-4 ml-4">
+          <div className="flex flex-col items-end min-w-[60px]">
+            <span className={cn(
+              "text-sm font-black tracking-tight transition-colors",
+              item.currentQuantity > (item.minStock || 0) ? "text-white" : "text-red-500 animate-pulse"
+            )}>
+              {item.currentQuantity}
+            </span>
+            <span className="text-[7px] font-black text-slate-500 uppercase tracking-widest -mt-1 group-hover:text-slate-400">Stock</span>
+          </div>
+
+          <div className="flex items-center border-l border-white/10 pl-4 space-x-1">
+            {isApproved && (
+              <button 
+                onClick={(e) => { e.stopPropagation(); onEdit(item); }}
+                className="w-8 h-8 rounded-lg bg-white/5 text-slate-500 flex items-center justify-center hover:bg-primary/20 hover:text-primary transition-all active:scale-90 mr-1"
+                title="Edit"
+              >
+                <Edit className="w-3.5 h-3.5" />
+              </button>
+            )}
+            {canUpdateStock && (
+              <div className="flex items-center space-x-1.5 mr-2">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onAdjustment('IN', item); }}
+                  className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center hover:bg-emerald-500 hover:text-white transition-all active:scale-90"
+                  title="In"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onAdjustment('OUT', item); }}
+                  className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all active:scale-90"
+                  title="Out"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+            <div className={cn(
+               "w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-slate-600 transition-all",
+               isExpanded && "rotate-180 text-primary bg-primary/10"
+            )}>
+               <ChevronDown className="w-4 h-4" />
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
+      ref={ref}
+      layout
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: Math.min(idx * 0.03, 0.5) }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ 
+        type: "spring",
+        stiffness: 300,
+        damping: 30,
+        delay: Math.min(idx * 0.03, 0.5) 
+      }}
       className={cn(
         "group rounded-[32px] overflow-hidden border transition-all duration-500",
         isSelected ? "border-primary bg-primary/5 shadow-[0_0_40px_rgba(var(--primary-rgb),0.1)]" : "border-white/5 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/10 shadow-xl",
@@ -134,7 +260,7 @@ export const InventoryListItem = React.memo(({
             )}>
               {item.currentQuantity}
             </span>
-            <span className="text-[8px] font-bold text-slate-600 uppercase tracking-[0.3em] mt-1">Units</span>
+            <span className="text-[8px] font-bold text-slate-500 uppercase tracking-[0.3em] mt-1">Units</span>
           </div>
 
           <div className="flex items-center space-x-2 md:space-x-4 pr-2">
@@ -176,70 +302,70 @@ export const InventoryListItem = React.memo(({
           >
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 md:gap-12 text-left">
                 <div className="space-y-5">
-                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2 mb-2 leading-none"><Info className="w-4 h-4 text-primary" />Metadata</p>
+                   <p className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.3em] flex items-center gap-2 mb-2 leading-none"><Info className="w-4 h-4 text-primary" />Metadata</p>
                    <div className="space-y-4">
                       <div className="flex flex-col">
-                         <span className="text-[8px] text-slate-600 uppercase font-black tracking-widest mb-1.5 leading-none">Category</span>
+                         <span className="text-[8px] text-slate-500 uppercase font-black tracking-widest mb-1.5 leading-none">Category</span>
                          <span className="text-sm text-white font-bold uppercase drop-shadow-sm">{item.category || 'Standard Asset'}</span>
                       </div>
                       <div className="flex flex-col">
-                         <span className="text-[8px] text-slate-600 uppercase font-black tracking-widest mb-1.5 leading-none">Supplier Source</span>
+                         <span className="text-[8px] text-slate-500 uppercase font-black tracking-widest mb-1.5 leading-none">Supplier Source</span>
                          <span className="text-sm text-slate-300 font-bold">{item.supplier || 'NOT SPECIFIED'}</span>
                       </div>
                       <div className="flex flex-col pt-1">
-                         <span className="text-[8px] text-slate-600 uppercase font-black tracking-widest mb-1.5 leading-none">Storage Mapping</span>
+                         <span className="text-[8px] text-slate-500 uppercase font-black tracking-widest mb-1.5 leading-none">Storage Mapping</span>
                          <span className="text-xs text-primary font-black font-mono bg-primary/5 px-2 py-1 rounded-lg border border-primary/10 inline-block w-fit">#{item.warehouseLocation || 'OFF-SITE'}</span>
                       </div>
                    </div>
                 </div>
                 <div className="space-y-5">
-                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2 mb-2 leading-none"><Building className="w-4 h-4 text-amber-500" />Job Specs</p>
+                   <p className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.3em] flex items-center gap-2 mb-2 leading-none"><Building className="w-4 h-4 text-amber-500" />Job Specs</p>
                    <div className="space-y-4">
                       <div className="flex flex-col">
-                         <span className="text-[8px] text-slate-600 uppercase font-black tracking-widest mb-1.5 leading-none">Client Identity</span>
+                         <span className="text-[8px] text-slate-500 uppercase font-black tracking-widest mb-1.5 leading-none">Client Identity</span>
                          <span className="text-sm text-white font-bold uppercase drop-shadow-sm">{item.client || 'INTERNAL USE'}</span>
                       </div>
                       <div className="flex flex-col">
-                         <span className="text-[8px] text-slate-600 uppercase font-black tracking-widest mb-1.5 leading-none">Job Control #</span>
+                         <span className="text-[8px] text-slate-500 uppercase font-black tracking-widest mb-1.5 leading-none">Job Control #</span>
                          <span className="text-sm text-amber-500 font-black font-mono tracking-widest italic">{item.jobNumber || 'PENDING'}</span>
                       </div>
                       <div className="flex flex-col">
-                         <span className="text-[8px] text-slate-600 uppercase font-black tracking-widest mb-1.5 leading-none">Physical Point</span>
+                         <span className="text-[8px] text-slate-500 uppercase font-black tracking-widest mb-1.5 leading-none">Physical Point</span>
                          <span className="text-sm text-slate-200 font-bold italic tracking-tight">{item.outlet || 'GEN-01'}</span>
                       </div>
                    </div>
                 </div>
                 <div className="space-y-5">
-                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2 mb-2 leading-none"><Hash className="w-4 h-4 text-blue-500" />Technical ID</p>
+                   <p className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.3em] flex items-center gap-2 mb-2 leading-none"><Hash className="w-4 h-4 text-blue-500" />Technical ID</p>
                    <div className="space-y-4">
                       <div className="flex flex-col">
-                         <span className="text-[8px] text-slate-600 uppercase font-black tracking-widest mb-1.5 leading-none">Position Slot</span>
+                         <span className="text-[8px] text-slate-500 uppercase font-black tracking-widest mb-1.5 leading-none">Position Slot</span>
                          <span className="text-sm font-bold font-mono text-blue-400">POS-{item.posNo || 'N/A'}</span>
                       </div>
                       <div className="flex flex-col pt-2">
-                         <span className="text-[8px] text-slate-600 uppercase font-black tracking-widest mb-1.5 leading-none">System DocRef</span>
+                         <span className="text-[8px] text-slate-500 uppercase font-black tracking-widest mb-1.5 leading-none">System DocRef</span>
                          <span className="text-[9px] font-mono text-slate-500 bg-white/5 p-2 rounded-xl border border-white/5 truncate">{item.id}</span>
                       </div>
                    </div>
                 </div>
                 <div className="space-y-5">
-                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2 mb-2 leading-none"><FileText className="w-4 h-4 text-emerald-500" />Blueprint</p>
+                   <p className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.3em] flex items-center gap-2 mb-2 leading-none"><FileText className="w-4 h-4 text-emerald-500" />Blueprint</p>
                    <div className="space-y-4">
                       <div className="flex flex-col">
-                         <span className="text-[8px] text-slate-600 uppercase font-black tracking-widest mb-1.5 leading-none">Dimensions</span>
+                         <span className="text-[8px] text-slate-500 uppercase font-black tracking-widest mb-1.5 leading-none">Dimensions</span>
                          <span className="text-sm text-emerald-400 font-bold font-mono">{item.dimensions || 'NOT QUANTIFIED'}</span>
                       </div>
                       <div className="flex flex-col">
-                         <span className="text-[8px] text-slate-600 uppercase font-black tracking-widest mb-1.5 leading-none">Manufacturing</span>
+                         <span className="text-[8px] text-slate-500 uppercase font-black tracking-widest mb-1.5 leading-none">Manufacturing</span>
                          <span className="text-sm text-slate-200 font-bold uppercase tracking-widest">{item.origin || 'GLOBAL STAND'}</span>
                       </div>
                    </div>
                 </div>
                 <div className="space-y-5">
-                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2 mb-2 leading-none"><Sparkles className="w-4 h-4 text-purple-500" />Operations</p>
+                   <p className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.3em] flex items-center gap-2 mb-2 leading-none"><Sparkles className="w-4 h-4 text-purple-500" />Operations</p>
                    <div className="space-y-4">
                       <div className="flex flex-col">
-                         <span className="text-[8px] text-slate-600 uppercase font-black tracking-widest mb-1.5 leading-none">Lifecycle State</span>
+                         <span className="text-[8px] text-slate-500 uppercase font-black tracking-widest mb-1.5 leading-none">Lifecycle State</span>
                          <span className="text-sm text-purple-400 font-bold uppercase drop-shadow-sm">{item.logistics || 'OPERATIONAL'}</span>
                       </div>
                       <div className="flex gap-3 pt-6">
@@ -273,6 +399,6 @@ export const InventoryListItem = React.memo(({
       </AnimatePresence>
     </motion.div>
   );
-});
+}));
 
 InventoryListItem.displayName = 'InventoryListItem';
